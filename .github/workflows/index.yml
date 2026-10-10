@@ -1,0 +1,26 @@
+# Rebuilds dist/ and index.json after changes to plugins/ or common/ and commits them.
+name: Repository index
+
+on:
+  push:
+    branches: [main]
+    paths: ["plugins/**", "common/**", "repo.json", "tools/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build archives and index.json
+        run: python3 tools/oa-repo-index
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dist index.json
+          git diff --cached --quiet || git commit -m "Update repository index"
+          git push

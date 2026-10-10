@@ -1,0 +1,28 @@
+{
+  "name": "Beispiel (vcan0-Demo)",
+  "description": "Demo-Profil zum Testen mit vcan0 und cansend, siehe README. Für ein echtes Auto ein eigenes Profil mit dessen CAN-IDs anlegen.",
+  "signals": [
+    {"id": "0x100", "topic": "vehicle.speed", "field": "kmh", "byte": 0, "length": 16, "endian": "big", "scale": 0.01},
+    {"id": "0x100", "topic": "vehicle.engine", "field": "rpm", "byte": 2, "length": 16, "endian": "big"},
+    {"id": "0x200", "topic": "vehicle.gear", "field": "reverse", "byte": 0, "bit": 0, "length": 1},
+    {"id": "0x200", "topic": "vehicle.lights", "field": "headlights", "byte": 0, "bit": 1, "length": 1},
+    {"id": "0x200", "topic": "vehicle.climate", "field": "outsideTemp", "byte": 1, "length": 8, "signed": true, "scale": 0.5}
+  ],
+  "buttons": [
+    {"id": "0x300", "byte": 0, "mask": "0x01", "action": "volume.up"},
+    {"id": "0x300", "byte": 0, "mask": "0x02", "action": "volume.down"},
+    {"id": "0x300", "byte": 0, "mask": "0x04", "action": "media.next"},
+    {"id": "0x300", "byte": 0, "mask": "0x08", "action": "media.previous"},
+    {"id": "0x300", "byte": 0, "mask": "0x10", "action": "voice"},
+    {"id": "0x300", "byte": 0, "mask": "0x20", "action": "call.answer"},
+    {"id": "0x300", "byte": 0, "mask": "0x40", "action": "call.end"},
+    {"id": "0x300", "byte": 0, "mask": "0x80", "action": "media.play_pause"}
+  ],
+  "triggers": [
+    {"topic": "vehicle.gear", "field": "reverse", "equals": true,
+     "then": {"action": "camera.show"}, "else": {"action": "camera.hide"}},
+    {"topic": "vehicle.lights", "field": "headlights", "equals": true,
+     "then": {"method": "daynight.set", "params": {"night": true}},
+     "else": {"method": "daynight.set", "params": {"night": false}}}
+  ]
+}

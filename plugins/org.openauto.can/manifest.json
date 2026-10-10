@@ -1,0 +1,12 @@
+{
+  "id": "org.openauto.can",
+  "name": "CAN-Bus",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Fahrzeugdaten (Geschwindigkeit, Gang, Licht …) und Lenkradtasten vom CAN-Bus über SocketCAN. Fahrzeugprofile beschreiben die CAN-IDs.",
+  "arch": ["all"],
+  "ui": {"page": "qml/Main.qml", "icon": "icon.svg"},
+  "process": {"exec": "bin/can.py", "restart": "on-failure"},
+  "permissions": ["can", "input"],
+  "shared": ["oa.py"]
+}
