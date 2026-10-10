@@ -1,11 +1,11 @@
 {
-  "name": "OpenAuto Plugins",
-  "description": "Offizielle Plugins für OpenAuto: CAN-Bus, Lenkradtasten, Rückfahrkamera, FM/AM-Radio",
+  "name": "OpenHU Plugins",
+  "description": "Offizielle Plugins für OpenHU: CAN-Bus, Lenkradtasten, Rückfahrkamera, FM/AM-Radio",
   "maintainer": "average-web-dev",
   "api": 1,
   "plugins": [
     {
-      "id": "org.openauto.camera",
+      "id": "org.openhu.camera",
       "name": "Rückfahrkamera",
       "version": "1.0.0",
       "description": "Kamerabild mit Hilfslinien im Inhaltsbereich oder als Vollbild, automatisch beim Rückwärtsgang (CAN-Plugin) oder per Aktion camera.show / camera.hide / camera.toggle.",
@@ -15,12 +15,12 @@
       "permissions": [
         "camera"
       ],
-      "archive": "dist/org.openauto.camera-1.0.0.tar.gz",
-      "sha256": "1e0311046cda7236d9b888850e596f30d7dfeb1e4849b57079878dc7533a1c44",
-      "size": 5982
+      "archive": "dist/org.openhu.camera-1.0.0.tar.gz",
+      "sha256": "c7bc02dd9b34fcda49cdf23fc2b436ac8e9feb3ed29ed8b87bb58a2cd2f88f23",
+      "size": 5993
     },
     {
-      "id": "org.openauto.can",
+      "id": "org.openhu.can",
       "name": "CAN-Bus",
       "version": "1.0.0",
       "description": "Fahrzeugdaten (Geschwindigkeit, Gang, Licht …) und Lenkradtasten vom CAN-Bus über SocketCAN. Fahrzeugprofile beschreiben die CAN-IDs.",
@@ -31,12 +31,12 @@
         "can",
         "input"
       ],
-      "archive": "dist/org.openauto.can-1.0.0.tar.gz",
-      "sha256": "fc23cfda9bbcc9fba813fea1179a30737c062ee97803dffda116ca0f1bd56ad6",
-      "size": 8835
+      "archive": "dist/org.openhu.can-1.0.0.tar.gz",
+      "sha256": "c02283696e8f3b16baa421696308f0c83bb6d7c77dfe3c2873ad0f9975176da2",
+      "size": 8845
     },
     {
-      "id": "org.openauto.radio",
+      "id": "org.openhu.radio",
       "name": "Radio",
       "version": "1.0.0",
       "description": "FM/AM-Radio mit einem RTL-SDR-USB-Stick: Sendersuche, Favoriten und RDS (Sendername, Radiotext; RDS braucht redsea).",
@@ -47,24 +47,24 @@
         "audio",
         "usb"
       ],
-      "archive": "dist/org.openauto.radio-1.0.0.tar.gz",
-      "sha256": "5805cbd4a7113afc3ebf95746ae62d80435e4c2e6ced75a69a8f51698de5381f",
-      "size": 8270
+      "archive": "dist/org.openhu.radio-1.0.0.tar.gz",
+      "sha256": "2ebbfa0747c573e586a974cfbcccadb0351632f407b3add65bd10bb6030e18bd",
+      "size": 8285
     },
     {
-      "id": "org.openauto.swc",
+      "id": "org.openhu.swc",
       "name": "Lenkradtasten",
       "version": "1.0.0",
-      "description": "Tasten von Eingabegeräten (USB-Lenkradadapter, IR-Fernbedienungen, Multimedia-Tastaturen) als OpenAuto-Aktionen, mit Anlern-Modus.",
+      "description": "Tasten von Eingabegeräten (USB-Lenkradadapter, IR-Fernbedienungen, Multimedia-Tastaturen) als OpenHU-Aktionen, mit Anlern-Modus.",
       "arch": [
         "all"
       ],
       "permissions": [
         "input"
       ],
-      "archive": "dist/org.openauto.swc-1.0.0.tar.gz",
-      "sha256": "66556875a76b683373d77241ab29ceb79add759d96f584207281eabc443c375d",
-      "size": 6783
+      "archive": "dist/org.openhu.swc-1.0.0.tar.gz",
+      "sha256": "049f7d8427b3157847038bea63f82e66fbceff8ed5ac0e9415854fa850002ce6",
+      "size": 6794
     }
   ]
 }

@@ -1,5 +1,5 @@
 {
-  "name": "OpenAuto Plugins",
-  "description": "Offizielle Plugins für OpenAuto: CAN-Bus, Lenkradtasten, Rückfahrkamera, FM/AM-Radio",
+  "name": "OpenHU Plugins",
+  "description": "Offizielle Plugins für OpenHU: CAN-Bus, Lenkradtasten, Rückfahrkamera, FM/AM-Radio",
   "maintainer": "average-web-dev"
 }

@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""Builds an OpenHU plugin repository: dist/<id>-<version>.tar.gz and index.json.
+
+    tools/openhu-repo-index [repository]      (default: current directory)
+
+Layout:
+    repo.json                   {"name": ..., "description": ..., "maintainer": ...}
+    plugins/<id>/manifest.json  one folder per plugin
+    common/                     shared files, copied into a plugin's lib/ when listed in its
+                                manifest ("shared": ["openhu.py"])
+
+Archives are reproducible (sorted entries, fixed timestamps and owners), so unchanged plugins keep
+their checksum. Run it after every change and commit dist/ and index.json; OpenHU installs the
+archives and verifies the sha256 from index.json.
+"""
+
+import gzip
+import hashlib
+import io
+import json
+import os
+import re
+import sys
+import tarfile
+
+ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+VERSION_PATTERN = re.compile(r"^\d+(\.\d+)*$")
+REQUIRED = ("id", "name", "version")
+
+
+def fail(message):
+    print("error: " + message, file=sys.stderr)
+    sys.exit(1)
+
+
+def add_file(tar, path, arcname):
+    info = tar.gettarinfo(path, arcname)
+    info.mtime = 0
+    info.uid = info.gid = 0
+    info.uname = info.gname = ""
+    info.mode = 0o755 if os.access(path, os.X_OK) else 0o644
+    with open(path, "rb") as file:
+        tar.addfile(info, file)
+
+
+def build_archive(repo, plugin_dir, manifest):
+    plugin_id = manifest["id"]
+    files = []
+    for root, dirs, names in os.walk(plugin_dir):
+        dirs[:] = sorted(d for d in dirs if d not in ("__pycache__", ".git", "tests"))
+        for name in sorted(names):
+            if name.endswith(".pyc"):
+                continue
+            path = os.path.join(root, name)
+            files.append((path, plugin_id + "/" + os.path.relpath(path, plugin_dir)))
+    for shared in manifest.get("shared", []):
+        path = os.path.join(repo, "common", shared)
+        if not os.path.isfile(path):
+            fail("%s: shared file common/%s not found" % (plugin_id, shared))
+        files.append((path, plugin_id + "/lib/" + shared))
+
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w", format=tarfile.PAX_FORMAT) as tar:
+        for path, arcname in sorted(files, key=lambda entry: entry[1]):
+            add_file(tar, path, arcname)
+
+    compressed = io.BytesIO()
+    with gzip.GzipFile(fileobj=compressed, mode="wb", mtime=0, filename="") as gz:
+        gz.write(raw.getvalue())
+    return compressed.getvalue()
+
+
+def main():
+    repo = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else ".")
+    try:
+        with open(os.path.join(repo, "repo.json")) as file:
+            info = json.load(file)
+    except (OSError, ValueError) as error:
+        fail("repo.json: %s" % error)
+
+    plugins_dir = os.path.join(repo, "plugins")
+    dist_dir = os.path.join(repo, "dist")
+    os.makedirs(dist_dir, exist_ok=True)
+
+    entries = []
+    archives = set()
+    for folder in sorted(os.listdir(plugins_dir)):
+        plugin_dir = os.path.join(plugins_dir, folder)
+        manifest_path = os.path.join(plugin_dir, "manifest.json")
+        if not os.path.isfile(manifest_path):
+            continue
+        with open(manifest_path) as file:
+            manifest = json.load(file)
+
+        missing = [key for key in REQUIRED if not manifest.get(key)]
+        if missing:
+            fail("%s: missing %s" % (manifest_path, ", ".join(missing)))
+        if manifest["id"] != folder or not ID_PATTERN.match(folder):
+            fail("%s: id must match the folder name" % manifest_path)
+        if not VERSION_PATTERN.match(manifest["version"]):
+            fail("%s: version must look like 1.2.3" % manifest_path)
+
+        data = build_archive(repo, plugin_dir, manifest)
+        archive = "dist/%s-%s.tar.gz" % (manifest["id"], manifest["version"])
+        archives.add(os.path.basename(archive))
+        with open(os.path.join(repo, archive), "wb") as file:
+            file.write(data)
+
+        entries.append({
+            "id": manifest["id"],
+            "name": manifest["name"],
+            "version": manifest["version"],
+            "description": manifest.get("description", ""),
+            "arch": manifest.get("arch", ["all"]),
+            "permissions": manifest.get("permissions", []),
+            "archive": archive,
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "size": len(data),
+        })
+        print("%-28s %-8s %s" % (manifest["id"], manifest["version"], archive))
+
+    for name in os.listdir(dist_dir):
+        if name.endswith(".tar.gz") and name not in archives:
+            os.remove(os.path.join(dist_dir, name))
+            print("removed dist/" + name)
+
+    index = {
+        "name": info.get("name", os.path.basename(repo)),
+        "description": info.get("description", ""),
+        "maintainer": info.get("maintainer", ""),
+        "api": 1,
+        "plugins": entries,
+    }
+    with open(os.path.join(repo, "index.json"), "w") as file:
+        json.dump(index, file, indent=2, ensure_ascii=False)
+        file.write("\n")
+    print("index.json: %d plugins" % len(entries))
+
+
+if __name__ == "__main__":
+    main()

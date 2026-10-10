@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build archives and index.json
-        run: python3 tools/oa-repo-index
+        run: python3 tools/openhu-repo-index
       - name: Commit
         run: |
           git config user.name "github-actions[bot]"
