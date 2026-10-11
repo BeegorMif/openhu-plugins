@@ -26,6 +26,8 @@ import tarfile
 ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 VERSION_PATTERN = re.compile(r"^\d+(\.\d+)*$")
 REQUIRED = ("id", "name", "version")
+# Plugin API of the OpenHU this repository is made for (2 = Qt 6)
+API = 2
 
 
 def fail(message):
@@ -112,6 +114,8 @@ def main():
             "version": manifest["version"],
             "description": manifest.get("description", ""),
             "arch": manifest.get("arch", ["all"]),
+            # plugin API (OpenHU only installs plugins made for its version), 1 = Qt 5 era
+            "api": manifest.get("api", 1),
             "permissions": manifest.get("permissions", []),
             "archive": archive,
             "sha256": hashlib.sha256(data).hexdigest(),
@@ -128,7 +132,7 @@ def main():
         "name": info.get("name", os.path.basename(repo)),
         "description": info.get("description", ""),
         "maintainer": info.get("maintainer", ""),
-        "api": 1,
+        "api": API,
         "plugins": entries,
     }
     with open(os.path.join(repo, "index.json"), "w") as file:

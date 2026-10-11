@@ -1,4 +1,4 @@
-import QtQuick 2.15
+import QtQuick
 import OpenHU 1.0
 
 // Full screen camera above the shell and Android Auto.

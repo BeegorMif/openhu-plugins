@@ -1,6 +1,6 @@
-import QtQuick 2.15
-import QtQuick.Controls 2.15
-import QtQuick.Layouts 1.15
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
 import OpenHU 1.0
 
 // CAN bus: interface, vehicle profile, live vehicle values and a frame monitor.
@@ -49,8 +49,8 @@ Item {
             spacing: Theme.spacing
 
             Rectangle {
-                width: Theme.spacing * 0.7
-                height: width
+                Layout.preferredWidth: Theme.spacing * 0.7
+                Layout.preferredHeight: Theme.spacing * 0.7
                 radius: width / 2
                 color: canState.data.connected ? Theme.success : "#ff8a80"
             }

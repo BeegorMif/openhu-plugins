@@ -1,8 +1,8 @@
 {
   "id": "org.openhu.radio",
   "name": "Radio",
-  "version": "1.0.0",
-  "api": 1,
+  "version": "2.0.0",
+  "api": 2,
   "description": "FM/AM-Radio mit einem RTL-SDR-USB-Stick: Sendersuche, Favoriten und RDS (Sendername, Radiotext; RDS braucht redsea).",
   "arch": ["all"],
   "ui": {"page": "qml/Main.qml", "icon": "icon.svg", "dock": true},

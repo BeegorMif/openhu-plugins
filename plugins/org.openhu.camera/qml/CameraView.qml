@@ -1,5 +1,5 @@
-import QtQuick 2.15
-import QtMultimedia 5.15
+import QtQuick
+import QtMultimedia
 import OpenHU 1.0
 
 // Camera picture with optional mirroring and parking guide lines (used by the overlay and the page).
@@ -10,15 +10,35 @@ Rectangle {
 
     property var config: ({})
 
-    Camera {
-        id: camera
-        deviceId: view.config.device || ""
-        captureMode: Camera.CaptureViewfinder
+    // Device id as text ("/dev/video0"); QCameraDevice.id is a byte array in QML
+    function deviceId(device) {
+        var bytes = new Uint8Array(device.id)
+        var text = ""
+        for (var i = 0; i < bytes.length; ++i)
+            text += String.fromCharCode(bytes[i])
+        return text
+    }
+
+    MediaDevices { id: devices }
+
+    CaptureSession {
+        camera: Camera {
+            id: camera
+            active: true
+            cameraDevice: {
+                var inputs = devices.videoInputs
+                for (var i = 0; i < inputs.length; ++i)
+                    if (view.deviceId(inputs[i]) === view.config.device)
+                        return inputs[i]
+                return devices.defaultVideoInput
+            }
+        }
+        videoOutput: output
     }
 
     VideoOutput {
+        id: output
         anchors.fill: parent
-        source: camera
         fillMode: VideoOutput.PreserveAspectCrop
         transform: Scale {
             origin.x: view.width / 2
@@ -55,8 +75,8 @@ Rectangle {
 
     Text {
         anchors.centerIn: parent
-        visible: camera.cameraStatus !== Camera.ActiveStatus
-        text: camera.errorString || "Kamera wird gestartet …"
+        visible: !camera.active || camera.error !== Camera.NoError || devices.videoInputs.length === 0
+        text: devices.videoInputs.length === 0 ? "Keine Kamera gefunden" : (camera.errorString || "Kamera wird gestartet …")
         color: Theme.textDim
         font.pixelSize: Theme.fontNormal
     }

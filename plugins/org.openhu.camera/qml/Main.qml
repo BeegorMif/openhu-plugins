@@ -1,7 +1,7 @@
-import QtQuick 2.15
-import QtQuick.Controls 2.15
-import QtQuick.Layouts 1.15
-import QtMultimedia 5.15
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import QtMultimedia
 import OpenHU 1.0
 
 // Reverse camera page: camera picture, settings behind the gear button.
@@ -28,6 +28,17 @@ Item {
             if (list[i].id === pluginId)
                 return list[i].dock
         return false
+    }
+
+    MediaDevices { id: devices }
+
+    // Device id as text ("/dev/video0"), stored in the plugin config; QCameraDevice.id is a byte array in QML
+    function deviceId(device) {
+        var bytes = new Uint8Array(device.id)
+        var text = ""
+        for (var i = 0; i < bytes.length; ++i)
+            text += String.fromCharCode(bytes[i])
+        return text
     }
 
     function set(key, value) {
@@ -96,16 +107,16 @@ Item {
                 }
                 ComboBox {
                     Layout.fillWidth: true
-                    textRole: "displayName"
-                    model: QtMultimedia.availableCameras
+                    textRole: "description"
+                    model: devices.videoInputs
                     currentIndex: {
-                        var cameras = QtMultimedia.availableCameras
+                        var cameras = devices.videoInputs
                         for (var i = 0; i < cameras.length; ++i)
-                            if (cameras[i].deviceId === cameraConfig.data.device)
+                            if (page.deviceId(cameras[i]) === cameraConfig.data.device)
                                 return i
                         return 0
                     }
-                    onActivated: page.set("device", QtMultimedia.availableCameras[index].deviceId)
+                    onActivated: index => page.set("device", page.deviceId(devices.videoInputs[index]))
                 }
 
                 Text {
