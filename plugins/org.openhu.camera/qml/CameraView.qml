@@ -25,6 +25,8 @@ Rectangle {
         camera: Camera {
             id: camera
             active: true
+            // The device can still be busy for a moment (previous page, other program): try again
+            onErrorOccurred: if (retry.attempts < 5) retry.start()
             cameraDevice: {
                 var inputs = devices.videoInputs
                 for (var i = 0; i < inputs.length; ++i)
@@ -34,6 +36,17 @@ Rectangle {
             }
         }
         videoOutput: output
+    }
+
+    Timer {
+        id: retry
+        property int attempts: 0
+        interval: 1000
+        onTriggered: {
+            attempts++
+            camera.active = false
+            camera.active = true
+        }
     }
 
     VideoOutput {

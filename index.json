@@ -7,7 +7,7 @@
     {
       "id": "org.openhu.camera",
       "name": "Rückfahrkamera",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "description": "Kamerabild mit Hilfslinien im Inhaltsbereich oder als Vollbild, automatisch beim Rückwärtsgang (CAN-Plugin) oder per Aktion camera.show / camera.hide / camera.toggle.",
       "arch": [
         "all"
@@ -16,9 +16,9 @@
       "permissions": [
         "camera"
       ],
-      "archive": "dist/org.openhu.camera-2.0.0.tar.gz",
-      "sha256": "d33611f342d2df12939aa6a2190f44b120f69cb89e297f6ea51f0665d5f5e4d3",
-      "size": 6243
+      "archive": "dist/org.openhu.camera-2.0.1.tar.gz",
+      "sha256": "3b625501991da136be0997071529ac65e09aea9186da6d221e737472b742f374",
+      "size": 6381
     },
     {
       "id": "org.openhu.can",
