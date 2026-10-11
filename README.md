@@ -1,6 +1,7 @@
 # OpenHU Plugins
 
-Plugin-Repository für [OpenHU](https://github.com/average-web-dev/openhu) – im Store als Quelle eintragen:
+Plugin-Repository für [OpenHU](https://github.com/average-web-dev/openhu), im Store bereits als offizielle Quelle
+eingetragen:
 
 ```
 github average-web-dev/openhu-plugins main
@@ -30,9 +31,12 @@ Für ein neues Release die `version` im Manifest erhöhen, dann bietet der Store
 ## Eigenes Repository
 
 Dieses Repository forken oder ein leeres mit gleichem Aufbau anlegen, Plugins unter `plugins/` ablegen,
-`tools/openhu-repo-index` ausführen, pushen und in OpenHU unter Apps → Store → Quellen
+`tools/openhu-repo-index` ausführen, pushen und in OpenHU unter **Einstellungen → Apps & Store → Quellen**
 `github <benutzer>/<repo>` eintragen. Zum lokalen Entwickeln: Repo neben das OpenHU-Repository legen,
-`./run.sh` hängt es als `/opt/openhu-plugins` ein → Quelle `file /opt/openhu-plugins`.
+`docker/run.sh` (im OpenHU-Repo) hängt es als `/opt/openhu-plugins` ein → Quelle `file /opt/openhu-plugins`.
+
+Plugin-Format, QML-Modul und ein vollständiges Beispiel: [openhu/docs/plugins.md](https://github.com/average-web-dev/openhu/blob/main/docs/plugins.md),
+API: [openhu/docs/api.md](https://github.com/average-web-dev/openhu/blob/main/docs/api.md).
 
 ## Tests
 
@@ -41,3 +45,10 @@ python3 -m unittest discover -s plugins/org.openhu.can/tests
 python3 -m unittest discover -s plugins/org.openhu.swc/tests
 python3 -m unittest discover -s plugins/org.openhu.radio/tests
 ```
+
+## Hinweis
+
+> [!CAUTION]
+> Die Plugins wurden größtenteils von einer KI (Anthropic Claude) geschrieben und nur stichprobenartig getestet
+> (Kamera mit einer Webcam, CAN und Radio mit Unit-Tests, nicht im Fahrzeug). Nutzung auf eigene Gefahr, keine
+> Gewährleistung. Nicht während der Fahrt bedienen.
