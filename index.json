@@ -17,8 +17,8 @@
         "camera"
       ],
       "archive": "dist/org.openhu.camera-2.0.1.tar.gz",
-      "sha256": "3b625501991da136be0997071529ac65e09aea9186da6d221e737472b742f374",
-      "size": 6381
+      "sha256": "022404673939d8e6c84c3c92ff8a31d04fc4079ded29f9cba1d679fd490cc2bf",
+      "size": 6591
     },
     {
       "id": "org.openhu.can",
@@ -34,8 +34,8 @@
         "input"
       ],
       "archive": "dist/org.openhu.can-2.0.0.tar.gz",
-      "sha256": "246fdacad216a51d57e01f7a882748191079d851c891c1d0ec24566e56aafa99",
-      "size": 8836
+      "sha256": "b81b6df2b8145bbc879224ae088af8f9a644d446e20410096e00af82fab488c3",
+      "size": 9045
     },
     {
       "id": "org.openhu.radio",
@@ -51,8 +51,8 @@
         "usb"
       ],
       "archive": "dist/org.openhu.radio-2.0.0.tar.gz",
-      "sha256": "53edcc78b039ce6509876a43e7edbb288a4dc793b9c80f21e577ddfb86a51f13",
-      "size": 8279
+      "sha256": "496e9eae8ad3a86df6c1ba82a0071659ab4c76c9407b559782e1fafca6719b30",
+      "size": 8483
     },
     {
       "id": "org.openhu.swc",
@@ -67,8 +67,8 @@
         "input"
       ],
       "archive": "dist/org.openhu.swc-2.0.0.tar.gz",
-      "sha256": "42cd75510d4ca117a9f965da264cfb2050ba74bb0337ca3a53b9b194bb3bb547",
-      "size": 6788
+      "sha256": "754cb1f04adadd7789cc2035677fd6ca8b59efde9827eebf2ce890d893b365f4",
+      "size": 6993
     }
   ]
 }
