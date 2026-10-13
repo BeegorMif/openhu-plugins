@@ -35,6 +35,11 @@ Dieses Repository forken oder ein leeres mit gleichem Aufbau anlegen, Plugins un
 `github <benutzer>/<repo>` eintragen. Zum lokalen Entwickeln: Repo neben das OpenHU-Repository legen,
 `docker/run.sh` (im OpenHU-Repo) hängt es als `/opt/openhu-plugins` ein → Quelle `file /opt/openhu-plugins`.
 
+Ein Plugin-Prozess kann zum Entwickeln auch auf dem eigenen Rechner laufen und mit einer Head-Unit im Netzwerk
+sprechen: `PYTHONPATH=common OPENHU_API_URL=ws://<head-unit>:5520 OPENHU_API_TOKEN=<token> python3 plugins/<id>/bin/<name>.py` (Token unter
+**Einstellungen → Netzwerk → API-Token**, die API muss dort im Netzwerk freigegeben sein). Auf der Head-Unit selbst
+brauchen Plugins keinen Token.
+
 Plugin-Format, QML-Modul und ein vollständiges Beispiel: [openhu/docs/plugins.md](https://github.com/average-web-dev/openhu/blob/main/docs/plugins.md),
 API: [openhu/docs/api.md](https://github.com/average-web-dev/openhu/blob/main/docs/api.md).
 

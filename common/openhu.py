@@ -9,6 +9,8 @@
     await api.run(on_connect)                          # connects and reconnects forever
 
 Environment (set by OpenHU): OPENHU_API_URL, OPENHU_PLUGIN_ID, OPENHU_PLUGIN_DIR, OPENHU_DATA_DIR.
+OPENHU_API_TOKEN (optional, not set by OpenHU): API token, only needed from another computer, e.g. while developing
+a plugin against a head unit (OPENHU_API_URL=ws://<head unit>:5520). On the head unit itself no token is needed.
 """
 
 import asyncio
@@ -59,8 +61,9 @@ def save_config(config):
 
 
 class OpenHU:
-    def __init__(self, url=None):
+    def __init__(self, url=None, token=None):
         self.url = url or os.environ.get("OPENHU_API_URL", "ws://127.0.0.1:5520")
+        self.token = token or os.environ.get("OPENHU_API_TOKEN")
         self._ws = None
         self._next_id = 0
         self._pending = {}
@@ -112,6 +115,9 @@ class OpenHU:
                 async with websockets.connect(self.url, max_size=None) as ws:
                     self._ws = ws
                     log.info("connected to %s", self.url)
+                    # answered with {"type":"auth"}; messages are handled in order, so no need to wait for it
+                    if self.token:
+                        await ws.send(json.dumps({"type": "auth", "token": self.token}))
                     topics = sorted({pattern for pattern, _ in self._handlers})
                     if topics:
                         await ws.send(json.dumps({"type": "subscribe", "topics": topics}))
@@ -140,6 +146,8 @@ class OpenHU:
             for pattern, callback in self._handlers:
                 if matches(pattern, topic):
                     asyncio.create_task(self._call(callback, topic, data))
+        elif kind == "error":
+            log.warning("API: %s", message.get("error"))
 
     @staticmethod
     async def _call(callback, *args):
