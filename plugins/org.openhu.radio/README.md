@@ -4,6 +4,8 @@ FM/AM-Radio mit einem RTL-SDR-USB-Stick: `rtl_fm` → `pacat`, RDS über `redsea
 `rtl_power`. Pakete auf der Head-Unit: `rtl-sdr`, `pulseaudio-utils`, für RDS zusätzlich `redsea` und `sox`.
 
 Status `radio.state`, Befehle `radio.command` und Konfiguration: siehe Kopf von [`bin/radio.py`](bin/radio.py).
+`radio.state.bands` enthält beide Bänder mit Sendern, Favoriten und den RDS-Namen, die sich das Plugin pro Frequenz
+merkt (für Android Auto, openhu#75).
 
 ## Simulierter Stick (Test ohne Hardware)
 

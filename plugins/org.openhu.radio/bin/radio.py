@@ -2,7 +2,8 @@
 """FM/AM radio with an RTL-SDR stick: rtl_fm -> pacat, optional RDS via redsea, station scan via rtl_power.
 
 State: "radio.state" {band, frequency, unit, playing, scanning, rds: {ps, rt}, presets, stations, error, rdsAvailable,
-          simulated}
+          simulated, bands: {fm|am: {min, max, step, unit, stations, presets, names: {"96.2": "NDR 2"}}}}
+          (presets/stations: current band; bands: both, with the RDS names remembered per frequency)
 Commands: bus.emit "radio.command" {cmd: "play"|"stop"|"toggle"|"tune"|"step"|"band"|"preset"|"savePreset"|
           "removePreset"|"scan"|"fakeSdr", value}
 Actions: radio.toggle, radio.next, radio.previous (e.g. for steering wheel buttons)
@@ -33,6 +34,7 @@ DEFAULTS = {
     "frequency": {"fm": 101.3, "am": 1008},
     "presets": {"fm": [], "am": []},
     "stations": {"fm": [], "am": []},
+    "names": {"fm": {}, "am": {}},
     "gain": "auto",
     "ppm": 0,
     "amOptions": ["-E", "direct2"],
@@ -150,6 +152,9 @@ class RadioPlugin:
             update = radiolib.parse_redsea(line.decode(errors="replace"))
             if update and any(self.rds.get(key) != value for key, value in update.items()):
                 self.rds.update(update)
+                if self.playing and radiolib.remember_name(self.config.setdefault("names", {}), self.band,
+                                                           self.frequency, update.get("ps")):
+                    save_config(self.config)
                 await self.publish_state()
 
     async def watch(self, rtl):
@@ -311,6 +316,7 @@ class RadioPlugin:
             stations=self.config["stations"].get(self.band, []),
             error=self.error,
             simulated=self.simulated(),
+            bands=radiolib.band_summary(self.config),
         ))
 
 

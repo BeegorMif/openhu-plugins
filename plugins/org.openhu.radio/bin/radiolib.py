@@ -59,6 +59,41 @@ def pacat_command(rate):
             "--client-name=OpenHU", "--stream-name=Radio"]
 
 
+def frequency_key(band, frequency):
+    """Key of a frequency in the remembered station names: "96.2" (FM) / "1008" (AM)."""
+    return "%.1f" % frequency if band == "fm" else "%d" % round(frequency)
+
+
+def remember_name(names, band, frequency, ps):
+    """Stores the RDS name of a frequency in names ({band: {key: name}}); True if it changed."""
+    ps = (ps or "").strip()
+    if not ps:
+        return False
+    band_names = names.setdefault(band, {})
+    key = frequency_key(band, frequency)
+    if band_names.get(key) == ps:
+        return False
+    band_names[key] = ps
+    return True
+
+
+def band_summary(config):
+    """Both bands for radio.state "bands": range, stations, presets and remembered names (e.g. for Android Auto,
+    which lists the stations of all bands)."""
+    result = {}
+    for band, spec in BANDS.items():
+        result[band] = {
+            "min": spec["min"],
+            "max": spec["max"],
+            "step": spec["step"],
+            "unit": spec["unit"],
+            "stations": config.get("stations", {}).get(band, []),
+            "presets": config.get("presets", {}).get(band, []),
+            "names": config.get("names", {}).get(band, {}),
+        }
+    return result
+
+
 def parse_rtl_power(lines, threshold_db=10.0):
     """rtl_power CSV -> frequencies (MHz, 0.1 raster) of stations clearly above the noise floor."""
     bins = {}
