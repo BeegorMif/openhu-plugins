@@ -26,6 +26,9 @@ class RadioLibTest(unittest.TestCase):
         args, _ = radiolib.rtl_fm_command("am", 1008, {}, rds=False)
         self.assertIn("1008k", args)
         self.assertIn("direct2", args)
+        # sox: de-emphasis only at 44.1 kHz, i.e. after the rate conversion
+        sox = radiolib.sox_mpx_to_audio()
+        self.assertLess(sox.index("rate"), sox.index("deemph"))
 
     def test_scan(self):
         noise = ", ".join(["-40"] * 10)

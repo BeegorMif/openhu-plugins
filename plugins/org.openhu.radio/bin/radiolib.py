@@ -47,9 +47,11 @@ def rtl_fm_command(band, frequency, config, rds):
 
 
 def sox_mpx_to_audio():
-    """FM multiplex (171 kHz) -> mono audio 44.1 kHz with 15 kHz low pass and 50 us de-emphasis."""
+    """FM multiplex (171 kHz) -> mono audio 44.1 kHz with 15 kHz low pass and 50 us de-emphasis.
+    deemph only works at 44.1/48 kHz, so the rate conversion has to come before it."""
     return ["sox", "-t", "raw", "-r", "171k", "-e", "signed", "-b", "16", "-c", "1", "-",
-            "-t", "raw", "-r", "44100", "-e", "signed", "-b", "16", "-c", "1", "-", "sinc", "-15k", "deemph"]
+            "-t", "raw", "-r", "44100", "-e", "signed", "-b", "16", "-c", "1", "-",
+            "sinc", "-15k", "rate", "44100", "deemph"]
 
 
 def pacat_command(rate):
