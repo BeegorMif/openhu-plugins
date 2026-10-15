@@ -1,0 +1,204 @@
+#!/usr/bin/env python3
+"""Simulated rtl_fm (see fakesdr.py): plays the station configured for the tuned frequency as raw s16le mono on
+stdout, at the rate the real rtl_fm would use. Stream/file via ffmpeg, tone stations without it, quiet noise
+between stations and while a stream (re)connects. Runs until it is terminated, like the real one."""
+
+import os
+import queue
+import shutil
+import signal
+import subprocess
+import sys
+import threading
+import time
+import urllib.request
+
+import fakesdr
+
+CHUNK_SECONDS = 0.05
+STALL_SECONDS = 1.5  # no stream data for this long: noise until it comes back
+RETRY_SECONDS = 3
+USER_AGENT = "OpenHU-fake-sdr/1.0"
+
+
+class StreamSource(threading.Thread):
+    """Decodes the station's url with ffmpeg in the background and puts the PCM chunks into a queue."""
+
+    def __init__(self, station, rate, band, rds, on_title):
+        super().__init__(daemon=True)
+        self.url = station["url"]
+        self.rate, self.band, self.rds = rate, band, rds
+        self.on_title = on_title
+        self.chunks = queue.Queue()
+        self.process = None
+        self.stopped = False
+
+    def log(self, message):
+        print("fake rtl_fm: " + message, file=sys.stderr, flush=True)
+
+    def run(self):
+        while not self.stopped:
+            try:
+                self.play_once()
+            except Exception as error:  # network errors, ffmpeg gone, ...
+                self.log("%s: %s" % (self.url, error))
+            if not self.stopped:
+                time.sleep(RETRY_SECONDS)
+
+    def open_http(self, url):
+        """HTTP stream with ICY metadata, follows m3u/pls playlists -> (response, metaint, url).
+        HLS (m3u8) is left to ffmpeg: (None, 0, url)."""
+        for _ in range(3):
+            if url.lower().split("?")[0].endswith(".m3u8"):
+                return None, 0, url
+            request = urllib.request.Request(url, headers={"Icy-MetaData": "1", "User-Agent": USER_AGENT})
+            response = urllib.request.urlopen(request, timeout=10)
+            kind = (response.headers.get("Content-Type") or "").lower()
+            if "vnd.apple.mpegurl" in kind:
+                response.close()
+                return None, 0, url
+            if "mpegurl" in kind or "scpls" in kind or url.lower().split("?")[0].endswith((".m3u", ".pls")):
+                target = fakesdr.playlist_url(response.read(65536).decode("utf-8", "replace"))
+                response.close()
+                if not target:
+                    raise OSError("empty playlist")
+                url = target
+                continue
+            return response, int(response.headers.get("icy-metaint") or 0), url
+        raise OSError("playlist nesting too deep")
+
+    def play_once(self):
+        response, metaint, url = None, 0, self.url
+        if url.startswith(("http://", "https://")):
+            response, metaint, url = self.open_http(url)
+        from_stdin = response is not None
+        args = fakesdr.ffmpeg_command(url, self.rate, self.band, self.rds, from_stdin=from_stdin)
+        self.process = subprocess.Popen(args, stdin=subprocess.PIPE if from_stdin else subprocess.DEVNULL,
+                                        stdout=subprocess.PIPE)
+        if from_stdin:
+            reader = fakesdr.IcyReader(response, metaint, self.on_title) if metaint else response
+            threading.Thread(target=self.feed, args=(reader, response), daemon=True).start()
+        try:
+            while not self.stopped:
+                data = self.process.stdout.read1(16384)
+                if not data:
+                    break
+                self.chunks.put(data)
+        finally:
+            self.close()
+            if response is not None:
+                response.close()
+        if not self.stopped:
+            self.log("stream ended, reconnecting")
+
+    def feed(self, reader, response):
+        """Network -> ffmpeg stdin (without the ICY metadata blocks)."""
+        try:
+            while not self.stopped:
+                data = reader.read(16384)
+                if not data:
+                    break
+                self.process.stdin.write(data)
+        except (OSError, ValueError, AttributeError):
+            pass
+        finally:
+            try:
+                self.process.stdin.close()
+            except (OSError, AttributeError):
+                pass
+
+    def close(self):
+        process, self.process = self.process, None
+        if process and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(3)
+            except subprocess.TimeoutExpired:
+                process.kill()
+
+    def stop(self):
+        self.stopped = True
+        self.close()
+
+
+def main():
+    try:
+        options = fakesdr.parse_rtl_fm_args(sys.argv[1:])
+        stations = fakesdr.load_stations()
+    except (OSError, ValueError) as error:
+        print("fake rtl_fm: %s" % error, file=sys.stderr)
+        return 1
+    if stations["error"]:
+        fakesdr.fail(stations["error"])
+
+    band, rate = options["band"], options["rate"]
+    rds = band == "fm" and options["mode"] == "fm" and rate >= 150000  # multiplex for redsea
+    station = fakesdr.find_station(stations, band, options["frequency"])
+    pid = os.getpid()
+    state = {"pid": pid, "band": band, "frequency": options["frequency"], "station": station, "title": None}
+    fakesdr.write_state(state)
+    print("Found 1 device(s):\n  0:  Simulated, RTL2838UHIDIR (fake-sdr)\nTuned to %s %s, station: %s" % (
+        options["frequency"], "MHz" if band == "fm" else "kHz", station["name"] if station else "-"),
+        file=sys.stderr, flush=True)
+
+    def on_title(title):
+        state["title"] = title
+        fakesdr.write_state(state)
+
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    out = sys.stdout.buffer
+    chunk = int(rate * CHUNK_SECONDS) * 2
+    background = fakesdr.noise(rate)
+    source = None
+    if station and station.get("url"):
+        if shutil.which("ffmpeg"):
+            source = StreamSource(station, rate, band, rds, on_title)
+            source.start()
+        else:
+            print("fake rtl_fm: ffmpeg missing, noise instead of %s" % station["url"], file=sys.stderr, flush=True)
+    elif station and station.get("tone"):
+        background = fakesdr.tone(rate, int(station["tone"]))
+
+    position = 0
+    last_data = 0.0
+    next_time = time.monotonic()
+    try:
+        while True:
+            if source:
+                try:
+                    data = source.chunks.get(timeout=CHUNK_SECONDS)
+                    out.write(data)
+                    out.flush()
+                    last_data = next_time = time.monotonic()
+                    continue
+                except queue.Empty:
+                    if time.monotonic() - last_data < STALL_SECONDS:
+                        continue
+            # tone, noise or a stalled stream: paced to real time
+            now = time.monotonic()
+            if next_time > now:
+                time.sleep(next_time - now)
+            next_time = max(next_time, now - 1) + CHUNK_SECONDS
+            data = background[position:position + chunk]
+            if len(data) < chunk:
+                data += background[:chunk - len(data)]
+            position = (position + chunk) % len(background)
+            out.write(data)
+            out.flush()
+    except (BrokenPipeError, KeyboardInterrupt):
+        pass
+    finally:
+        if source:
+            source.stop()
+        fakesdr.clear_state(pid)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        code = main()
+    except SystemExit as exit_request:  # SIGTERM, errors in fakesdr.fail()
+        code = exit_request.code if isinstance(exit_request.code, int) else 1
+    sys.stderr.flush()
+    # no flush of stdout at exit: with a full pipe (reader gone or paused) it would block forever
+    os._exit(code)

@@ -41,6 +41,13 @@ Item {
                 }
             }
             Item { Layout.fillWidth: true }
+            // Test mode (tools/fake-sdr): internet streams instead of real reception
+            Text {
+                visible: radio.data.simulated === true
+                text: "Simulierter Stick"
+                color: "#ffb74d"
+                font.pixelSize: Theme.fontSmall
+            }
             Text {
                 visible: !radio.data.rdsAvailable && page.fm
                 text: "RDS: redsea nicht installiert"
