@@ -41,7 +41,8 @@ class StreamSource(threading.Thread):
             try:
                 self.play_once()
             except Exception as error:  # network errors, ffmpeg gone, ...
-                self.log("%s: %s" % (self.url, error))
+                if not self.stopped:
+                    self.log("%s: %s" % (self.url, error))
             if not self.stopped:
                 time.sleep(RETRY_SECONDS)
 
@@ -110,11 +111,10 @@ class StreamSource(threading.Thread):
     def close(self):
         process, self.process = self.process, None
         if process and process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(3)
-            except subprocess.TimeoutExpired:
-                process.kill()
+            # Kill right away: ffmpeg blocks writing its output once nobody reads it and would not see SIGTERM (it
+            # took 3 s per station change). Closing the pipes instead would wait for the reader thread's lock.
+            process.kill()
+            process.wait()
 
     def stop(self):
         self.stopped = True
