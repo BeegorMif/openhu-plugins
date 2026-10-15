@@ -30,6 +30,25 @@ class RadioLibTest(unittest.TestCase):
         sox = radiolib.sox_mpx_to_audio()
         self.assertLess(sox.index("rate"), sox.index("deemph"))
 
+    def test_station_names(self):
+        names = {}
+        self.assertTrue(radiolib.remember_name(names, "fm", 96.2, "NDR 2   "))
+        self.assertFalse(radiolib.remember_name(names, "fm", 96.20000001, "NDR 2"))
+        self.assertFalse(radiolib.remember_name(names, "fm", 96.2, "  "))
+        self.assertTrue(radiolib.remember_name(names, "am", 1008, "AM TEST"))
+        self.assertEqual(names, {"fm": {"96.2": "NDR 2"}, "am": {"1008": "AM TEST"}})
+
+    def test_band_summary(self):
+        config = {"stations": {"fm": [96.2, 101.9]}, "presets": {"am": [1008]}, "names": {"fm": {"96.2": "NDR 2"}}}
+        bands = radiolib.band_summary(config)
+        self.assertEqual(set(bands), {"fm", "am"})
+        self.assertEqual(bands["fm"]["stations"], [96.2, 101.9])
+        self.assertEqual(bands["fm"]["names"], {"96.2": "NDR 2"})
+        self.assertEqual(bands["fm"]["unit"], "MHz")
+        self.assertEqual(bands["am"]["presets"], [1008])
+        self.assertEqual(bands["am"]["stations"], [])
+        self.assertEqual((bands["am"]["min"], bands["am"]["max"], bands["am"]["step"]), (531, 1602, 9))
+
     def test_scan(self):
         noise = ", ".join(["-40"] * 10)
         lines = [
