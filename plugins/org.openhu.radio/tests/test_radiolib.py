@@ -60,6 +60,20 @@ class RadioLibTest(unittest.TestCase):
         self.assertEqual((unknown["title"], unknown["artist"]), ("UKW 101,9 MHz", "UKW 101,9 MHz"))
         self.assertEqual(radiolib.media_metadata("am", 1008, {}, {})["album"], "MW 1008 kHz")
 
+    def test_action_commands(self):
+        self.assertEqual(radiolib.action_command("radio.next", False), {"cmd": "seek", "value": 1})
+        self.assertEqual(radiolib.action_command("radio.toggle", False), {"cmd": "toggle"})
+        # media keys only while the radio is the media source
+        self.assertIsNone(radiolib.action_command("media.next", False))
+        self.assertEqual(radiolib.action_command("media.next", True), {"cmd": "seek", "value": 1})
+        self.assertEqual(radiolib.action_command("media.previous", True), {"cmd": "seek", "value": -1})
+        self.assertEqual(radiolib.action_command("media.play_pause", True), {"cmd": "toggle"})
+        self.assertEqual(radiolib.action_command("media.pause", True), {"cmd": "stop"})
+        self.assertIsNone(radiolib.action_command("volume.up", True))
+        # the table itself stays unchanged
+        radiolib.action_command("media.next", True)["value"] = 5
+        self.assertEqual(radiolib.MEDIA_KEY_COMMANDS["media.next"]["value"], 1)
+
     def test_scan(self):
         noise = ", ".join(["-40"] * 10)
         lines = [

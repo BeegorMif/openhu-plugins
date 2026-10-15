@@ -6,7 +6,8 @@ State: "radio.state" {band, frequency, unit, playing, scanning, rds: {ps, rt}, p
           (presets/stations: current band; bands: both, with the RDS names remembered per frequency)
 Commands: bus.emit "radio.command" {cmd: "play"|"stop"|"toggle"|"tune"|"step"|"band"|"preset"|"savePreset"|
           "removePreset"|"scan"|"fakeSdr", value}
-Actions: radio.toggle, radio.next, radio.previous (e.g. for steering wheel buttons)
+Actions: radio.toggle, radio.next, radio.previous (e.g. for steering wheel buttons); media.next/previous (seek),
+          media.play_pause/play/pause while the radio is the current media source
 Media: while playing also media.metadata / media.status with source "radio" (home page, Bluetooth car radio);
           "stopped" only if the radio was the last media source (not when Android Auto music took over)
 Config (plugin data dir): gain ("auto" or dB), ppm, amOptions (rtl_fm arguments for AM, default direct sampling),
@@ -306,11 +307,10 @@ class RadioPlugin:
     async def on_action(self, topic, data):
         if data.get("phase") == "release":
             return
-        action = data.get("action")
-        if action == "radio.toggle":
-            await self.on_command(topic, {"cmd": "toggle"})
-        elif action in ("radio.next", "radio.previous"):
-            await self.on_command(topic, {"cmd": "seek", "value": 1 if action == "radio.next" else -1})
+        # media keys only while the radio is the current media source (also after it was stopped: play resumes)
+        command = radiolib.action_command(data.get("action"), self.media_source == "radio")
+        if command:
+            await self.on_command(topic, command)
 
     async def on_media_status(self, topic, data):
         self.media_source = data.get("source")
