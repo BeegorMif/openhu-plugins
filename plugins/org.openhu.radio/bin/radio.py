@@ -58,7 +58,10 @@ class RadioPlugin:
         self.scanning = False
         self.rds = {}
         self.error = ""
-        self.media_source = None  # source of the last media.status (radio, androidauto, ...)
+        # Source that started last (radio, androidauto, ...): it owns the media keys, also while paused. Only starts
+        # count: after the radio started, the phone still reports "playing" until OpenHU's focus loss arrives (#79).
+        self.media_owner = None
+        self.android_auto_playing = False
         self.media_sent = None
         # Every event runs as its own task: commands that come quickly one after the other (Android Auto sends
         # band, tune and play together) would overtake each other while processes start and stop.
@@ -308,16 +311,26 @@ class RadioPlugin:
         if data.get("phase") == "release":
             return
         # media keys only while the radio is the current media source (also after it was stopped: play resumes)
-        command = radiolib.action_command(data.get("action"), self.media_source == "radio")
+        command = radiolib.action_command(data.get("action"), self.media_owner == "radio")
         if command:
             await self.on_command(topic, command)
 
     async def on_media_status(self, topic, data):
-        self.media_source = data.get("source")
-        # Android Auto starts playing music: radio off
-        if (self.config["pauseForAndroidAuto"] and self.playing and data.get("source") == "androidauto"
-                and data.get("state") == "playing"):
-            log.info("Android Auto media playing, radio stopped")
+        source, playing = data.get("source"), data.get("state") == "playing"
+        if source == "radio":
+            return
+        if source == "androidauto":
+            started = playing and not self.android_auto_playing
+            self.android_auto_playing = playing
+        else:
+            # another local source
+            started = playing and self.media_owner != source
+        if not started:
+            return
+        self.media_owner = source
+        # Android Auto (or another source) starts playing music: radio off
+        if self.config["pauseForAndroidAuto"] and self.playing:
+            log.info("%s started playing, radio stopped", source)
             async with self.lock:
                 await self.stop()
 
@@ -328,14 +341,14 @@ class RadioPlugin:
             if metadata == self.media_sent:
                 return
             self.media_sent = metadata
-            self.media_source = "radio"
+            self.media_owner = "radio"
             await self.api.safe(self.api.publish("media.metadata", **metadata))
             await self.api.safe(self.api.publish("media.status", state="playing", app="Radio", position=0,
                                                  shuffle=False, repeat=False, repeatOne=False, source="radio"))
         elif self.media_sent is not None:
             self.media_sent = None
             # do not overwrite Android Auto's status when its music stopped the radio
-            if self.media_source == "radio":
+            if self.media_owner == "radio":
                 await self.api.safe(self.api.publish("media.status", state="stopped", app="Radio", source="radio"))
 
     async def publish_state(self):
