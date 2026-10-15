@@ -7,6 +7,8 @@ State: "radio.state" {band, frequency, unit, playing, scanning, rds: {ps, rt}, p
 Commands: bus.emit "radio.command" {cmd: "play"|"stop"|"toggle"|"tune"|"step"|"band"|"preset"|"savePreset"|
           "removePreset"|"scan"|"fakeSdr", value}
 Actions: radio.toggle, radio.next, radio.previous (e.g. for steering wheel buttons)
+Media: while playing also media.metadata / media.status with source "radio" (home page, Bluetooth car radio);
+          "stopped" only if the radio was the last media source (not when Android Auto music took over)
 Config (plugin data dir): gain ("auto" or dB), ppm, amOptions (rtl_fm arguments for AM, default direct sampling),
           rds, pauseForAndroidAuto, fakeSdr (simulated stick, tools/fake-sdr; also OPENHU_FAKE_SDR=1)
 """
@@ -55,6 +57,11 @@ class RadioPlugin:
         self.scanning = False
         self.rds = {}
         self.error = ""
+        self.media_source = None  # source of the last media.status (radio, androidauto, ...)
+        self.media_sent = None
+        # Every event runs as its own task: commands that come quickly one after the other (Android Auto sends
+        # band, tune and play together) would overtake each other while processes start and stop.
+        self.lock = asyncio.Lock()
         self.api.on("radio.command", self.on_command)
         self.api.on("input.action", self.on_action)
         self.api.on("media.status", self.on_media_status)
@@ -241,6 +248,10 @@ class RadioPlugin:
     # --- commands -------------------------------------------------------------------
 
     async def on_command(self, topic, data):
+        async with self.lock:
+            await self.handle_command(data)
+
+    async def handle_command(self, data):
         command, value = data.get("cmd"), data.get("value")
         if self.scanning and command != "stop":
             return
@@ -293,13 +304,33 @@ class RadioPlugin:
             await self.on_command(topic, {"cmd": "seek", "value": 1 if action == "radio.next" else -1})
 
     async def on_media_status(self, topic, data):
+        self.media_source = data.get("source")
         # Android Auto starts playing music: radio off
         if (self.config["pauseForAndroidAuto"] and self.playing and data.get("source") == "androidauto"
                 and data.get("state") == "playing"):
             log.info("Android Auto media playing, radio stopped")
-            await self.stop()
+            async with self.lock:
+                await self.stop()
+
+    async def publish_media(self):
+        """The radio as the current media source, sent only when something changed."""
+        if self.playing:
+            metadata = radiolib.media_metadata(self.band, self.frequency, self.rds, self.config.get("names", {}))
+            if metadata == self.media_sent:
+                return
+            self.media_sent = metadata
+            self.media_source = "radio"
+            await self.api.safe(self.api.publish("media.metadata", **metadata))
+            await self.api.safe(self.api.publish("media.status", state="playing", app="Radio", position=0,
+                                                 shuffle=False, repeat=False, repeatOne=False, source="radio"))
+        elif self.media_sent is not None:
+            self.media_sent = None
+            # do not overwrite Android Auto's status when its music stopped the radio
+            if self.media_source == "radio":
+                await self.api.safe(self.api.publish("media.status", state="stopped", app="Radio", source="radio"))
 
     async def publish_state(self):
+        await self.publish_media()
         spec = radiolib.BANDS[self.band]
         await self.api.safe(self.api.publish(
             "radio.state",
