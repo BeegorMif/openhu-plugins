@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+"""Simulated rtl_power (see fakesdr.py): one sweep as CSV with a peak on every configured FM station.
+Takes OPENHU_FAKE_SDR_SCAN_SECONDS (default 2) like a real sweep; -f is used, the other options are ignored."""
+
+import os
+import random
+import sys
+import time
+
+import fakesdr
+
+
+def main(argv):
+    frequency_range, output = None, "-"
+    index = 0
+    while index < len(argv):
+        if argv[index] == "-f" and index + 1 < len(argv):
+            frequency_range = argv[index + 1]
+            index += 2
+        elif argv[index] in ("-i", "-g", "-p", "-e", "-d", "-c", "-w", "-F", "-b") and index + 1 < len(argv):
+            index += 2
+        elif argv[index].startswith("-") and argv[index] != "-":
+            index += 1
+        else:
+            output = argv[index]
+            index += 1
+    try:
+        low, high, step = fakesdr.parse_power_range(frequency_range or "")
+        stations = fakesdr.load_stations()
+    except (OSError, ValueError) as error:
+        print("fake rtl_power: %s" % error, file=sys.stderr)
+        return 1
+    if stations["error"]:
+        fakesdr.fail(stations["error"])
+
+    time.sleep(float(os.environ.get("OPENHU_FAKE_SDR_SCAN_SECONDS", "2")))
+    lines = fakesdr.rtl_power_lines(stations, low, high, step, time.strftime("%Y-%m-%d, %H:%M:%S").split(", "),
+                                    rng=random.Random())
+    text = "\n".join(lines) + "\n"
+    if output == "-":
+        sys.stdout.write(text)
+    else:
+        with open(output, "w") as file:
+            file.write(text)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

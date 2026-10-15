@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """FM/AM radio with an RTL-SDR stick: rtl_fm -> pacat, optional RDS via redsea, station scan via rtl_power.
 
-State: "radio.state" {band, frequency, unit, playing, scanning, rds: {ps, rt}, presets, stations, error, rdsAvailable}
+State: "radio.state" {band, frequency, unit, playing, scanning, rds: {ps, rt}, presets, stations, error, rdsAvailable,
+          simulated}
 Commands: bus.emit "radio.command" {cmd: "play"|"stop"|"toggle"|"tune"|"step"|"band"|"preset"|"savePreset"|
-          "removePreset"|"scan", value}
+          "removePreset"|"scan"|"fakeSdr", value}
 Actions: radio.toggle, radio.next, radio.previous (e.g. for steering wheel buttons)
 Config (plugin data dir): gain ("auto" or dB), ppm, amOptions (rtl_fm arguments for AM, default direct sampling),
-          rds, pauseForAndroidAuto
+          rds, pauseForAndroidAuto, fakeSdr (simulated stick, tools/fake-sdr; also OPENHU_FAKE_SDR=1)
 """
 
 import asyncio
@@ -20,9 +21,12 @@ sys.path.insert(0, os.path.join(HERE, "..", "lib"))
 sys.path.insert(0, HERE)
 
 import radiolib  # noqa: E402
-from openhu import OpenHU, load_config, save_config, setup_logging  # noqa: E402
+from openhu import DATA_DIR, OpenHU, load_config, save_config, setup_logging  # noqa: E402
 
 log = logging.getLogger("radio")
+
+# Simulated stick for tests without hardware: rtl_fm/rtl_power/redsea stand-ins, first in PATH when switched on
+FAKE_SDR_DIR = os.path.normpath(os.path.join(HERE, "..", "tools", "fake-sdr"))
 
 DEFAULTS = {
     "band": "fm",
@@ -34,6 +38,7 @@ DEFAULTS = {
     "amOptions": ["-E", "direct2"],
     "rds": True,
     "pauseForAndroidAuto": True,
+    "fakeSdr": False,
 }
 CHUNK = 4096
 
@@ -60,14 +65,30 @@ class RadioPlugin:
     def frequency(self):
         return self.config["frequency"][self.band]
 
+    def simulated(self):
+        return bool(self.config.get("fakeSdr")) or os.environ.get("OPENHU_FAKE_SDR") == "1"
+
+    def environment(self):
+        """Environment for the tools: with the simulated stick its directory comes first in PATH."""
+        env = dict(os.environ)
+        if self.simulated():
+            env["PATH"] = FAKE_SDR_DIR + os.pathsep + env.get("PATH", "")
+            own = os.path.join(DATA_DIR, "fake-sdr-stations.json")
+            env.setdefault("OPENHU_FAKE_SDR_STATIONS",
+                           own if os.path.isfile(own) else os.path.join(FAKE_SDR_DIR, "stations.json"))
+        return env
+
+    def which(self, name):
+        return shutil.which(name, path=self.environment()["PATH"])
+
     def rds_available(self):
-        return self.band == "fm" and self.config["rds"] and shutil.which("redsea") and shutil.which("sox")
+        return self.band == "fm" and self.config["rds"] and self.which("redsea") and self.which("sox")
 
     # --- playback ---------------------------------------------------------------
 
     async def start(self):
         await self.stop_processes()
-        if shutil.which("rtl_fm") is None or shutil.which("pacat") is None:
+        if self.which("rtl_fm") is None or self.which("pacat") is None:
             self.error = "rtl_fm oder pacat fehlt (Pakete rtl-sdr, pulseaudio-utils)"
             self.playing = False
             await self.publish_state()
@@ -77,15 +98,16 @@ class RadioPlugin:
         self.error = ""
         rds = bool(self.rds_available())
         args, rate = radiolib.rtl_fm_command(self.band, self.frequency, self.config, rds)
-        log.info("%s", " ".join(args))
+        env = self.environment()
+        log.info("%s%s", " ".join(args), " (simulated stick)" if self.simulated() else "")
 
         if rds:
             # rtl_fm (multiplex) -> this process -> redsea (RDS) and sox (audio) -> pacat
             rtl = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.PIPE,
-                                                       stderr=asyncio.subprocess.PIPE)
+                                                       stderr=asyncio.subprocess.PIPE, env=env)
             redsea = await asyncio.create_subprocess_exec("redsea", "-r", "171k", stdin=asyncio.subprocess.PIPE,
                                                           stdout=asyncio.subprocess.PIPE,
-                                                          stderr=asyncio.subprocess.DEVNULL)
+                                                          stderr=asyncio.subprocess.DEVNULL, env=env)
             read_fd, write_fd = os.pipe()
             sox = await asyncio.create_subprocess_exec(*radiolib.sox_mpx_to_audio(), stdin=asyncio.subprocess.PIPE,
                                                        stdout=write_fd, stderr=asyncio.subprocess.DEVNULL)
@@ -98,7 +120,7 @@ class RadioPlugin:
                           asyncio.create_task(self.watch(rtl))]
         else:
             read_fd, write_fd = os.pipe()
-            rtl = await asyncio.create_subprocess_exec(*args, stdout=write_fd, stderr=asyncio.subprocess.PIPE)
+            rtl = await asyncio.create_subprocess_exec(*args, stdout=write_fd, stderr=asyncio.subprocess.PIPE, env=env)
             pacat = await asyncio.create_subprocess_exec(*radiolib.pacat_command(rate), stdin=read_fd)
             os.close(read_fd)
             os.close(write_fd)
@@ -174,7 +196,7 @@ class RadioPlugin:
     # --- station scan (FM) ----------------------------------------------------------
 
     async def scan(self):
-        if self.band != "fm" or shutil.which("rtl_power") is None:
+        if self.band != "fm" or self.which("rtl_power") is None:
             self.error = "Sendersuche nur für FM, braucht rtl_power"
             await self.publish_state()
             return
@@ -186,7 +208,7 @@ class RadioPlugin:
 
         process = await asyncio.create_subprocess_exec(
             "rtl_power", "-f", "87.5M:108M:100k", "-i", "2", "-1", "-",
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=self.environment())
         stdout, stderr = await process.communicate()
         stations = radiolib.parse_rtl_power(stdout.decode(errors="replace").splitlines())
         if process.returncode != 0 and not stations:
@@ -248,6 +270,11 @@ class RadioPlugin:
             await self.publish_state()
         elif command == "scan":
             await self.scan()
+        elif command == "fakeSdr":
+            self.config["fakeSdr"] = bool(value)
+            save_config(self.config)
+            log.info("simulated stick %s", "on" if value else "off")
+            await (self.start() if self.playing else self.publish_state())
         else:
             log.warning("unknown command %s", data)
 
@@ -283,6 +310,7 @@ class RadioPlugin:
             presets=self.config["presets"].get(self.band, []),
             stations=self.config["stations"].get(self.band, []),
             error=self.error,
+            simulated=self.simulated(),
         ))
 
 
