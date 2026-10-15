@@ -96,6 +96,10 @@ class RadioPlugin:
     # --- playback ---------------------------------------------------------------
 
     async def start(self):
+        if self.processes:
+            # another station or band: show it right away, stopping the old processes takes a moment
+            self.rds = {}
+            await self.publish_state()
         await self.stop_processes()
         if self.which("rtl_fm") is None or self.which("pacat") is None:
             self.error = "rtl_fm oder pacat fehlt (Pakete rtl-sdr, pulseaudio-utils)"
@@ -124,7 +128,7 @@ class RadioPlugin:
             os.close(read_fd)
             os.close(write_fd)
             self.processes = [rtl, redsea, sox, pacat]
-            self.tasks = [asyncio.create_task(self.split(rtl, [redsea, sox])),
+            self.tasks = [asyncio.create_task(self.split(rtl, [redsea, sox]), name="split"),
                           asyncio.create_task(self.read_rds(redsea)),
                           asyncio.create_task(self.watch(rtl))]
         else:
@@ -181,6 +185,11 @@ class RadioPlugin:
     async def stop_processes(self):
         processes, self.processes = self.processes, []
         tasks, self.tasks = self.tasks, []
+        # RDS reader and watcher first: no RDS line of the old station after the new one is shown. The split task
+        # keeps draining rtl_fm until it ended (a full pipe could block it).
+        for task in tasks:
+            if task.get_name() != "split":
+                task.cancel()
         for process in processes:
             if process.returncode is None:
                 process.terminate()
