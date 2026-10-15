@@ -94,6 +94,29 @@ def band_summary(config):
     return result
 
 
+def frequency_label(band, frequency):
+    """"UKW 96,2 MHz" / "MW 1008 kHz" """
+    if band == "fm":
+        return "UKW %s MHz" % ("%.1f" % frequency).replace(".", ",")
+    return "MW %d kHz" % round(frequency)
+
+
+def media_metadata(band, frequency, rds, names):
+    """media.metadata of the station that plays (home page, Bluetooth car radio, API): radiotext as the title, the
+    station name as the artist."""
+    name = (rds.get("ps") or "").strip() or names.get(band, {}).get(frequency_key(band, frequency), "")
+    label = frequency_label(band, frequency)
+    return {
+        "title": (rds.get("rt") or "").strip() or name or label,
+        "artist": name or label,
+        "album": label,
+        "playlist": "",
+        "duration": 0,
+        "cover": "",
+        "source": "radio",
+    }
+
+
 def parse_rtl_power(lines, threshold_db=10.0):
     """rtl_power CSV -> frequencies (MHz, 0.1 raster) of stations clearly above the noise floor."""
     bins = {}

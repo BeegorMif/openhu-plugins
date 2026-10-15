@@ -49,6 +49,17 @@ class RadioLibTest(unittest.TestCase):
         self.assertEqual(bands["am"]["stations"], [])
         self.assertEqual((bands["am"]["min"], bands["am"]["max"], bands["am"]["step"]), (531, 1602, 9))
 
+    def test_media_metadata(self):
+        names = {"fm": {"96.2": "NDR 2"}}
+        playing = radiolib.media_metadata("fm", 96.2, {"ps": "NDR 2   ", "rt": "Dreamer - Ozzy Osbourne"}, names)
+        self.assertEqual((playing["title"], playing["artist"], playing["album"], playing["source"]),
+                         ("Dreamer - Ozzy Osbourne", "NDR 2", "UKW 96,2 MHz", "radio"))
+        # no RDS yet: the remembered name, else the frequency
+        self.assertEqual(radiolib.media_metadata("fm", 96.2, {}, names)["title"], "NDR 2")
+        unknown = radiolib.media_metadata("fm", 101.9, {}, names)
+        self.assertEqual((unknown["title"], unknown["artist"]), ("UKW 101,9 MHz", "UKW 101,9 MHz"))
+        self.assertEqual(radiolib.media_metadata("am", 1008, {}, {})["album"], "MW 1008 kHz")
+
     def test_scan(self):
         noise = ", ".join(["-40"] * 10)
         lines = [
