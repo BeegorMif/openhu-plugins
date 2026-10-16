@@ -4,8 +4,14 @@ FM/AM-Radio mit einem RTL-SDR-USB-Stick: `rtl_fm` → `pacat`, RDS über `redsea
 `rtl_power`. Pakete auf der Head-Unit: `rtl-sdr`, `pulseaudio-utils`, für RDS zusätzlich `redsea` und `sox`.
 
 Status `radio.state`, Befehle `radio.command` und Konfiguration: siehe Kopf von [`bin/radio.py`](bin/radio.py).
-`radio.state.bands` enthält beide Bänder mit Sendern, Favoriten und den RDS-Namen, die sich das Plugin pro Frequenz
-merkt (für Android Auto, openhu#75).
+`radio.state.bands` enthält beide Bänder mit Sendern, Favoriten und den RDS-Namen und PI-Codes, die sich das Plugin
+pro Frequenz merkt (für Android Auto, openhu#75).
+
+**RDS-PI:** Der PI-Code kennzeichnet ein Programm unabhängig von der Frequenz (NDR 2 ist `0xD382` auf 96,2 MHz in
+Hannover wie auf 97,8 MHz in Lingen). Das Plugin zeigt ihn in `radio.state.rds.pi`, merkt ihn sich pro Frequenz
+(`bands.fm.pis`) und stellt mit `{"cmd": "tunePi", "value": "0xD382"}` die stärkste bekannte Frequenz des Programms
+ein (Pegel aus dem letzten Suchlauf); kennt es keine, steht ein Fehler in `radio.state.error`. Android Auto kann
+Sender so über den PI wählen.
 
 ## Senderlogos
 
@@ -54,9 +60,9 @@ Ein echter Stick wird dabei nicht angesprochen; ausschalten mit `false`.
 
 **Senderliste:** `fake-sdr-stations.json` im Datenverzeichnis des Plugins, sonst die mitgelieferte
 [`tools/fake-sdr/stations.json`](tools/fake-sdr/stations.json) (Raum Hannover: NDR, Deutschlandfunk, ffn, Radio 21,
-Radio Hannover, Leibniz.FM auf ihren echten UKW-Frequenzen, ein Testton auf 87,6 MHz). Logos haben dort nur
-die beiden Testtöne (selbst gezeichnete Sinuskurven); Senderlogos zum Testen selbst in `logos/` legen. Pfad auch über
-`OPENHU_FAKE_SDR_STATIONS`.
+Radio Hannover, Leibniz.FM auf ihren echten UKW-Frequenzen mit ihren echten PI-Codes laut FMLIST, ein Testton auf
+87,6 MHz). Logos haben dort nur die beiden Testtöne (selbst gezeichnete Sinuskurven); Senderlogos zum Testen selbst in
+`logos/` legen. Pfad auch über `OPENHU_FAKE_SDR_STATIONS`.
 
 ```json
 {
@@ -76,6 +82,7 @@ die beiden Testtöne (selbst gezeichnete Sinuskurven); Senderlogos zum Testen se
 | `frequency` | MHz (FM, 0,1er-Raster) bzw. kHz (AM) |
 | `name` | Name, Standard für RDS |
 | `ps` | RDS-Sendername, 8 Zeichen (Standard: `name`) |
+| `pi` | RDS-PI-Code, z. B. `"0xD382"` (Standard: aus dem Namen abgeleitet); gleicher PI auf zwei Frequenzen = ein Programm auf zwei Sendern |
 | `url` | Stream (MP3, AAC, HLS, Icecast, auch `.m3u`/`.pls`) oder lokale Datei (läuft in Schleife) |
 | `tone` | statt `url`: Sinuston in Hz, ohne Netzwerk und ohne `ffmpeg` |
 | `rt` | fester RDS-Radiotext (Standard: Titel aus dem Stream, sonst `name`) |

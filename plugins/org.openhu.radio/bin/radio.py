@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """FM/AM radio with an RTL-SDR stick: rtl_fm -> pacat, optional RDS via redsea, station scan via rtl_power.
 
-State: "radio.state" {band, frequency, unit, playing, scanning, rds: {ps, rt}, presets, stations, error, rdsAvailable,
-          simulated, bands: {fm|am: {min, max, step, unit, stations, presets, names: {"96.2": "NDR 2"}}}}
-          (presets/stations: current band; bands: both, with the RDS names remembered per frequency)
+State: "radio.state" {band, frequency, unit, playing, scanning, rds: {pi, ps, rt}, presets, stations, error,
+          rdsAvailable, simulated, bands: {fm|am: {min, max, step, unit, stations, presets, names: {"96.2": "NDR 2"},
+          pis: {"96.2": "0xD382"}}}}
+          (presets/stations: current band; bands: both, with the RDS names and PI codes remembered per frequency;
+          rds.pi: PI code of the station that plays, "0xD382")
 Commands: bus.emit "radio.command" {cmd: "play"|"stop"|"toggle"|"tune"|"step"|"band"|"preset"|"savePreset"|
-          "removePreset"|"scan"|"fakeSdr", value}
+          "removePreset"|"scan"|"fakeSdr"|"tunePi", value}
+          tunePi: value is a PI code ("0xD382"): tunes FM to the strongest remembered frequency with it (level of the
+          last scan), error "... unbekannt" if no frequency is known for it
 Actions: radio.toggle, radio.next, radio.previous (e.g. for steering wheel buttons); media.next/previous (seek),
           media.play_pause/play/pause while the radio is the current media source
 Logos: "radio.logos" {fm: {"96.2": data URL}, am: {...}} – station logos from logos/ in the plugin data dir (PNG/JPEG
@@ -43,6 +47,8 @@ DEFAULTS = {
     "presets": {"fm": [], "am": []},
     "stations": {"fm": [], "am": []},
     "names": {"fm": {}, "am": {}},
+    "pis": {"fm": {}},
+    "levels": {"fm": {}},
     "gain": "auto",
     "ppm": 0,
     "amOptions": ["-E", "direct2"],
@@ -176,9 +182,13 @@ class RadioPlugin:
             update = radiolib.parse_redsea(line.decode(errors="replace"))
             if update and any(self.rds.get(key) != value for key, value in update.items()):
                 self.rds.update(update)
-                if self.playing and radiolib.remember_name(self.config.setdefault("names", {}), self.band,
-                                                           self.frequency, update.get("ps")):
-                    save_config(self.config)
+                if self.playing:
+                    changed = radiolib.remember_name(self.config.setdefault("names", {}), self.band, self.frequency,
+                                                     update.get("ps"))
+                    changed |= radiolib.remember(self.config.setdefault("pis", {}), self.band, self.frequency,
+                                                 update.get("pi"))
+                    if changed:
+                        save_config(self.config)
                 await self.publish_state()
 
     async def watch(self, rtl):
@@ -220,12 +230,29 @@ class RadioPlugin:
         await self.publish_state()
 
     async def tune(self, frequency):
+        # an old error (e.g. unknown PI) would make OpenHU report this tune to Android Auto as failed
+        self.error = ""
         self.config["frequency"][self.band] = radiolib.clamp_frequency(self.band, frequency)
         save_config(self.config)
         if self.playing:
             await self.start()
         else:
             await self.publish_state()
+
+    async def tune_pi(self, value):
+        """Tunes to a programme by its RDS PI code (e.g. from Android Auto)."""
+        pi = radiolib.normalize_pi(value)
+        current = self.config["frequency"]["fm"] if self.band == "fm" else None
+        frequency = radiolib.pi_frequency(self.config, pi, current)
+        if frequency is None:
+            log.info("tunePi %s: no frequency known", value)
+            self.error = "Sender mit PI %s unbekannt" % (pi or value)
+            await self.publish_state()
+            return
+        log.info("tunePi %s: %.1f MHz", pi, frequency)
+        if self.band != "fm":
+            self.config["band"] = "fm"
+        await self.tune(frequency)
 
     # --- station scan (FM) ----------------------------------------------------------
 
@@ -244,10 +271,14 @@ class RadioPlugin:
             "rtl_power", "-f", "87.5M:108M:100k", "-i", "2", "-1", "-",
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=self.environment())
         stdout, stderr = await process.communicate()
-        stations = radiolib.parse_rtl_power(stdout.decode(errors="replace").splitlines())
+        levels = radiolib.parse_rtl_power_levels(stdout.decode(errors="replace").splitlines())
+        stations = sorted(levels)
         if process.returncode != 0 and not stations:
             self.error = "Sendersuche fehlgeschlagen: " + (stderr.decode(errors="replace").strip().splitlines() or ["?"])[-1]
         self.config["stations"]["fm"] = stations
+        # signal levels for tunePi (the strongest frequency of a programme)
+        self.config.setdefault("levels", {})["fm"] = {radiolib.frequency_key("fm", frequency): round(level, 1)
+                                                      for frequency, level in levels.items()}
         save_config(self.config)
         self.scanning = False
         log.info("scan: %d stations", len(stations))
@@ -415,6 +446,8 @@ class RadioPlugin:
             await self.publish_state()
         elif command == "scan":
             await self.scan()
+        elif command == "tunePi":
+            await self.tune_pi(value)
         elif command == "fakeSdr":
             self.config["fakeSdr"] = bool(value)
             save_config(self.config)

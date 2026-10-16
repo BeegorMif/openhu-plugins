@@ -13,6 +13,8 @@ Stations come from a JSON file (OPENHU_FAKE_SDR_STATIONS, default stations.json 
     url     internet radio stream or local file, decoded with ffmpeg (mp3, aac, HLS, Icecast, ...)
     tone    sine tone in Hz instead of a url (no network, no ffmpeg needed)
     ps      RDS station name, 8 characters (default: the first 8 characters of name)
+    pi      RDS PI code, "0xD382" (default: derived from the name, D = Germany); the same PI on two frequencies is
+            one programme on two transmitters (tunePi picks the stronger one by level)
     rt      fixed RDS radiotext (default: the current title from the stream's ICY metadata, else the name)
     level   signal level for rtl_power in dB (default -10, noise floor about -40; below -30 the scan skips it)
     logo    station logo, a local PNG/JPEG file (relative to the station list); the radio plugin shows it like a file
@@ -172,9 +174,17 @@ def redsea_line(station, title=None):
     name = str(station.get("name") or "")
     ps = str(station.get("ps") or name)
     text = station.get("rt") or title or name
-    pi = 0xD000 | (zlib.crc32(name.encode()) & 0x0FFF)  # D = Germany
-    return json.dumps({"pi": "0x%04X" % pi, "ps": ps[:8].ljust(8), "radiotext": str(text)[:64]},
+    return json.dumps({"pi": station_pi(station), "ps": ps[:8].ljust(8), "radiotext": str(text)[:64]},
                       ensure_ascii=False)
+
+
+def station_pi(station):
+    """PI code of a station as redsea prints it ("0xD382"): "pi" from the list, else derived from the name."""
+    try:
+        return "0x%04X" % (int(str(station["pi"]), 16) & 0xFFFF)
+    except (KeyError, TypeError, ValueError):
+        name = str(station.get("name") or "")
+        return "0x%04X" % (0xD000 | (zlib.crc32(name.encode()) & 0x0FFF))  # D = Germany
 
 
 # --- ICY metadata (Icecast/Shoutcast titles) ---------------------------------------------
