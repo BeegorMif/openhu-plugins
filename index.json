@@ -40,8 +40,8 @@
     {
       "id": "org.openhu.radio",
       "name": "Radio",
-      "version": "2.6.0",
-      "description": "FM/AM-Radio mit einem RTL-SDR-USB-Stick: Sendersuche, Favoriten und RDS (Sendername, Radiotext, PI; RDS braucht redsea) und Senderlogos aus eigenen Bilddateien. Zum Testen ohne Stick: simulierter Stick mit Internetradio-Streams.",
+      "version": "2.7.0",
+      "description": "FM/AM/DAB+-Radio mit einem RTL-SDR-USB-Stick: Sendersuche, Favoriten und RDS (Sendername, Radiotext, PI; RDS braucht redsea), Senderlogos aus eigenen Bilddateien; DAB+ mit welle-cli (DLS, Slideshow). Zum Testen ohne Stick: simulierter Stick mit Internetradio-Streams.",
       "arch": [
         "all"
       ],
@@ -50,9 +50,9 @@
         "audio",
         "usb"
       ],
-      "archive": "dist/org.openhu.radio-2.6.0.tar.gz",
-      "sha256": "b94b6fc040650450b8348820ec624afadc741142b3a3b5b7efadf51a565507ae",
-      "size": 27625
+      "archive": "dist/org.openhu.radio-2.7.0.tar.gz",
+      "sha256": "be24f510fc743e3dcc674f09bf30fe4fdf2dea95010eacedd0c6382d549cf71a",
+      "size": 42551
     },
     {
       "id": "org.openhu.swc",
