@@ -1,25 +1,36 @@
 #!/usr/bin/env python3
-"""FM/AM radio with an RTL-SDR stick: rtl_fm -> pacat, optional RDS via redsea, station scan via rtl_power.
+"""FM/AM/DAB+ radio with an RTL-SDR stick: rtl_fm -> pacat, optional RDS via redsea, station scan via rtl_power;
+DAB+ with welle-cli (dab.py: MP3 from welle-cli -> mpg123 -> pacat, DLS, slideshow, scan over Band III).
 
-State: "radio.state" {band, frequency, unit, playing, scanning, rds: {pi, ps, rt}, presets, stations, error,
-          rdsAvailable, simulated, bands: {fm|am: {min, max, step, unit, stations, presets, names: {"96.2": "NDR 2"},
-          pis: {"96.2": "0xD382"}}}}
-          (presets/stations: current band; bands: both, with the RDS names and PI codes remembered per frequency;
+State: "radio.state" {band, frequency, unit, playing, scanning, scan, rds: {pi, ps, rt}, presets, stations, error,
+          rdsAvailable, dabAvailable, dab, simulated, bands: {fm|am: {min, max, step, unit, stations, presets,
+          names: {"96.2": "NDR 2"}, pis: {"96.2": "0xD382"}}, dab: {unit, stations, presets, names, channels,
+          services: {"0xD882": {label, shortLabel, channel, ensemble, ensembleLabel, ecc}}}}}
+          (presets/stations: current band; bands: all, with the RDS names and PI codes remembered per frequency;
           rds.pi: PI code of the station that plays, "0xD382")
+          DAB: band "dab", a station is a service, its key ("frequency", stations, presets) the service id "0xD882";
+          rds.ps is the service label, rds.rt the DLS; dab: {id, label, ecc} of the ensemble that plays;
+          scan: {channel, done, total, found} while a DAB scan runs (minutes: every channel 5A-13F)
 Commands: bus.emit "radio.command" {cmd: "play"|"stop"|"toggle"|"tune"|"step"|"band"|"preset"|"savePreset"|
           "removePreset"|"scan"|"fakeSdr"|"tunePi", value}
           tunePi: value is a PI code ("0xD382"): tunes FM to the strongest remembered frequency with it (level of the
           last scan), error "... unbekannt" if no frequency is known for it
+          band "dab": tune/presets with service ids; step/seek go through the station list; scan runs in the
+          background, "stop" cancels it
 Actions: radio.toggle, radio.next, radio.previous (e.g. for steering wheel buttons); media.next/previous (seek),
           media.play_pause/play/pause while the radio is the current media source
 Logos: "radio.logos" {fm: {"96.2": data URL}, am: {...}} – station logos from logos/ in the plugin data dir (PNG/JPEG
           named after the frequency, "96.2.png", or the station name, "NDR 2.png"; at most 512 KB each), sent only when
           they change (a separate topic keeps radio.state small). With the simulated stick also its "logo" files.
-Media: while playing also media.metadata / media.status with source "radio" (home page, Bluetooth car radio), the
-          station logo as cover; "stopped" only if the radio was the last media source (not when Android Auto music
-          took over)
+Slide: "radio.slide" {band, station, image: data URL} – DAB slideshow picture (MOT SLS) of the station that plays,
+          from the broadcast; image "" when there is none (FM, other station)
+Media: while playing also media.metadata / media.status with source "radio" (home page, Bluetooth car radio), as
+          cover the slideshow picture, else the station logo; "stopped" only if the radio was the last media source
+          (not when Android Auto music took over)
 Config (plugin data dir): gain ("auto" or dB), ppm, amOptions (rtl_fm arguments for AM, default direct sampling),
-          rds, pauseForAndroidAuto, fakeSdr (simulated stick, tools/fake-sdr; also OPENHU_FAKE_SDR=1)
+          rds, pauseForAndroidAuto, fakeSdr (simulated stick, tools/fake-sdr; also OPENHU_FAKE_SDR=1),
+          dabPort (welle-cli web server, default 7979), dabScanSeconds (per channel, default 5), dabChannels
+          (channels the DAB scan tunes, default all of 5A-13F)
 """
 
 import asyncio
@@ -32,6 +43,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "lib"))
 sys.path.insert(0, HERE)
 
+import dab  # noqa: E402
 import radiolib  # noqa: E402
 from openhu import DATA_DIR, OpenHU, load_config, save_config, setup_logging  # noqa: E402
 
@@ -43,10 +55,13 @@ LOGO_POLL_SECONDS = 10
 
 DEFAULTS = {
     "band": "fm",
-    "frequency": {"fm": 101.3, "am": 1008},
-    "presets": {"fm": [], "am": []},
-    "stations": {"fm": [], "am": []},
-    "names": {"fm": {}, "am": {}},
+    "frequency": {"fm": 101.3, "am": 1008, "dab": None},
+    "presets": {"fm": [], "am": [], "dab": []},
+    "stations": {"fm": [], "am": [], "dab": []},
+    "names": {"fm": {}, "am": {}, "dab": {}},
+    "dabServices": {},
+    "dabPort": 7979,
+    "dabScanSeconds": 5,
     "pis": {"fm": {}},
     "levels": {"fm": {}},
     "gain": "auto",
@@ -59,9 +74,14 @@ DEFAULTS = {
 CHUNK = 4096
 
 
-class RadioPlugin:
+class RadioPlugin(dab.DabMixin):
     def __init__(self):
         self.config = load_config(DEFAULTS)
+        # configs of older versions: no DAB entries yet
+        self.config["frequency"].setdefault(radiolib.DAB, None)
+        for table in ("presets", "stations"):
+            self.config[table].setdefault(radiolib.DAB, [])
+        self.config["names"].setdefault(radiolib.DAB, {})
         self.api = OpenHU()
         self.processes = []
         self.tasks = []
@@ -78,6 +98,11 @@ class RadioPlugin:
         self.logos_sent = False
         self.logo_cache = {}  # path -> ((mtime, size), data URL or None)
         self.logo_task = None
+        self.slide = ""  # DAB slideshow picture (data URL) of the station that plays
+        self.slide_sent = None
+        self.dab_ensemble = {}
+        self.scan_progress = None
+        self.scan_abort = False
         # Every event runs as its own task: commands that come quickly one after the other (Android Auto sends
         # band, tune and play together) would overtake each other while processes start and stop.
         self.lock = asyncio.Lock()
@@ -120,6 +145,11 @@ class RadioPlugin:
             self.rds = {}
             await self.publish_state()
         await self.stop_processes()
+        if self.band == radiolib.DAB:
+            self.error = ""
+            await self.start_dab()
+            return
+        await self.set_slide("")
         if self.which("rtl_fm") is None or self.which("pacat") is None:
             self.error = "rtl_fm oder pacat fehlt (Pakete rtl-sdr, pulseaudio-utils)"
             self.playing = False
@@ -135,15 +165,15 @@ class RadioPlugin:
 
         if rds:
             # rtl_fm (multiplex) -> this process -> redsea (RDS) and sox (audio) -> pacat
-            rtl = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.PIPE,
+            rtl = await radiolib.spawn(*args, stdout=asyncio.subprocess.PIPE,
                                                        stderr=asyncio.subprocess.PIPE, env=env)
-            redsea = await asyncio.create_subprocess_exec("redsea", "-r", "171k", stdin=asyncio.subprocess.PIPE,
+            redsea = await radiolib.spawn("redsea", "-r", "171k", stdin=asyncio.subprocess.PIPE,
                                                           stdout=asyncio.subprocess.PIPE,
                                                           stderr=asyncio.subprocess.DEVNULL, env=env)
             read_fd, write_fd = os.pipe()
-            sox = await asyncio.create_subprocess_exec(*radiolib.sox_mpx_to_audio(), stdin=asyncio.subprocess.PIPE,
+            sox = await radiolib.spawn(*radiolib.sox_mpx_to_audio(), stdin=asyncio.subprocess.PIPE,
                                                        stdout=write_fd, stderr=asyncio.subprocess.DEVNULL)
-            pacat = await asyncio.create_subprocess_exec(*radiolib.pacat_command(44100), stdin=read_fd)
+            pacat = await radiolib.spawn(*radiolib.pacat_command(44100), stdin=read_fd)
             os.close(read_fd)
             os.close(write_fd)
             self.processes = [rtl, redsea, sox, pacat]
@@ -152,8 +182,8 @@ class RadioPlugin:
                           asyncio.create_task(self.watch(rtl))]
         else:
             read_fd, write_fd = os.pipe()
-            rtl = await asyncio.create_subprocess_exec(*args, stdout=write_fd, stderr=asyncio.subprocess.PIPE, env=env)
-            pacat = await asyncio.create_subprocess_exec(*radiolib.pacat_command(rate), stdin=read_fd)
+            rtl = await radiolib.spawn(*args, stdout=write_fd, stderr=asyncio.subprocess.PIPE, env=env)
+            pacat = await radiolib.spawn(*radiolib.pacat_command(rate), stdin=read_fd)
             os.close(read_fd)
             os.close(write_fd)
             self.processes = [rtl, pacat]
@@ -232,6 +262,10 @@ class RadioPlugin:
     async def tune(self, frequency):
         # an old error (e.g. unknown PI) would make OpenHU report this tune to Android Auto as failed
         self.error = ""
+        if self.band == radiolib.DAB and not self.dab_service(radiolib.clamp_frequency(self.band, frequency)):
+            self.error = "Unbekannter DAB-Sender %s – Sendersuche starten" % frequency
+            await self.publish_state()
+            return
         self.config["frequency"][self.band] = radiolib.clamp_frequency(self.band, frequency)
         save_config(self.config)
         if self.playing:
@@ -267,7 +301,7 @@ class RadioPlugin:
         self.error = ""
         await self.publish_state()
 
-        process = await asyncio.create_subprocess_exec(
+        process = await radiolib.spawn(
             "rtl_power", "-f", "87.5M:108M:100k", "-i", "2", "-1", "-",
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=self.environment())
         stdout, stderr = await process.communicate()
@@ -291,6 +325,14 @@ class RadioPlugin:
 
     def neighbour_station(self, direction):
         """Next station of the scan list (or preset) in the given direction, wrapping around."""
+        if self.band == radiolib.DAB:
+            # DAB: the station list in its order (channel, name), presets that are not in it after it
+            stations = list(self.config["stations"].get(radiolib.DAB, []))
+            stations += [key for key in self.config["presets"].get(radiolib.DAB, []) if key not in stations]
+            if not stations:
+                return self.frequency
+            index = stations.index(self.frequency) if self.frequency in stations else -1 if direction > 0 else 0
+            return stations[(index + (1 if direction > 0 else -1)) % len(stations)]
         stations = sorted(set(self.config["stations"].get(self.band, []) + self.config["presets"].get(self.band, [])))
         if not stations:
             return radiolib.step_frequency(self.band, self.frequency, direction)
@@ -326,7 +368,7 @@ class RadioPlugin:
         index = radiolib.logo_index(files)
         fake = self.fake_logos() if self.simulated() else {}
         result = {}
-        for band in radiolib.BANDS:
+        for band in radiolib.ALL_BANDS:
             names = self.config.get("names", {}).get(band, {})
             for key in radiolib.logo_keys(self.config, band, self.config["frequency"].get(band)):
                 file = radiolib.find_logo(index, band, key, names.get(key, ""))
@@ -374,7 +416,7 @@ class RadioPlugin:
         self.logos = logos
         self.logos_sent = True
         log.info("logos: %d", sum(len(band) for band in logos.values()))
-        await self.api.safe(self.api.publish("radio.logos", **{band: logos.get(band, {}) for band in radiolib.BANDS}))
+        await self.api.safe(self.api.publish("radio.logos", **{band: logos.get(band, {}) for band in radiolib.ALL_BANDS}))
         return True
 
     async def watch_logos(self):
@@ -391,8 +433,9 @@ class RadioPlugin:
         return self.logos.get(self.band, {}).get(radiolib.frequency_key(self.band, self.frequency), "")
 
     async def on_connect(self):
-        # OpenHU may have restarted: send the logos again
+        # OpenHU may have restarted: send the logos and the slide again
         self.logos_sent = False
+        self.slide_sent = False
         if self.logo_task is None:
             try:
                 # the folder for the user's logo files
@@ -412,6 +455,9 @@ class RadioPlugin:
         command, value = data.get("cmd"), data.get("value")
         if self.scanning and command != "stop":
             return
+        if self.scanning:
+            # a DAB scan takes minutes: stop cancels it
+            self.scan_abort = True
         if command == "play":
             if radiolib.start_needed(self.playing, bool(self.processes)):
                 await self.start()
@@ -423,11 +469,13 @@ class RadioPlugin:
             await (self.stop() if self.playing else self.start())
         elif command == "tune" and value is not None:
             await self.tune(value)
+        elif command == "step" and self.band == radiolib.DAB:
+            await self.tune(self.neighbour_station(value or 1))
         elif command == "step":
             await self.tune(radiolib.step_frequency(self.band, self.frequency, value or 1))
         elif command == "seek":
             await self.tune(self.neighbour_station(value or 1))
-        elif command == "band" and value in radiolib.BANDS:
+        elif command == "band" and value in radiolib.ALL_BANDS:
             self.config["band"] = value
             save_config(self.config)
             await (self.start() if self.playing else self.publish_state())
@@ -444,6 +492,10 @@ class RadioPlugin:
                 presets.remove(value)
             save_config(self.config)
             await self.publish_state()
+        elif command == "scan" and self.band == radiolib.DAB:
+            # in the background: commands (stop) still arrive during the minutes it takes
+            self.scanning, self.scan_abort = True, False
+            asyncio.create_task(self.scan_dab())
         elif command == "scan":
             await self.scan()
         elif command == "tunePi":
@@ -487,7 +539,7 @@ class RadioPlugin:
         """The radio as the current media source, sent only when something changed."""
         if self.playing:
             metadata = radiolib.media_metadata(self.band, self.frequency, self.rds, self.config.get("names", {}),
-                                               self.current_logo())
+                                               self.slide or self.current_logo(), self.config.get("dabServices"))
             if metadata == self.media_sent:
                 return
             self.media_sent = metadata
@@ -501,10 +553,25 @@ class RadioPlugin:
             if self.media_owner == "radio":
                 await self.api.safe(self.api.publish("media.status", state="stopped", app="Radio", source="radio"))
 
+    async def set_slide(self, image):
+        """The DAB slideshow picture of the station that plays ("" for none): radio.slide and the media cover."""
+        if image == self.slide and self.slide_sent:
+            return
+        self.slide = image
+        await self.publish_slide()
+        await self.publish_media()
+
+    async def publish_slide(self):
+        self.slide_sent = True
+        await self.api.safe(self.api.publish("radio.slide", band=self.band,
+                                             station=radiolib.frequency_key(self.band, self.frequency)
+                                             if self.frequency is not None else "",
+                                             image=self.slide))
+
     async def publish_state(self):
         await self.publish_logos()
         await self.publish_media()
-        spec = radiolib.BANDS[self.band]
+        spec = radiolib.BANDS.get(self.band, {"unit": "", "min": None, "max": None})
         await self.api.safe(self.api.publish(
             "radio.state",
             band=self.band,
@@ -514,6 +581,9 @@ class RadioPlugin:
             max=spec["max"],
             playing=self.playing,
             scanning=self.scanning,
+            scan=self.scan_progress,
+            dab=self.dab_ensemble if self.band == radiolib.DAB else {},
+            dabAvailable=self.dab_available(),
             rds=self.rds,
             rdsAvailable=bool(self.rds_available()),
             presets=self.config["presets"].get(self.band, []),

@@ -1,7 +1,8 @@
 # Radio (`org.openhu.radio`)
 
-FM/AM-Radio mit einem RTL-SDR-USB-Stick: `rtl_fm` → `pacat`, RDS über `redsea` (mit `sox`), Sendersuche über
-`rtl_power`. Pakete auf der Head-Unit: `rtl-sdr`, `pulseaudio-utils`, für RDS zusätzlich `redsea` und `sox`.
+FM/AM/DAB+-Radio mit einem RTL-SDR-USB-Stick: `rtl_fm` → `pacat`, RDS über `redsea` (mit `sox`), Sendersuche über
+`rtl_power`; DAB+ über `welle-cli`. Pakete auf der Head-Unit: `rtl-sdr`, `pulseaudio-utils`, für RDS zusätzlich
+`redsea` und `sox`, für DAB+ `welle.io` (enthält `welle-cli`) und `mpg123`.
 
 Status `radio.state`, Befehle `radio.command` und Konfiguration: siehe Kopf von [`bin/radio.py`](bin/radio.py).
 `radio.state.bands` enthält beide Bänder mit Sendern, Favoriten und den RDS-Namen und PI-Codes, die sich das Plugin
@@ -13,6 +14,27 @@ Hannover wie auf 97,8 MHz in Lingen). Das Plugin zeigt ihn in `radio.state.rds.p
 ein (Pegel aus dem letzten Suchlauf); kennt es keine, steht ein Fehler in `radio.state.error`. Android Auto kann
 Sender so über den PI wählen.
 
+## DAB+
+
+Das Band `dab` (Knopf „DAB+“): ein Sender ist ein Dienst in einem Ensemble (Multiplex) auf einem Kanal 5A–13F, sein
+Schlüssel die Service-ID (`"0xD882"`) statt einer Frequenz (`frequency`, `stations`, `presets`, `tune`).
+
+- **Empfang:** `welle-cli -c <Kanal> -w 7979 -T` (Web-Server-Modus, das Plugin fragt nur `127.0.0.1` ab). Ton:
+  `/mp3/<sid>` → `mpg123` (oder `ffmpeg`) → `pacat`, 48 kHz Stereo. Ein Stick: der Bandwechsel beendet FM/AM bzw.
+  `welle-cli`.
+- **Metadaten:** Dienstname als `rds.ps`, DLS (Dynamic Label) als `rds.rt`, Ensemble in `radio.state.dab`.
+- **Slideshow (MOT SLS):** das Bild aus der Sendung im Thema `radio.slide` (`{band, station, image}`, Data-URL) und
+  als `media.metadata.cover` (sonst das Senderlogo). Nur Bilder, die der Sender selbst ausstrahlt.
+- **Sendersuche:** alle Kanäle nacheinander (`POST /channel`), je bis zu `dabScanSeconds` (5 s) bis zum Ensemble,
+  dauert einige Minuten; Fortschritt in `radio.state.scan`, „Abbrechen“ (`stop`) behält die alte Liste.
+  `dabChannels` in `config.json` beschränkt die Suche auf bestimmte Kanäle (z. B. `["5C", "7A", "8C"]` in Hannover).
+- **Kein Stick:** `welle-cli` 2.4 beendet sich dann nicht, sondern läuft mit einem „Null device“ weiter; das Plugin
+  erkennt das an `/mux.json` und meldet „Kein RTL-SDR-Stick gefunden“.
+
+Der echte DAB-Empfang ist noch nicht mit einem Stick getestet (nur der simulierte Stick); offen ist auch, wie viel
+CPU `welle-cli` auf einem Raspberry Pi 4 neben OpenHU braucht. Achtung: `welle-cli` lauscht auf allen
+Netzwerkschnittstellen (Port `dabPort`, ohne Passwort, erlaubt auch das Umschalten des Kanals).
+
 ## Senderlogos
 
 Das Plugin bringt keine Logos mit (sie sind Marken der Sender) und lädt nichts aus dem Internet. Eigene Bilder
@@ -23,7 +45,8 @@ legt das Plugin beim Start an):
 |---|---|
 | `96.2.png`, `96,2.jpg` | UKW 96,2 MHz |
 | `1008.png` | MW 1008 kHz |
-| `NDR 2.png`, `ndr2.jpg` | den Sender, dessen RDS-Name sich das Plugin gemerkt hat (Groß-/Kleinschreibung, Leer- und Satzzeichen zählen nicht) |
+| `NDR 2.png`, `ndr2.jpg` | den Sender, dessen RDS-Name (DAB: Dienstname) sich das Plugin gemerkt hat (Groß-/Kleinschreibung, Leer- und Satzzeichen zählen nicht) |
+| `0xD882.png` | den DAB-Dienst mit dieser Service-ID |
 
 Die Frequenz hat Vorrang vor dem Namen. PNG oder JPEG, höchstens 512 KB (256×256 Pixel reichen; OpenHU verkleinert
 sie für Android Auto auf 128×128). Neue oder geänderte Dateien erkennt das Plugin nach spätestens 10 Sekunden.
@@ -35,7 +58,7 @@ Favoriten und aktuellem Sender.
 
 ## Simulierter Stick (Test ohne Hardware)
 
-`tools/fake-sdr/` ersetzt `rtl_fm`, `rtl_power` und `redsea`, zum Beispiel in der Entwicklungs-VM. Jeder Sender
+`tools/fake-sdr/` ersetzt `rtl_fm`, `rtl_power`, `redsea` und `welle-cli`, zum Beispiel in der Entwicklungs-VM. Jeder Sender
 in einer Senderliste spielt einen **Internetradio-Stream** (oder eine Datei, oder einen Testton), als würde er über
 UKW empfangen:
 
@@ -91,6 +114,14 @@ Radio Hannover, Leibniz.FM auf ihren echten UKW-Frequenzen mit ihren echten PI-C
 
 Die Streams in der Liste sind die öffentlichen Web-Streams der Sender, zum Anhören beim Testen. Eigene Listen
 bitte nur mit Streams, die man so nutzen darf.
+
+**DAB+ simuliert:** Abschnitt `dab` der Senderliste – Ensembles mit Kanal, Ensemble-ID, Name und Diensten
+(`sid`, `label`, `shortLabel`, `url` oder `tone`, `dls` fest statt des Stream-Titels, `slides` als Slideshow-Bilder
+im Wechsel alle `slideSeconds`, `logo`). Mitgeliefert: die Hannoveraner Ensembles 5C (DR Deutschland), 7A (NDR NDS)
+und 8C (NI HANNOVER K8C) mit echten Kanälen, Ensemble- und Service-IDs laut DABLIST (sender-tabelle.de) und den
+Web-Streams der Sender; 12D „OpenHU Test“ ist erfunden (Testton, selbst gezeichnete Testbilder als Slideshow). Der
+simulierte `welle-cli` braucht `ffmpeg` (MP3), das Plugin nimmt `ffmpeg` statt `mpg123`, wenn das fehlt. Wie der
+echte läuft er bei `"error"` ohne Stick mit „Null device“ weiter.
 
 **Grenzen:** getestet wird alles oberhalb der Hardware (Plugin, Oberfläche, Favoriten, Suchlauf, RDS-Anzeige,
 später die Android-Auto-Anbindung). Nicht simuliert: echter Empfang, Verstärkung, `ppm`, AM-Direct-Sampling,

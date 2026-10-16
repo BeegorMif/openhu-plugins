@@ -28,7 +28,7 @@ class FakeSdrLogoTest(unittest.TestCase):
     def test_bundled_logos_exist(self):
         path = os.path.join(FAKE_SDR, "stations.json")
         logos = fakesdr.station_logos(fakesdr.load_stations(path), path)
-        self.assertEqual(set(logos), {"fm", "am"})
+        self.assertEqual(set(logos), {"fm", "am", "dab"})
         for band in logos.values():
             for file in band.values():
                 with open(file, "rb") as handle:
@@ -87,7 +87,7 @@ class RadioPluginLogoTest(unittest.TestCase):
 
         self.assertTrue(asyncio.run(self.plugin.publish_logos()))
         logos = self.published_logos()[-1]
-        self.assertEqual(set(logos), {"fm", "am"})
+        self.assertEqual(set(logos), {"fm", "am", "dab"})
         self.assertEqual(logos["fm"], {"96.2": radiolib.data_url(JPEG), "92.6": radiolib.data_url(PNG)})
         self.assertEqual(logos["am"], {})
         self.assertEqual(self.plugin.current_logo(), radiolib.data_url(JPEG))

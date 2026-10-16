@@ -79,7 +79,7 @@ class RadioLibTest(unittest.TestCase):
         bands = radiolib.band_summary(config)
         self.assertEqual(bands["fm"]["pis"], {"96.2": "0xD382"})
         self.assertEqual(bands["am"]["pis"], {})
-        self.assertEqual(set(bands), {"fm", "am"})
+        self.assertEqual(set(bands), {"fm", "am", "dab"})
         self.assertEqual(bands["fm"]["stations"], [96.2, 101.9])
         self.assertEqual(bands["fm"]["names"], {"96.2": "NDR 2"})
         self.assertEqual(bands["fm"]["unit"], "MHz")

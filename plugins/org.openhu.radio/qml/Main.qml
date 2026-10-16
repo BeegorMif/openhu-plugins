@@ -3,7 +3,8 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import OpenHU 1.0
 
-// FM/AM radio: frequency, RDS, station logo, seek/step, presets and scanned stations.
+// FM/AM/DAB+ radio: frequency or DAB service, RDS/DLS, station logo or DAB slideshow, seek/step, presets and
+// scanned stations.
 Item {
     id: page
 
@@ -11,19 +12,31 @@ Item {
     // station logos from logos/ in the plugin data dir: {fm: {"96.2": data URL}, am: {...}}
     BusTopic { id: logos; topic: "radio.logos" }
 
-    readonly property bool fm: radio.data.band !== "am"
-    // key of the current frequency in radio.logos ("96.2" / "1008", radiolib.frequency_key)
-    readonly property string frequencyKey: radio.data.frequency === undefined ? ""
+    // DAB slideshow picture of the station that plays: {band, station, image}
+    BusTopic { id: slide; topic: "radio.slide" }
+
+    readonly property string band: radio.data.band || "fm"
+    readonly property bool fm: page.band === "fm"
+    readonly property bool dab: page.band === "dab"
+    // key of the current frequency in radio.logos ("96.2" / "1008" / DAB service id, radiolib.frequency_key)
+    readonly property string frequencyKey: radio.data.frequency === undefined || radio.data.frequency === null ? ""
+        : page.dab ? String(radio.data.frequency)
         : page.fm ? Number(radio.data.frequency).toFixed(1) : String(Math.round(radio.data.frequency))
-    readonly property string logo: ((logos.data || {})[radio.data.band || "fm"] || {})[page.frequencyKey] || ""
+    readonly property string slideImage: page.dab && (slide.data || {}).station === page.frequencyKey
+        ? ((slide.data || {}).image || "") : ""
+    readonly property string logo: page.slideImage
+        || ((logos.data || {})[page.band] || {})[page.frequencyKey] || ""
+    readonly property var dabNames: ((radio.data.bands || {}).dab || {}).names || {}
 
     function command(cmd, value) {
         api.emitEvent("radio.command", { cmd: cmd, value: value })
     }
 
     function format(frequency) {
-        if (frequency === undefined)
+        if (frequency === undefined || frequency === null)
             return "–"
+        if (page.dab)
+            return page.dabNames[frequency] || String(frequency)
         return page.fm ? Number(frequency).toFixed(1).replace(".", ",") : String(frequency)
     }
 
@@ -38,7 +51,7 @@ Item {
             spacing: Theme.spacing
 
             Repeater {
-                model: [{ band: "fm", label: "FM" }, { band: "am", label: "AM" }]
+                model: [{ band: "fm", label: "FM" }, { band: "am", label: "AM" }, { band: "dab", label: "DAB+" }]
                 Button {
                     text: modelData.label
                     checkable: true
@@ -99,14 +112,20 @@ Item {
                     }
                     Text {
                         anchors.baseline: parent.children[0].baseline
-                        text: radio.data.unit || "MHz"
+                        // DAB: the channel of the ensemble instead of a unit
+                        text: page.dab ? ((((radio.data.bands || {}).dab || {}).services || {})[page.frequencyKey]
+                                          || {}).channel || ""
+                            : radio.data.unit || "MHz"
                         color: Theme.textDim
                         font.pixelSize: Theme.fontLarge
                     }
                 }
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: radio.data.scanning ? "Sendersuche …"
+                    text: radio.data.scanning ? (radio.data.scan
+                            ? "Sendersuche … Kanal %1 (%2/%3), %4 Sender".arg(radio.data.scan.channel)
+                                .arg(radio.data.scan.done + 1).arg(radio.data.scan.total).arg(radio.data.scan.found)
+                            : "Sendersuche …")
                         : radio.data.error ? radio.data.error
                         : [radio.data.rds && radio.data.rds.ps, radio.data.rds && radio.data.rds.rt]
                             .filter(function(part) { return part }).join(" · ")
@@ -128,19 +147,20 @@ Item {
             Button { text: "◀◀"; font.pixelSize: Theme.fontNormal; onClicked: page.command("seek", -1) }
             Button { text: "−"; font.pixelSize: Theme.fontLarge; onClicked: page.command("step", -1) }
             Button {
-                text: radio.data.playing ? "Stopp" : "Abspielen"
+                // the DAB scan takes minutes and can be cancelled
+                text: radio.data.scanning ? "Abbrechen" : radio.data.playing ? "Stopp" : "Abspielen"
                 highlighted: true
                 font.pixelSize: Theme.fontNormal
                 Layout.preferredWidth: Theme.dockWidth * 1.8
-                enabled: !radio.data.scanning
-                onClicked: page.command("toggle")
+                enabled: !radio.data.scanning || page.dab
+                onClicked: page.command(radio.data.scanning ? "stop" : "toggle")
             }
             Button { text: "+"; font.pixelSize: Theme.fontLarge; onClicked: page.command("step", 1) }
             Button { text: "▶▶"; font.pixelSize: Theme.fontNormal; onClicked: page.command("seek", 1) }
             Button { text: "★"; font.pixelSize: Theme.fontLarge; onClicked: page.command("savePreset") }
             Button {
                 text: "Suchlauf"
-                visible: page.fm
+                visible: page.fm || page.dab
                 enabled: !radio.data.scanning
                 onClicked: page.command("scan")
             }
@@ -181,7 +201,7 @@ Item {
             Text {
                 anchors.centerIn: parent
                 visible: parent.count === 0
-                text: page.fm ? "Noch keine Sender – Suchlauf starten" : ""
+                text: page.fm || page.dab ? "Noch keine Sender – Suchlauf starten" : ""
                 color: Theme.textDim
                 font.pixelSize: Theme.fontNormal
             }

@@ -1,5 +1,5 @@
 {
-  "_comment": "Simulated stations, Hannover (Lower Saxony). FM frequencies of the real transmitters (Hannover-Hemmingen, Telemax, ffn Barsinghausen), the streams are the stations' public web streams. Own list: plugin data dir fake-sdr-stations.json, format in fakesdr.py. Logos: only the two self-made test pictures, no station logos (trademarks). PI codes: the real ones from the FMLIST data on sender-tabelle.de (UKW/TV-Arbeitskreis), NDR 1 with its Hannover regional PI.",
+  "_comment": "Simulated stations, Hannover (Lower Saxony). FM frequencies of the real transmitters (Hannover-Hemmingen, Telemax, ffn Barsinghausen), the streams are the stations' public web streams. Own list: plugin data dir fake-sdr-stations.json, format in fakesdr.py. Logos: only the two self-made test pictures, no station logos (trademarks). PI codes: the real ones from the FMLIST data on sender-tabelle.de (UKW/TV-Arbeitskreis), NDR 1 with its Hannover regional PI. DAB: the Hannover ensembles 5C, 7A, 8C with their real channels, ensemble and service ids (DABLIST data on sender-tabelle.de), streams as on FM; 12D \"OpenHU Test\" is made up (test tone, the self-drawn test slides).",
   "fm": [
     {"frequency": 87.6, "name": "Testton 440 Hz", "ps": "TESTTON", "tone": 440, "rt": "Simulierter Sender ohne Netzwerk", "logo": "logos/testton-fm.png"},
     {"frequency": 88.6, "pi": "0xD384", "name": "NDR Info", "ps": "NDR INFO", "url": "https://icecast.ndr.de/ndr/ndrinfo/niedersachsen/mp3/128/stream.mp3"},
@@ -16,6 +16,30 @@
   "am": [
     {"frequency": 549, "name": "Deutschlandfunk (AM, historisch)", "ps": "DLF", "url": "https://st01.sslstream.dlf.de/dlf/01/128/mp3/stream.mp3"},
     {"frequency": 1008, "name": "AM-Testton 800 Hz", "ps": "AM TEST", "tone": 800, "logo": "logos/testton-am.png"}
+  ],
+  "dab": [
+    {"channel": "5C", "ensemble": "0x10BC", "label": "DR Deutschland", "ecc": "0xE0", "services": [
+      {"sid": "0xD210", "label": "Dlf", "shortLabel": "Dlf", "url": "https://st01.sslstream.dlf.de/dlf/01/128/mp3/stream.mp3"},
+      {"sid": "0xD220", "label": "Dlf Kultur", "shortLabel": "Dlf Kult", "url": "https://st02.sslstream.dlf.de/dlf/02/128/mp3/stream.mp3"},
+      {"sid": "0xD230", "label": "Dlf Nova", "shortLabel": "Dlf Nova", "url": "https://st03.sslstream.dlf.de/dlf/03/128/mp3/stream.mp3"}
+    ]},
+    {"channel": "7A", "ensemble": "0x1188", "label": "NDR NDS", "ecc": "0xE0", "services": [
+      {"sid": "0xD481", "label": "NDR 1 NDS HAN", "shortLabel": "NDR1 NDS", "url": "https://icecast.ndr.de/ndr/ndr1niedersachsen/hannover/mp3/128/stream.mp3"},
+      {"sid": "0xD882", "label": "NDR 2 NDS", "shortLabel": "NDR 2", "url": "https://icecast.ndr.de/ndr/ndr2/niedersachsen/mp3/128/stream.mp3"},
+      {"sid": "0xD383", "label": "NDR Kultur", "shortLabel": "NDR Kult", "url": "https://icecast.ndr.de/ndr/ndrkultur/live/mp3/128/stream.mp3"},
+      {"sid": "0xD384", "label": "NDR Info", "shortLabel": "NDR Info", "url": "https://icecast.ndr.de/ndr/ndrinfo/niedersachsen/mp3/128/stream.mp3"},
+      {"sid": "0xD385", "label": "N-JOY", "shortLabel": "N-JOY", "url": "https://icecast.ndr.de/ndr/njoy/live/mp3/128/stream.mp3"},
+      {"sid": "0xD354", "label": "NDR Blue", "shortLabel": "NDR Blue", "url": "https://icecast.ndr.de/ndr/ndrblue/live/mp3/128/stream.mp3"},
+      {"sid": "0xD387", "label": "NDR Schlager", "shortLabel": "NDR Schl", "url": "https://icecast.ndr.de/ndr/ndrschlager/live/mp3/128/stream.mp3"}
+    ]},
+    {"channel": "8C", "ensemble": "0x1215", "label": "NI HANNOVER K8C", "ecc": "0xE0", "services": [
+      {"sid": "0xD388", "label": "ffn", "shortLabel": "ffn", "url": "https://player.ffn.de/radioffn.mp3"},
+      {"sid": "0x1B82", "label": "Radio Hannover", "shortLabel": "Hannover", "url": "http://radio-hannover.divicon-stream.net/rhann_livestrea_zqu6-mp3-128"},
+      {"sid": "0x1083", "label": "Leibniz.fm", "shortLabel": "Leibniz", "url": "https://server3.streamserver-unlimited.de:10519/stream"}
+    ]},
+    {"channel": "12D", "ensemble": "0xF0F0", "label": "OpenHU Test", "ecc": "0xE0", "services": [
+      {"sid": "0xF001", "label": "Testton DAB", "shortLabel": "Testton", "tone": 440, "dls": "Simulierter DAB+-Dienst", "slides": ["slides/test-1.png", "slides/test-2.png"], "slideSeconds": 10, "logo": "logos/testton-fm.png"}
+    ]}
   ],
   "error": null
 }

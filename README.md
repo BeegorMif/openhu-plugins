@@ -12,7 +12,7 @@ github average-web-dev/openhu-plugins main
 | `org.openhu.can` | CAN-Bus über SocketCAN: Fahrzeugdaten (`vehicle.*`), Lenkradtasten, Rückwärtsgang → Kamera, Licht → Nachtmodus. Fahrzeugprofile in `profiles/`. |
 | `org.openhu.swc` | Lenkradtasten über Eingabegeräte (USB-Lenkradadapter, IR-Fernbedienungen, Multimedia-Tasten) mit Anlern-Modus |
 | `org.openhu.camera` | Rückfahrkamera mit Hilfslinien, im Inhaltsbereich oder als Vollbild, automatisch beim Rückwärtsgang |
-| `org.openhu.radio` | FM/AM-Radio mit RTL-SDR-Stick, Sendersuche, Favoriten, RDS (mit `redsea`) |
+| `org.openhu.radio` | FM/AM/DAB+-Radio mit RTL-SDR-Stick, Sendersuche, Favoriten, RDS (mit `redsea`), DAB+ (mit `welle-cli`) |
 
 ## Aufbau
 
