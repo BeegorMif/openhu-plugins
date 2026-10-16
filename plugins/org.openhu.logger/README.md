@@ -144,7 +144,7 @@ FROM sample x JOIN signal s ON s.id = x.signal_id
 WHERE s.name = 'vehicle.speed.kmh' ORDER BY x.timestamp;
 ```
 
-A database of schema version 2 (1.1.0, with `signal.description` and no comments) is migrated in place when the
+A database of schema version 2 (a development state before 1.0.0, with `signal.description` and no comments) is migrated in place when the
 logger starts: the tables are recreated with the current schema and the data copied in one transaction, nothing is
 lost (it needs free space for a copy of the data while it runs). A damaged database is put aside as
 `logger.db.damaged`; a database of the first version (compressed blocks, tables `keys`/`blocks`) as
