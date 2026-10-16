@@ -14,9 +14,11 @@ Item {
     readonly property var groups: info.groups || {}
     readonly property var usage: info.usage || {}
     readonly property var limits: [100, 250, 500, 1024, 2048, 4096, 8192, 16384]
-    // rate of vehicle.*: null = the interval, seconds, or "update" (every update on the bus)
-    readonly property var vehicleRates: [null, 1, 0.1, "update"]
-    readonly property var vehicleRate: (info.rates || {})["vehicle.*"] === undefined ? null : info.rates["vehicle.*"]
+    // rate of vehicle.*: seconds (whole or tenths) or "update" (every update on the bus); unset = the interval
+    readonly property var vehicleRate: (info.rates || {})["vehicle.*"] === undefined ? (info.interval || 5)
+                                                                                   : info.rates["vehicle.*"]
+    // 0 = every n seconds, 1 = every 0.n seconds, 2 = every change
+    readonly property int vehicleMode: vehicleRate === "update" ? 2 : (Number(vehicleRate) < 1 ? 1 : 0)
     property bool confirmDelete: false
 
     function set(key, value) {
@@ -117,11 +119,47 @@ Item {
                         }
                     }
 
+                    // vehicle data: every n seconds, every 0.n seconds or every change
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text {
+                            Layout.fillWidth: true
+                            text: qsTrId("org.openhu.logger.main.vehicle_rate")
+                            wrapMode: Text.WordWrap
+                            color: Theme.text
+                            font.pixelSize: Theme.fontSmall
+                        }
+                        ComboBox {
+                            id: vehicleMode
+                            Layout.preferredWidth: Theme.dockWidth * 2.2
+                            model: [qsTrId("org.openhu.logger.main.rate_seconds"),
+                                    qsTrId("org.openhu.logger.main.rate_tenths"),
+                                    qsTrId("org.openhu.logger.main.rate_update")]
+                            currentIndex: page.vehicleMode
+                            onActivated: function (index) {
+                                page.set("rates.vehicle.*", index === 2 ? "update" : (index === 1 ? 0.5 : 5))
+                            }
+                        }
+                        SpinBox {
+                            visible: page.vehicleMode !== 2
+                            from: 1
+                            to: page.vehicleMode === 1 ? 9 : 60
+                            value: page.vehicleMode === 1 ? Math.round(Number(page.vehicleRate) * 10)
+                                                          : Math.round(Number(page.vehicleRate))
+                            textFromValue: function (value) {
+                                return page.vehicleMode === 1 ? page.number(value / 10, 1) : String(value)
+                            }
+                            onValueModified: page.set("rates.vehicle.*", page.vehicleMode === 1 ? value / 10 : value)
+                        }
+                    }
+
+                    // the other values (Android Auto, head unit): every n seconds
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
                             Layout.fillWidth: true
                             text: qsTrId("org.openhu.logger.main.interval")
+                            wrapMode: Text.WordWrap
                             color: Theme.text
                             font.pixelSize: Theme.fontSmall
                         }
@@ -130,23 +168,6 @@ Item {
                             to: 60
                             value: page.info.interval || 5
                             onValueModified: page.set("interval", value)
-                        }
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text {
-                            Layout.fillWidth: true
-                            text: qsTrId("org.openhu.logger.main.vehicle_rate")
-                            color: Theme.text
-                            font.pixelSize: Theme.fontSmall
-                        }
-                        ComboBox {
-                            Layout.preferredWidth: Theme.dockWidth * 2.2
-                            model: [qsTrId("org.openhu.logger.main.rate_interval"), qsTrId("org.openhu.logger.main.rate_1s"),
-                                    qsTrId("org.openhu.logger.main.rate_100ms"), qsTrId("org.openhu.logger.main.rate_update")]
-                            currentIndex: Math.max(0, page.vehicleRates.indexOf(page.vehicleRate))
-                            onActivated: function (index) { page.set("rates.vehicle.*", page.vehicleRates[index]) }
                         }
                     }
 

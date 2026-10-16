@@ -41,7 +41,7 @@
     </message>
     <message id="org.openhu.logger.main.interval">
         <source></source>
-        <translation>Interval (seconds)</translation>
+        <translation>Other values every (seconds)</translation>
     </message>
     <message id="org.openhu.logger.main.limit">
         <source></source>
@@ -75,21 +75,17 @@
         <source></source>
         <translation>Data since %1</translation>
     </message>
-    <message id="org.openhu.logger.main.rate_100ms">
+    <message id="org.openhu.logger.main.rate_seconds">
         <source></source>
-        <translation>Every 0.1 s</translation>
+        <translation>Every … seconds</translation>
     </message>
-    <message id="org.openhu.logger.main.rate_1s">
+    <message id="org.openhu.logger.main.rate_tenths">
         <source></source>
-        <translation>Every second</translation>
-    </message>
-    <message id="org.openhu.logger.main.rate_interval">
-        <source></source>
-        <translation>Like the interval</translation>
+        <translation>Every 0.… seconds</translation>
     </message>
     <message id="org.openhu.logger.main.rate_update">
         <source></source>
-        <translation>Every update</translation>
+        <translation>Every change</translation>
     </message>
     <message id="org.openhu.logger.main.record_start">
         <source></source>
@@ -129,7 +125,7 @@
     </message>
     <message id="org.openhu.logger.main.vehicle_rate">
         <source></source>
-        <translation>Vehicle data rate</translation>
+        <translation>Vehicle data</translation>
     </message>
     <message id="org.openhu.logger.name">
         <source></source>
