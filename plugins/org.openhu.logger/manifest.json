@@ -1,0 +1,12 @@
+{
+  "id": "org.openhu.logger",
+  "name": "Vehicle data logger",
+  "version": "1.0.0",
+  "api": 2,
+  "description": "Records vehicle data (from the CAN plugin), Android Auto state and head unit values on the device, detects trips and offers the data to other plugins. Offline, off until switched on.",
+  "arch": ["all"],
+  "ui": {"page": "qml/Main.qml", "icon": "icon.svg"},
+  "process": {"exec": "bin/logger.py", "restart": "on-failure"},
+  "permissions": ["storage"],
+  "shared": ["openhu.py"]
+}

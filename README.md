@@ -12,6 +12,7 @@ github average-web-dev/openhu-plugins main
 | `org.openhu.can` | CAN-Bus über SocketCAN: Fahrzeugdaten (`vehicle.*`), Lenkradtasten, Rückwärtsgang → Kamera, Licht → Nachtmodus. Fahrzeugprofile in `profiles/`. |
 | `org.openhu.swc` | Lenkradtasten über Eingabegeräte (USB-Lenkradadapter, IR-Fernbedienungen, Multimedia-Tasten) mit Anlern-Modus |
 | `org.openhu.camera` | Rückfahrkamera mit Hilfslinien, im Inhaltsbereich oder als Vollbild, automatisch beim Rückwärtsgang |
+| `org.openhu.logger` | Fahrzeugdaten-Logger: zeichnet `vehicle.*`, Android-Auto-Zustand und Werte der Head-Unit auf dem Gerät auf (SQLite, komprimiert, Größenlimit), erkennt Fahrten, hochfrequente Aufnahmen; Schnittstelle für andere Plugins (Fahrten, Messwerte, Live-Werte) |
 | `org.openhu.radio` | FM/AM/DAB+-Radio mit RTL-SDR-Stick, Sendersuche, Favoriten, RDS (mit `redsea`), DAB+ (mit `welle-cli`) |
 
 ## Aufbau
@@ -80,6 +81,7 @@ python3 -m unittest discover -s tests          # openhu.py, Übersetzungen
 python3 -m unittest discover -s plugins/org.openhu.can/tests
 python3 -m unittest discover -s plugins/org.openhu.swc/tests
 python3 -m unittest discover -s plugins/org.openhu.radio/tests
+python3 -m unittest discover -s plugins/org.openhu.logger/tests
 ```
 
 ## Hinweis
