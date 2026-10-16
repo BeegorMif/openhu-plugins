@@ -125,7 +125,7 @@ class DabMixin:
     async def start_welle(self, channel):
         args = dablib.welle_cli_command(channel, self.dab_port(), self.config)
         log.info("%s%s", " ".join(args), " (simulated stick)" if self.simulated() else "")
-        return await asyncio.create_subprocess_exec(*args, stdin=asyncio.subprocess.DEVNULL,
+        return await radiolib.spawn(*args, stdin=asyncio.subprocess.DEVNULL,
                                                     stdout=asyncio.subprocess.DEVNULL,
                                                     stderr=asyncio.subprocess.PIPE, env=self.environment())
 
@@ -149,10 +149,10 @@ class DabMixin:
         await self.set_slide("")
         welle = await self.start_welle(service["channel"])
         read_fd, write_fd = os.pipe()
-        mp3 = await asyncio.create_subprocess_exec(*dablib.mp3_decoder_command(decoder),
+        mp3 = await radiolib.spawn(*dablib.mp3_decoder_command(decoder),
                                                    stdin=asyncio.subprocess.PIPE, stdout=write_fd,
                                                    stderr=asyncio.subprocess.DEVNULL)
-        pacat = await asyncio.create_subprocess_exec(*radiolib.pacat_command(48000, 2), stdin=read_fd)
+        pacat = await radiolib.spawn(*radiolib.pacat_command(48000, 2), stdin=read_fd)
         os.close(read_fd)
         os.close(write_fd)
         self.processes = [welle, mp3, pacat]

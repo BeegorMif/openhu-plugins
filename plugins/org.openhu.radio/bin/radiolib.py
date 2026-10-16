@@ -1,8 +1,11 @@
 """Radio helpers without I/O (see tests/test_radiolib.py): bands, commands, scan, RDS parsing and station logos."""
 
+import asyncio
 import base64
+import ctypes
 import json
 import os
+import signal
 import statistics
 
 import dablib
@@ -73,6 +76,20 @@ def start_needed(playing, running):
     """play: start only if the radio does not play already. Android Auto sends "unmute" (-> play) when it connects;
     restarting the processes then made the running radio stutter."""
     return not (playing and running)
+
+
+def die_with_parent():
+    """preexec_fn for the tools: they get SIGTERM when the plugin dies. OpenHU stops the plugin, not its children;
+    welle-cli (an HTTP server) kept running after an OpenHU restart and blocked its port for the next start."""
+    try:
+        ctypes.CDLL(None, use_errno=True).prctl(1, signal.SIGTERM)  # PR_SET_PDEATHSIG
+    except (OSError, AttributeError):
+        pass
+
+
+async def spawn(*args, **kwargs):
+    """asyncio.create_subprocess_exec for the tools, ending with the plugin (die_with_parent)."""
+    return await asyncio.create_subprocess_exec(*args, preexec_fn=die_with_parent, **kwargs)
 
 
 def frequency_key(band, frequency):

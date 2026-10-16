@@ -9,10 +9,12 @@ receiver that has to sync; a channel without an ensemble in the list stays empty
 ICY title, else the label; only while the service is decoded, like welle-cli. Unlike welle-cli it listens on
 127.0.0.1 only."""
 
+import ctypes
 import http.server
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -148,7 +150,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         receiver.decoding[sid]["dls"] = title
 
         process = subprocess.Popen(args, stdin=subprocess.PIPE if source else subprocess.DEVNULL,
-                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, preexec_fn=die_with_parent)
         if source:
             response, metaint = source
             reader = fakesdr.IcyReader(response, metaint, on_title) if metaint else response
@@ -178,6 +180,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             with receiver.lock:
                 if receiver.generation == generation:
                     receiver.decoding.pop(sid, None)
+
+
+def die_with_parent():
+    """ffmpeg ends with this process (SIGTERM ends it with os._exit, which does not stop its children)."""
+    try:
+        ctypes.CDLL(None, use_errno=True).prctl(1, signal.SIGTERM)  # PR_SET_PDEATHSIG
+    except (OSError, AttributeError):
+        pass
 
 
 def feed(reader, process):

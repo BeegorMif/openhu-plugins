@@ -165,15 +165,15 @@ class RadioPlugin(dab.DabMixin):
 
         if rds:
             # rtl_fm (multiplex) -> this process -> redsea (RDS) and sox (audio) -> pacat
-            rtl = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.PIPE,
+            rtl = await radiolib.spawn(*args, stdout=asyncio.subprocess.PIPE,
                                                        stderr=asyncio.subprocess.PIPE, env=env)
-            redsea = await asyncio.create_subprocess_exec("redsea", "-r", "171k", stdin=asyncio.subprocess.PIPE,
+            redsea = await radiolib.spawn("redsea", "-r", "171k", stdin=asyncio.subprocess.PIPE,
                                                           stdout=asyncio.subprocess.PIPE,
                                                           stderr=asyncio.subprocess.DEVNULL, env=env)
             read_fd, write_fd = os.pipe()
-            sox = await asyncio.create_subprocess_exec(*radiolib.sox_mpx_to_audio(), stdin=asyncio.subprocess.PIPE,
+            sox = await radiolib.spawn(*radiolib.sox_mpx_to_audio(), stdin=asyncio.subprocess.PIPE,
                                                        stdout=write_fd, stderr=asyncio.subprocess.DEVNULL)
-            pacat = await asyncio.create_subprocess_exec(*radiolib.pacat_command(44100), stdin=read_fd)
+            pacat = await radiolib.spawn(*radiolib.pacat_command(44100), stdin=read_fd)
             os.close(read_fd)
             os.close(write_fd)
             self.processes = [rtl, redsea, sox, pacat]
@@ -182,8 +182,8 @@ class RadioPlugin(dab.DabMixin):
                           asyncio.create_task(self.watch(rtl))]
         else:
             read_fd, write_fd = os.pipe()
-            rtl = await asyncio.create_subprocess_exec(*args, stdout=write_fd, stderr=asyncio.subprocess.PIPE, env=env)
-            pacat = await asyncio.create_subprocess_exec(*radiolib.pacat_command(rate), stdin=read_fd)
+            rtl = await radiolib.spawn(*args, stdout=write_fd, stderr=asyncio.subprocess.PIPE, env=env)
+            pacat = await radiolib.spawn(*radiolib.pacat_command(rate), stdin=read_fd)
             os.close(read_fd)
             os.close(write_fd)
             self.processes = [rtl, pacat]
@@ -301,7 +301,7 @@ class RadioPlugin(dab.DabMixin):
         self.error = ""
         await self.publish_state()
 
-        process = await asyncio.create_subprocess_exec(
+        process = await radiolib.spawn(
             "rtl_power", "-f", "87.5M:108M:100k", "-i", "2", "-1", "-",
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=self.environment())
         stdout, stderr = await process.communicate()
