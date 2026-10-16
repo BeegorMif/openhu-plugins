@@ -8,8 +8,12 @@ Commands: bus.emit "radio.command" {cmd: "play"|"stop"|"toggle"|"tune"|"step"|"b
           "removePreset"|"scan"|"fakeSdr", value}
 Actions: radio.toggle, radio.next, radio.previous (e.g. for steering wheel buttons); media.next/previous (seek),
           media.play_pause/play/pause while the radio is the current media source
-Media: while playing also media.metadata / media.status with source "radio" (home page, Bluetooth car radio);
-          "stopped" only if the radio was the last media source (not when Android Auto music took over)
+Logos: "radio.logos" {fm: {"96.2": data URL}, am: {...}} – station logos from logos/ in the plugin data dir (PNG/JPEG
+          named after the frequency, "96.2.png", or the station name, "NDR 2.png"; at most 512 KB each), sent only when
+          they change (a separate topic keeps radio.state small). With the simulated stick also its "logo" files.
+Media: while playing also media.metadata / media.status with source "radio" (home page, Bluetooth car radio), the
+          station logo as cover; "stopped" only if the radio was the last media source (not when Android Auto music
+          took over)
 Config (plugin data dir): gain ("auto" or dB), ppm, amOptions (rtl_fm arguments for AM, default direct sampling),
           rds, pauseForAndroidAuto, fakeSdr (simulated stick, tools/fake-sdr; also OPENHU_FAKE_SDR=1)
 """
@@ -31,6 +35,7 @@ log = logging.getLogger("radio")
 
 # Simulated stick for tests without hardware: rtl_fm/rtl_power/redsea stand-ins, first in PATH when switched on
 FAKE_SDR_DIR = os.path.normpath(os.path.join(HERE, "..", "tools", "fake-sdr"))
+LOGO_POLL_SECONDS = 10
 
 DEFAULTS = {
     "band": "fm",
@@ -63,6 +68,10 @@ class RadioPlugin:
         self.media_owner = None
         self.android_auto_playing = False
         self.media_sent = None
+        self.logos = {}  # {band: {frequency key: data URL}}
+        self.logos_sent = False
+        self.logo_cache = {}  # path -> ((mtime, size), data URL or None)
+        self.logo_task = None
         # Every event runs as its own task: commands that come quickly one after the other (Android Auto sends
         # band, tune and play together) would overtake each other while processes start and stop.
         self.lock = asyncio.Lock()
@@ -258,6 +267,110 @@ class RadioPlugin:
             return next((s for s in stations if s > self.frequency + 1e-6), stations[0])
         return next((s for s in reversed(stations) if s < self.frequency - 1e-6), stations[-1])
 
+    # --- station logos ---------------------------------------------------------------
+
+    @staticmethod
+    def logo_dir():
+        """Station logos the user puts there (none are bundled)"""
+        return os.path.join(DATA_DIR, "logos")
+
+    def fake_logos(self):
+        """"logo" files of the simulated stick's station list."""
+        try:
+            if FAKE_SDR_DIR not in sys.path:
+                sys.path.append(FAKE_SDR_DIR)
+            import fakesdr
+            path = self.environment()["OPENHU_FAKE_SDR_STATIONS"]
+            return fakesdr.station_logos(fakesdr.load_stations(path), path)
+        except (ImportError, OSError, ValueError, KeyError):
+            return {}
+
+    def logo_paths(self):
+        """Logo file of every known station: {band: {frequency key: path}}. A file in logos/ named after the frequency,
+        else after the remembered RDS name, else (simulated stick) the station list's logo."""
+        try:
+            files = os.listdir(self.logo_dir())
+        except OSError:
+            files = []
+        index = radiolib.logo_index(files)
+        fake = self.fake_logos() if self.simulated() else {}
+        result = {}
+        for band in radiolib.BANDS:
+            names = self.config.get("names", {}).get(band, {})
+            for key in radiolib.logo_keys(self.config, band, self.config["frequency"].get(band)):
+                file = radiolib.find_logo(index, band, key, names.get(key, ""))
+                path = os.path.join(self.logo_dir(), file) if file else fake.get(band, {}).get(key)
+                if path:
+                    result.setdefault(band, {})[key] = path
+        return result
+
+    def read_logo(self, path):
+        """Data URL of a logo file, read again only when it changed; None if it is missing, too big or no PNG/JPEG."""
+        try:
+            stat = os.stat(path)
+        except OSError:
+            return None
+        version = (stat.st_mtime, stat.st_size)
+        cached = self.logo_cache.get(path)
+        if cached and cached[0] == version:
+            return cached[1]
+        url = None
+        if stat.st_size > radiolib.MAX_LOGO_BYTES:
+            log.warning("logo %s: %d KB, at most %d KB", path, -(-stat.st_size // 1024),
+                        radiolib.MAX_LOGO_BYTES // 1024)
+        else:
+            try:
+                with open(path, "rb") as file:
+                    url = radiolib.data_url(file.read())
+            except OSError as error:
+                log.warning("logo %s: %s", path, error)
+            else:
+                if url is None:
+                    log.warning("logo %s: neither PNG nor JPEG", path)
+        self.logo_cache[path] = (version, url)
+        return url
+
+    async def publish_logos(self):
+        """radio.logos, only when a logo changed (or after a new connection); True if it was sent."""
+        logos = {}
+        for band, paths in self.logo_paths().items():
+            for key, path in paths.items():
+                url = self.read_logo(path)
+                if url:
+                    logos.setdefault(band, {})[key] = url
+        if self.logos_sent and logos == self.logos:
+            return False
+        self.logos = logos
+        self.logos_sent = True
+        log.info("logos: %d", sum(len(band) for band in logos.values()))
+        await self.api.safe(self.api.publish("radio.logos", **{band: logos.get(band, {}) for band in radiolib.BANDS}))
+        return True
+
+    async def watch_logos(self):
+        """Picks up logo files the user adds or changes while the plugin runs."""
+        while True:
+            await asyncio.sleep(LOGO_POLL_SECONDS)
+            try:
+                if await self.publish_logos():
+                    await self.publish_media()
+            except Exception:
+                log.exception("logos")
+
+    def current_logo(self):
+        return self.logos.get(self.band, {}).get(radiolib.frequency_key(self.band, self.frequency), "")
+
+    async def on_connect(self):
+        # OpenHU may have restarted: send the logos again
+        self.logos_sent = False
+        if self.logo_task is None:
+            try:
+                # the folder for the user's logo files
+                os.makedirs(self.logo_dir(), exist_ok=True)
+            except OSError:
+                pass
+            self.logo_task = asyncio.create_task(self.watch_logos())
+        await self.publish_state()
+
     # --- commands -------------------------------------------------------------------
 
     async def on_command(self, topic, data):
@@ -340,7 +453,8 @@ class RadioPlugin:
     async def publish_media(self):
         """The radio as the current media source, sent only when something changed."""
         if self.playing:
-            metadata = radiolib.media_metadata(self.band, self.frequency, self.rds, self.config.get("names", {}))
+            metadata = radiolib.media_metadata(self.band, self.frequency, self.rds, self.config.get("names", {}),
+                                               self.current_logo())
             if metadata == self.media_sent:
                 return
             self.media_sent = metadata
@@ -355,6 +469,7 @@ class RadioPlugin:
                 await self.api.safe(self.api.publish("media.status", state="stopped", app="Radio", source="radio"))
 
     async def publish_state(self):
+        await self.publish_logos()
         await self.publish_media()
         spec = radiolib.BANDS[self.band]
         await self.api.safe(self.api.publish(
@@ -379,4 +494,4 @@ class RadioPlugin:
 if __name__ == "__main__":
     setup_logging()
     plugin = RadioPlugin()
-    asyncio.run(plugin.api.run(plugin.publish_state))
+    asyncio.run(plugin.api.run(plugin.on_connect))

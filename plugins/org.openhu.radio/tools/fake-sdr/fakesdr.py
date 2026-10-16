@@ -15,6 +15,8 @@ Stations come from a JSON file (OPENHU_FAKE_SDR_STATIONS, default stations.json 
     ps      RDS station name, 8 characters (default: the first 8 characters of name)
     rt      fixed RDS radiotext (default: the current title from the stream's ICY metadata, else the name)
     level   signal level for rtl_power in dB (default -10, noise floor about -40; below -30 the scan skips it)
+    logo    station logo, a local PNG/JPEG file (relative to the station list); the radio plugin shows it like a file
+            in its logos/ folder (which wins). Only own pictures: the stations' logos are their trademarks.
     error   "no-device" or "busy": rtl_fm and rtl_power fail like the real ones
 
 rtl_fm writes the tuned station to a state file (XDG_RUNTIME_DIR/fake-sdr/state.json), redsea reads it.
@@ -71,6 +73,21 @@ def find_station(stations, band, frequency):
         if abs(station["frequency"] - frequency) <= TOLERANCE[band] + 1e-9:
             return station
     return None
+
+
+def station_logos(stations, path=None):
+    """Logo files of the stations: {"fm": {"96.2": absolute path}, "am": {"1008": ...}} (keys like the radio
+    plugin's frequency keys), relative paths are relative to the station list."""
+    base = os.path.dirname(os.path.abspath(path or stations_path()))
+    result = {}
+    for band in ("fm", "am"):
+        for station in stations.get(band, []):
+            logo = station.get("logo")
+            if not logo:
+                continue
+            key = "%.1f" % station["frequency"] if band == "fm" else "%d" % round(station["frequency"])
+            result.setdefault(band, {})[key] = os.path.join(base, os.path.expanduser(str(logo)))
+    return result
 
 
 # --- command lines ----------------------------------------------------------------

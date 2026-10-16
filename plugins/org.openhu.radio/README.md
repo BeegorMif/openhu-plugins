@@ -7,6 +7,26 @@ Status `radio.state`, Befehle `radio.command` und Konfiguration: siehe Kopf von 
 `radio.state.bands` enthält beide Bänder mit Sendern, Favoriten und den RDS-Namen, die sich das Plugin pro Frequenz
 merkt (für Android Auto, openhu#75).
 
+## Senderlogos
+
+Das Plugin bringt keine Logos mit (sie sind Marken der Sender) und lädt nichts aus dem Internet. Eigene Bilder
+kommen in den Ordner `logos/` im Datenverzeichnis des Plugins (`~/.openhu/plugin-data/org.openhu.radio/logos/`,
+legt das Plugin beim Start an):
+
+| Dateiname | gilt für |
+|---|---|
+| `96.2.png`, `96,2.jpg` | UKW 96,2 MHz |
+| `1008.png` | MW 1008 kHz |
+| `NDR 2.png`, `ndr2.jpg` | den Sender, dessen RDS-Name sich das Plugin gemerkt hat (Groß-/Kleinschreibung, Leer- und Satzzeichen zählen nicht) |
+
+Die Frequenz hat Vorrang vor dem Namen. PNG oder JPEG, höchstens 512 KB (256×256 Pixel reichen; OpenHU verkleinert
+sie für Android Auto auf 128×128). Neue oder geänderte Dateien erkennt das Plugin nach spätestens 10 Sekunden.
+
+Die Logos stehen als Data-URLs im Thema `radio.logos` (`{"fm": {"96.2": "data:image/png;base64,…"}, "am": {…}}`),
+nur bei Änderungen gesendet, damit `radio.state` klein bleibt. Sie erscheinen auf der Seite des Plugins, als Cover
+auf der Startseite (`media.metadata.cover`, solange das Radio spielt) und in Android Auto bei Senderliste,
+Favoriten und aktuellem Sender.
+
 ## Simulierter Stick (Test ohne Hardware)
 
 `tools/fake-sdr/` ersetzt `rtl_fm`, `rtl_power` und `redsea`, zum Beispiel in der Entwicklungs-VM. Jeder Sender
@@ -34,7 +54,8 @@ Ein echter Stick wird dabei nicht angesprochen; ausschalten mit `false`.
 
 **Senderliste:** `fake-sdr-stations.json` im Datenverzeichnis des Plugins, sonst die mitgelieferte
 [`tools/fake-sdr/stations.json`](tools/fake-sdr/stations.json) (Raum Hannover: NDR, Deutschlandfunk, ffn, Radio 21,
-Radio Hannover, Leibniz.FM auf ihren echten UKW-Frequenzen, ein Testton auf 87,6 MHz). Pfad auch über
+Radio Hannover, Leibniz.FM auf ihren echten UKW-Frequenzen, ein Testton auf 87,6 MHz). Logos haben dort nur
+die beiden Testtöne (selbst gezeichnete Sinuskurven); Senderlogos zum Testen selbst in `logos/` legen. Pfad auch über
 `OPENHU_FAKE_SDR_STATIONS`.
 
 ```json
@@ -59,6 +80,7 @@ Radio Hannover, Leibniz.FM auf ihren echten UKW-Frequenzen, ein Testton auf 87,6
 | `tone` | statt `url`: Sinuston in Hz, ohne Netzwerk und ohne `ffmpeg` |
 | `rt` | fester RDS-Radiotext (Standard: Titel aus dem Stream, sonst `name`) |
 | `level` | Pegel für die Sendersuche in dB (Standard -10, Rauschen -40, unter -30 wird der Sender nicht gefunden) |
+| `logo` | Senderlogo, lokale PNG/JPEG-Datei (relativ zur Senderliste); eine Datei in `logos/` hat Vorrang |
 
 Die Streams in der Liste sind die öffentlichen Web-Streams der Sender, zum Anhören beim Testen. Eigene Listen
 bitte nur mit Streams, die man so nutzen darf.
