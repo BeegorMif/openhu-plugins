@@ -1,7 +1,7 @@
 {
   "id": "org.openhu.swc",
   "name": "Steering wheel keys",
-  "version": "1.1.0",
+  "version": "1.0.0",
   "api": 2,
   "description": "Keys of input devices (USB steering wheel adapters, IR remote controls, multimedia keyboards) as OpenHU actions, with a learn mode.",
   "arch": ["all"],
