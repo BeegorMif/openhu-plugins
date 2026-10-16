@@ -118,11 +118,38 @@ class TripsTest(unittest.TestCase):
     def test_android_auto_time(self):
         trips = Trips()
         drive(trips, 0, MIN, 50)
-        trips.update(MIN, "projection.state.connected", True)
+        trips.update(MIN, "androidauto.connected", True)
         drive(trips, MIN, 3 * MIN, 50)
-        trips.update(3 * MIN, "projection.state.connected", False)
+        trips.update(3 * MIN, "androidauto.connected", False)
         drive(trips, 3 * MIN, 4 * MIN, 50)
         self.assertEqual(trips.trip["aaTime"], 2 * MIN)
+
+    def test_android_auto_time_stops_with_the_trip(self):
+        """Android Auto stays connected while the car stands (the end rule fires 10 minutes later): that time is
+        not part of the trip (seen in the VM: aaTime 761 s for a trip of 228 s)."""
+        trips = Trips()
+        trips.update(0, "androidauto.connected", True)
+        drive(trips, 0, 4 * MIN, 50)
+        changes = drive(trips, 4 * MIN, 15 * MIN, 0)
+        trip = changes[0][1]
+        self.assertEqual((trip["duration"], trip["aaTime"]), (4 * MIN, 4 * MIN))
+        # same with the engine: off for good, the grace minute is not counted either
+        trips = Trips()
+        trips.update(0, "vehicle.engine.running", True)
+        trips.update(0, "androidauto.connected", True)
+        drive(trips, 0, 3 * MIN, 30)
+        trips.update(3 * MIN, SPEED, 0)
+        trips.update(3 * MIN, "vehicle.engine.running", False)
+        trip = drive(trips, 3 * MIN, 5 * MIN, 0)[0][1]
+        self.assertEqual((trip["endReason"], trip["duration"], trip["aaTime"]), ("engine", 3 * MIN, 3 * MIN))
+        # and after a power cut: as it was at the last activity
+        trips = Trips()
+        trips.update(0, "androidauto.connected", True)
+        drive(trips, 0, 2 * MIN, 50)
+        drive(trips, 2 * MIN, 6 * MIN, 0)  # written while standing, then the power goes
+        saved = dict(trips.trip, id=1)
+        trip = Trips().restore(saved, 10 * 60 * MIN)[0][1]
+        self.assertEqual((trip["duration"], trip["aaTime"]), (2 * MIN, 2 * MIN))
 
     def test_gaps_are_capped(self):
         """The process did not run for an hour (or the clock jumped): not an hour at 50 km/h."""

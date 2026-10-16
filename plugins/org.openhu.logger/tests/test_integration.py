@@ -95,9 +95,10 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
     async def start_plugin(self):
         plugin = self.logger.LoggerPlugin(
             data_dir=self.dir.name, api=self.openhu.OpenHU(self.url),
-            overrides={"enabled": True, "interval": 0.1, "flushSeconds": 0.2, "stopMinutes": 0.01,
+            overrides={"enabled": True, "interval": 0.1, "rates": {"vehicle.*": 0.1}, "flushSeconds": 0.2,
+                       "stopMinutes": 0.01,
                        "engineOffSeconds": 0.2},
-            health=lambda data_dir: {"hu.cpuTemp": 48})
+            health=lambda data_dir: {"headunit.cpu_temp_c": 48})
         task = asyncio.create_task(plugin.main())
         await self.until(lambda: self.bus.subscribed("logger.query") and self.bus.subscribed("vehicle.speed"))
         return plugin, task
@@ -130,6 +131,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_drive_query_and_clear(self):
         bus = self.bus
+        await bus.send("signals.info", {"source": "test", "signals": {"vehicle.speed.kmh": {"unit": "km/h"}}})
         await bus.send("projection.state", {"connected": True})
         await bus.send("phone.status", {"callState": "in_call", "calls": [{"number": "+49123", "name": "Bob"}]})
         await bus.send("vehicle.gear", {"gear": "drive"})
@@ -157,21 +159,22 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn(60, values)
         self.assertEqual(values[-1], 0)
         result = await self.ask("logger.query", cmd="samples", trip=trip["id"], points=10)
-        self.assertIn("hu.cpuTemp", result["series"])
+        self.assertIn("headunit.cpu_temp_c", result["series"])
         self.assertLessEqual(len(result["series"]["vehicle.speed.kmh"]["t"]), 10)
 
         result = await self.ask("logger.query", cmd="events", start=0)
-        topics = [e["topic"] for e in result["events"]]
-        self.assertIn("vehicle.gear", topics)
-        self.assertIn("logger.trip", topics)
-        self.assertNotIn("Bob", json.dumps(result))
-        self.assertNotIn("+49123", json.dumps(result))
-        keys = [k["key"] for k in (await self.ask("logger.query", cmd="keys"))["keys"]]
-        self.assertIn("projection.state.connected", keys)
+        self.assertEqual({(e["key"], e["value"]) for e in result["events"]},
+                         {("vehicle.gear.gear", "drive"), ("phone.call_state", "in_call")})
+        everything = await self.ask("logger.query", cmd="samples", start=0, points=0)
+        self.assertNotIn("Bob", json.dumps(everything))
+        self.assertNotIn("+49123", json.dumps(everything))
+        signals = {s["name"]: s for s in (await self.ask("logger.query", cmd="signals"))["signals"]}
+        self.assertEqual(signals["androidauto.connected"]["description"], "Android Auto connected")
+        self.assertEqual(signals["vehicle.speed.kmh"]["unit"], "km/h")  # from signals.info
 
         live = bus.values["logger.live"]
         self.assertEqual(live["values"]["vehicle.speed.kmh"], 0)
-        self.assertEqual(live["values"]["phone.status.callState"], "in_call")
+        self.assertEqual(live["values"]["phone.call_state"], "in_call")
         state = bus.values["logger.state"]
         self.assertTrue(state["vehicleData"])
         self.assertEqual(state["limitMB"], 1024)
@@ -195,7 +198,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue((await self.ask("logger.command", cmd="set", key="recording.postSeconds", value=0.3))["ok"])
         with open(os.path.join(self.dir.name, "config.json")) as file:
             saved = json.load(file)
-        self.assertEqual(saved["rates"], {"vehicle.engine.*": "update"})
+        self.assertEqual(saved["rates"], {"vehicle.*": 0.1, "vehicle.engine.*": "update"})
         for rpm in [1000] * 5 + [3500] * 10 + [1500] * 5:
             await bus.send("vehicle.engine", {"rpm": rpm})
             await asyncio.sleep(0.02)
@@ -206,9 +209,9 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(recordings[0]["reason"], "trigger")
         result = await self.ask("logger.query", cmd="samples", recording=recordings[0]["id"], points=0)
         self.assertIn(3500, result["series"]["vehicle.engine.rpm"]["v"])
-        # every update in the log too ("update" rate): 20 values
+        # every change in the log too ("update" rate)
         log = await self.ask("logger.query", cmd="samples", start=0, keys=["vehicle.engine.rpm"], points=0)
-        self.assertEqual(len(log["series"]["vehicle.engine.rpm"]["v"]), 20)
+        self.assertEqual(log["series"]["vehicle.engine.rpm"]["v"], [1000, 3500, 1500])
 
         # by hand
         started = await self.ask("logger.command", cmd="record", action="start", label="test", seconds=30)

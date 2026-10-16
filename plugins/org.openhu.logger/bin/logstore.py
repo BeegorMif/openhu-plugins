@@ -1,18 +1,18 @@
-"""SQLite storage of the logger: sample blocks, events, trips, recordings, the size limits and the queries.
+"""SQLite storage of the logger: signals, samples, trips, recordings, the size limits and the queries.
 
-Times are ms since 1970. Tables:
-    keys        (id, name)                                logged keys, e.g. "vehicle.speed.kmh"
-    blocks      (key, t0, t1, n, vmin, vmax, vsum, data)   the continuous log: the samples of one key from t0 to t1,
-                                                          compressed (codec.py), with a summary for long-range queries
-    events      (id, t, topic, data JSON)                 discrete changes (gear, Android Auto, call state, trips)
-    trips       (id, started, ended, open, raw, summary JSON)
-    recordings  (id, started, ended, open, reason, label, bytes)  high-rate recordings, their own quota
-    rblocks     (rec, key, t0, t1, n, vmin, vmax, vsum, data)  their samples
-    meta        (name, value)                             schema version
+Plain tables, readable with any SQLite tool (times in ms since 1970):
+    meta       (key, value)                     schema version, logger version
+    signal     (id, name, unit, description, source, first_seen)
+               one row per logged signal, created when it first appears; unit/description/source if known
+    sample     (signal_id, timestamp, value)    WITHOUT ROWID, primary key (signal_id, timestamp); value without a
+               type: integers take 1-6 bytes (0 and 1, e.g. booleans, none), decimals 8, texts ("drive") as text
+    trip       (id, start_time, end_time, open, raw, start_reason, end_reason, distance_km, duration_s,
+                max_speed_kmh, avg_speed_kmh, aa_time_s, fuel_l, consumption_l_100km, summary JSON for the rest)
+    recording  (id, start_time, end_time, open, trigger, label, samples)
+               a high-rate recording is a time window; its samples are in sample
 
-A block holds at most MAX_BLOCK_VALUES samples and MAX_BLOCK_MS of time (the process closes its blocks at every
-batched write, so they are usually shorter). One row per block and key instead of one per value keeps the size at a
-few bytes per value even at 10-100 Hz.
+Example: SELECT s.name, datetime(x.timestamp / 1000, 'unixepoch'), x.value
+         FROM sample x JOIN signal s ON s.id = x.signal_id WHERE s.name = 'vehicle.speed.kmh';
 
 WAL with synchronous=NORMAL: a power cut loses at most the last transactions, never the database. The writer
 (Store) belongs to the process's event loop; queries use their own read connection (Store.reader()), which may run
@@ -25,11 +25,7 @@ import os
 import sqlite3
 import time
 
-import codec
-
-SCHEMA_VERSION = 1
-MAX_BLOCK_VALUES = 4096
-MAX_BLOCK_MS = 120_000
+SCHEMA_VERSION = 2
 # trip summaries are kept after their samples are gone (a few hundred bytes each), up to this many
 MAX_TRIPS = 100_000
 # limits of one query, so an answer stays a reasonable bus message
@@ -37,29 +33,37 @@ MAX_POINTS = 2000
 MAX_VALUES = 50_000
 MAX_LIST = 1000
 MAX_EVENTS = 5000
-# downsampled queries with buckets at least this long use the block summaries instead of decoding the blocks
-SUMMARY_BUCKET_MS = 4 * MAX_BLOCK_MS
+# bytes of one sample row before there are enough samples to measure it
+DEFAULT_SAMPLE_BYTES = 20
+# tables of the first version (compressed blocks), which is moved aside
+OLD_TABLES = {"keys", "blocks", "events", "trips", "recordings", "rblocks"}
 
-BLOCK_COLUMNS = "key INTEGER NOT NULL, t0 INTEGER NOT NULL, t1 INTEGER NOT NULL, n INTEGER NOT NULL, " \
-                "vmin REAL, vmax REAL, vsum REAL, data BLOB NOT NULL"
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS meta(name TEXT PRIMARY KEY, value TEXT);
-CREATE TABLE IF NOT EXISTS keys(id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL);
-CREATE TABLE IF NOT EXISTS blocks(%(block)s);
-CREATE INDEX IF NOT EXISTS blocks_key_t0 ON blocks(key, t0);
-CREATE INDEX IF NOT EXISTS blocks_t0 ON blocks(t0);
-CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, t INTEGER NOT NULL, topic TEXT NOT NULL, data TEXT NOT NULL);
-CREATE INDEX IF NOT EXISTS events_t ON events(t);
-CREATE TABLE IF NOT EXISTS trips(id INTEGER PRIMARY KEY, started INTEGER NOT NULL, ended INTEGER NOT NULL,
-    open INTEGER NOT NULL DEFAULT 1, raw INTEGER NOT NULL DEFAULT 1, summary TEXT NOT NULL);
-CREATE INDEX IF NOT EXISTS trips_started ON trips(started);
-CREATE TABLE IF NOT EXISTS recordings(id INTEGER PRIMARY KEY, started INTEGER NOT NULL, ended INTEGER NOT NULL,
-    open INTEGER NOT NULL DEFAULT 1, reason TEXT NOT NULL, label TEXT NOT NULL DEFAULT '', bytes INTEGER NOT NULL DEFAULT 0);
-CREATE TABLE IF NOT EXISTS rblocks(rec INTEGER NOT NULL, %(block)s);
-CREATE INDEX IF NOT EXISTS rblocks_rec_key_t0 ON rblocks(rec, key, t0);
-""" % {"block": BLOCK_COLUMNS}
+CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS signal(id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL, unit TEXT, description TEXT,
+    source TEXT, first_seen INTEGER);
+CREATE TABLE IF NOT EXISTS sample(signal_id INTEGER NOT NULL, timestamp INTEGER NOT NULL, value,
+    PRIMARY KEY (signal_id, timestamp)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS trip(id INTEGER PRIMARY KEY, start_time INTEGER NOT NULL, end_time INTEGER NOT NULL,
+    open INTEGER NOT NULL DEFAULT 1, raw INTEGER NOT NULL DEFAULT 1, start_reason TEXT, end_reason TEXT,
+    distance_km REAL, duration_s REAL, max_speed_kmh REAL, avg_speed_kmh REAL, aa_time_s REAL, fuel_l REAL,
+    consumption_l_100km REAL, summary TEXT);
+CREATE INDEX IF NOT EXISTS trip_start_time ON trip(start_time);
+CREATE TABLE IF NOT EXISTS recording(id INTEGER PRIMARY KEY, start_time INTEGER NOT NULL, end_time INTEGER NOT NULL,
+    open INTEGER NOT NULL DEFAULT 1, trigger TEXT NOT NULL, label TEXT, samples INTEGER NOT NULL DEFAULT 0);
+"""
 
-INTERNAL = ("speedDistance", "last", "odometerStart", "odometerEnd", "fuelStart", "fuelEnd")
+# trip dict (the interface) <-> columns; the rest goes into summary
+TRIP_COLUMNS = {
+    "startReason": "start_reason", "endReason": "end_reason", "distance": "distance_km",
+    "maxSpeed": "max_speed_kmh", "avgSpeed": "avg_speed_kmh", "fuel": "fuel_l", "consumption": "consumption_l_100km",
+}
+TRIP_SELECT = ("SELECT id, start_time, end_time, open, raw, start_reason, end_reason, distance_km, duration_s, "
+               "max_speed_kmh, avg_speed_kmh, aa_time_s, fuel_l, consumption_l_100km, summary FROM trip")
+RECORDING_SELECT = "SELECT id, start_time, end_time, open, trigger, label, samples FROM recording"
+# internal fields of a trip (trips.py), not shown in queries
+INTERNAL = ("speedDistance", "last", "odometerStart", "odometerEnd", "fuelStart", "fuelEnd", "lastDuration",
+            "lastAa", "atStop", "atEngineOff")
 
 
 class QueryError(Exception):
@@ -73,6 +77,22 @@ def connect(path):
     return db
 
 
+def normalize(value):
+    """The value as stored: booleans and whole numbers as integers, other numbers rounded to 12 significant digits
+    (raw * 0.01 in floating point, 50.370000000000005, becomes 50.37), texts as they are."""
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            return None
+        if value.is_integer() and abs(value) < 2 ** 53:
+            return int(value)
+        return float("%.12g" % value)
+    return value
+
+
 def public_trip(trip):
     if trip is None:
         return None
@@ -80,34 +100,33 @@ def public_trip(trip):
 
 
 def trip_row(row):
-    trip_id, started, ended, is_open, raw, summary = row
-    trip = public_trip(json.loads(summary))
-    trip.update(id=trip_id, start=started, end=ended, open=bool(is_open), raw=bool(raw))
+    (trip_id, start, end, is_open, raw, start_reason, end_reason, distance, duration, max_speed, avg_speed, aa_time,
+     fuel, consumption, summary) = row
+    trip = public_trip(json.loads(summary or "{}"))
+    trip.update(id=trip_id, start=start, end=end, open=bool(is_open), raw=bool(raw), startReason=start_reason,
+                endReason=end_reason, distance=distance, maxSpeed=max_speed, avgSpeed=avg_speed)
+    trip["duration"] = int(round(duration * 1000)) if duration is not None else None
+    trip["aaTime"] = int(round(aa_time * 1000)) if aa_time is not None else None
+    if fuel is not None:
+        trip.update(fuel=fuel, consumption=consumption)
     return trip
 
 
-def recording_row(row):
-    rec_id, started, ended, is_open, reason, label, size = row
-    return {"id": rec_id, "start": started, "end": ended, "open": bool(is_open), "reason": reason, "label": label,
-            "bytes": size}
-
-
-def block_values(times, values):
-    """Splits samples into block rows (t0, t1, n, vmin, vmax, vsum, data) of at most MAX_BLOCK_VALUES/MAX_BLOCK_MS."""
-    rows, first = [], 0
-    for index in range(1, len(times) + 1):
-        if index == len(times) or index - first >= MAX_BLOCK_VALUES or times[index] - times[first] > MAX_BLOCK_MS:
-            ts, vs = times[first:index], values[first:index]
-            rows.append((ts[0], max(ts), len(ts), min(vs), max(vs), math.fsum(vs), codec.encode(ts, vs)))
-            first = index
-    return rows
+def recording_row(row, sample_bytes=DEFAULT_SAMPLE_BYTES):
+    rec_id, start, end, is_open, trigger, label, samples = row
+    return {"id": rec_id, "start": start, "end": end, "open": bool(is_open), "trigger": trigger,
+            "reason": "manual" if trigger == "manual" else "trigger", "label": label or "", "samples": samples,
+            "bytes": int(samples * sample_bytes)}
 
 
 class Store:
-    def __init__(self, path):
+    def __init__(self, path, version=None):
         self.path = path
-        self.keys = {}
-        self.recovered = None  # name of a damaged database that was put aside
+        self.version = version or ""
+        self.signals = {}        # name -> id
+        self.signal_info = {}    # name -> {unit, description, source} known so far (from the sources)
+        self.recovered = None    # name of a damaged database that was put aside
+        self.old_schema = None   # name of a database of the first version that was put aside
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         try:
             self._open()
@@ -116,25 +135,39 @@ class Store:
         except sqlite3.DatabaseError:
             # not a database or damaged beyond use: keep it for inspection (one copy), start a new one
             self.close()
-            self.recovered = path + ".damaged"
-            self._remove_files(self.recovered)
-            for suffix in ("", "-wal", "-shm"):
-                if os.path.exists(path + suffix):
-                    os.replace(path + suffix, self.recovered + suffix)
+            self.recovered = self._put_aside(".damaged")
             self._open()
+
+    def _put_aside(self, suffix):
+        target = self.path + suffix
+        self._remove_files(target)
+        for extra in ("", "-wal", "-shm"):
+            if os.path.exists(self.path + extra):
+                os.replace(self.path + extra, target + extra)
+        return target
 
     def _open(self):
         self.db = None
         new = not os.path.exists(self.path)
         self.db = sqlite3.connect(self.path, isolation_level=None, check_same_thread=False, timeout=10)
+        tables = {name for (name,) in self.db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        if tables & OLD_TABLES:
+            # the first version (compressed blocks): kept as it is, a new database starts
+            self.close()
+            self.old_schema = self._put_aside(".old-schema")
+            new = True
+            self.db = sqlite3.connect(self.path, isolation_level=None, check_same_thread=False, timeout=10)
         if new:
             # only possible before the first table (and before WAL); lets a lowered limit shrink the file
             self.db.execute("PRAGMA auto_vacuum=INCREMENTAL")
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA synchronous=NORMAL")
         self.db.executescript(SCHEMA)
-        self.db.execute("INSERT OR IGNORE INTO meta VALUES ('schema', ?)", (str(SCHEMA_VERSION),))
-        self.keys = {name: key_id for key_id, name in self.db.execute("SELECT id, name FROM keys")}
+        self.db.execute("INSERT OR IGNORE INTO meta VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
+        self.db.execute("INSERT OR IGNORE INTO meta VALUES ('samples', '0')")
+        if self.version:
+            self.db.execute("INSERT OR REPLACE INTO meta VALUES ('logger_version', ?)", (self.version,))
+        self.signals = {name: signal_id for signal_id, name in self.db.execute("SELECT id, name FROM signal")}
 
     def close(self):
         if getattr(self, "db", None) is not None:
@@ -156,96 +189,107 @@ class Store:
         """A second connection for queries (Queries), usable from another thread."""
         return Queries(connect(self.path))
 
+    # --- signals --------------------------------------------------------------------
+
+    def describe(self, name, unit=None, description=None, source=None):
+        """Unit, description, source of a signal, from its source; written at once for a signal that exists."""
+        info = self.signal_info.setdefault(name, {})
+        changed = False
+        for key, value in (("unit", unit), ("description", description), ("source", source)):
+            if value and info.get(key) != value:
+                info[key] = value
+                changed = True
+        if changed and name in self.signals:
+            self.db.execute("UPDATE signal SET unit = coalesce(?, unit), description = coalesce(?, description), "
+                            "source = coalesce(?, source) WHERE id = ?",
+                            (info.get("unit"), info.get("description"), info.get("source"), self.signals[name]))
+
+    def signal_id(self, name, t):
+        signal_id = self.signals.get(name)
+        if signal_id is None:
+            info = self.signal_info.get(name, {})
+            self.db.execute("INSERT OR IGNORE INTO signal(name, unit, description, source, first_seen) "
+                            "VALUES (?, ?, ?, ?, ?)",
+                            (name, info.get("unit"), info.get("description"), info.get("source"), t))
+            signal_id = self.db.execute("SELECT id FROM signal WHERE name = ?", (name,)).fetchone()[0]
+            self.signals[name] = signal_id
+        return signal_id
+
     # --- writing --------------------------------------------------------------------
 
-    def key_id(self, name):
-        key_id = self.keys.get(name)
-        if key_id is None:
-            self.db.execute("INSERT OR IGNORE INTO keys(name) VALUES (?)", (name,))
-            key_id = self.db.execute("SELECT id FROM keys WHERE name = ?", (name,)).fetchone()[0]
-            self.keys[name] = key_id
-        return key_id
-
-    def write(self, series=None, events=(), trips=(), recordings=(), rseries=None):
+    def write(self, samples=(), trips=(), recordings=()):
         """One transaction.
-        series      {key name: (times, values)} for the continuous log
-        events      [(t, topic, data dict)]
+        samples     [(t, signal name, value)]; a second sample of a signal with the same time replaces the first
         trips       summaries; a trip without id gets one (written into the dict)
-        recordings  [{id?, start, end, open, reason, label}]; one without id gets one
-        rseries     {(recording id, key name): (times, values)}"""
+        recordings  [{id?, start, end, open, trigger, label}]; one without id gets one"""
         db = self.db
         db.execute("BEGIN")
         try:
             rows = []
-            for key, (times, values) in (series or {}).items():
-                if times:
-                    key_id = self.key_id(key)
-                    rows += [(key_id,) + row for row in block_values(times, values)]
-            db.executemany("INSERT INTO blocks VALUES (?, ?, ?, ?, ?, ?, ?, ?)", rows)
-            db.executemany("INSERT INTO events(t, topic, data) VALUES (?, ?, ?)",
-                           [(t, topic, json.dumps(data, separators=(",", ":"))) for t, topic, data in events])
+            for t, name, value in samples:
+                value = normalize(value)
+                if value is not None:
+                    rows.append((self.signal_id(name, t), int(t), value))
+            if rows:
+                cursor = db.executemany("INSERT OR REPLACE INTO sample VALUES (?, ?, ?)", rows)
+                db.execute("UPDATE meta SET value = CAST(value AS INTEGER) + ? WHERE key = 'samples'",
+                           (max(0, cursor.rowcount),))
             for trip in trips:
                 self._write_trip(trip)
             for recording in recordings:
                 self._write_recording(recording)
-            sizes = {}
-            for (rec_id, key), (times, values) in (rseries or {}).items():
-                if times:
-                    key_id = self.key_id(key)
-                    for row in block_values(times, values):
-                        db.execute("INSERT INTO rblocks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (rec_id, key_id) + row)
-                        sizes[rec_id] = sizes.get(rec_id, 0) + len(row[-1]) + 64
-            for rec_id, size in sizes.items():
-                db.execute("UPDATE recordings SET bytes = bytes + ? WHERE id = ?", (size, rec_id))
             db.execute("COMMIT")
         except BaseException:
             db.execute("ROLLBACK")
-            # the keys and ids added in this transaction are gone again
-            self.keys = {name: key_id for key_id, name in db.execute("SELECT id, name FROM keys")}
+            # the signals added in this transaction are gone again
+            self.signals = {name: signal_id for signal_id, name in db.execute("SELECT id, name FROM signal")}
             raise
 
     def _write_trip(self, trip):
         summary = json.dumps({key: value for key, value in trip.items()
-                              if key not in ("id", "start", "end", "open", "raw")}, separators=(",", ":"))
-        values = (trip["start"], trip["end"], int(bool(trip["open"])), summary)
+                              if key not in ("id", "start", "end", "open", "raw", "duration", "aaTime")
+                              and key not in TRIP_COLUMNS}, separators=(",", ":"))
+        values = (trip["start"], trip["end"], int(bool(trip["open"])), trip.get("startReason"), trip.get("endReason"),
+                  trip.get("distance"), trip.get("duration", 0) / 1000.0, trip.get("maxSpeed"), trip.get("avgSpeed"),
+                  trip.get("aaTime", 0) / 1000.0, trip.get("fuel"), trip.get("consumption"), summary)
         if trip.get("id") is None:
-            trip["id"] = self.db.execute("INSERT INTO trips(started, ended, open, summary) VALUES (?, ?, ?, ?)",
-                                         values).lastrowid
+            trip["id"] = self.db.execute(
+                "INSERT INTO trip(start_time, end_time, open, start_reason, end_reason, distance_km, duration_s, "
+                "max_speed_kmh, avg_speed_kmh, aa_time_s, fuel_l, consumption_l_100km, summary) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values).lastrowid
         else:
-            self.db.execute("UPDATE trips SET started = ?, ended = ?, open = ?, summary = ? WHERE id = ?",
-                            values + (trip["id"],))
+            self.db.execute(
+                "UPDATE trip SET start_time = ?, end_time = ?, open = ?, start_reason = ?, end_reason = ?, "
+                "distance_km = ?, duration_s = ?, max_speed_kmh = ?, avg_speed_kmh = ?, aa_time_s = ?, fuel_l = ?, "
+                "consumption_l_100km = ?, summary = ? WHERE id = ?", values + (trip["id"],))
 
     def _write_recording(self, recording):
-        values = (recording["start"], recording["end"], int(bool(recording["open"])), recording["reason"],
+        values = (recording["start"], recording["end"], int(bool(recording["open"])), recording["trigger"],
                   recording.get("label") or "")
         if recording.get("id") is None:
-            recording["id"] = self.db.execute("INSERT INTO recordings(started, ended, open, reason, label) "
+            recording["id"] = self.db.execute("INSERT INTO recording(start_time, end_time, open, trigger, label) "
                                               "VALUES (?, ?, ?, ?, ?)", values).lastrowid
         else:
-            self.db.execute("UPDATE recordings SET started = ?, ended = ?, open = ?, reason = ?, label = ? "
-                            "WHERE id = ?",
-                            values + (recording["id"],))
+            self.db.execute("UPDATE recording SET start_time = ?, end_time = ?, open = ?, trigger = ?, label = ? "
+                            "WHERE id = ?", values + (recording["id"],))
+        self.db.execute("UPDATE recording SET samples = ? WHERE id = ?",
+                        (self._count_window(recording["start"], recording["end"]), recording["id"]))
+
+    def _count_window(self, start, end):
+        return sum(self.db.execute("SELECT count(*) FROM sample WHERE signal_id = ? AND timestamp BETWEEN ? AND ?",
+                                   (signal_id, start, end)).fetchone()[0] for signal_id in self.signals.values())
 
     def open_trips(self):
         """Trips left open (process ended while driving or power cut), with their internal fields."""
-        trips = []
-        for trip_id, started, ended, summary in self.db.execute(
-                "SELECT id, started, ended, summary FROM trips WHERE open = 1 ORDER BY started"):
-            trip = json.loads(summary)
-            trip.update(id=trip_id, start=started, end=ended, open=True)
-            trips.append(trip)
-        return trips
+        return [dict(json.loads(row[-1] or "{}"), **{k: v for k, v in trip_row(row).items()})
+                for row in self.db.execute(TRIP_SELECT + " WHERE open = 1 ORDER BY start_time")]
 
     def close_recordings(self):
         """Recordings left open by the last run end at their last sample."""
-        self.db.execute("UPDATE recordings SET open = 0, ended = max(started, coalesce("
-                        "(SELECT max(t1) FROM rblocks WHERE rec = recordings.id), ended)) WHERE open = 1")
-
-    def recording_bytes(self, rec_id=None):
-        if rec_id is None:
-            return self.db.execute("SELECT coalesce(sum(bytes), 0) FROM recordings").fetchone()[0]
-        row = self.db.execute("SELECT bytes FROM recordings WHERE id = ?", (rec_id,)).fetchone()
-        return row[0] if row else 0
+        for rec_id, start, end in self.db.execute("SELECT id, start_time, end_time FROM recording WHERE open = 1")\
+                .fetchall():
+            self.db.execute("UPDATE recording SET open = 0, samples = ? WHERE id = ?",
+                            (self._count_window(start, end), rec_id))
 
     # --- size -----------------------------------------------------------------------
 
@@ -266,21 +310,37 @@ class Store:
         free = self.db.execute("PRAGMA freelist_count").fetchone()[0]
         return (pages - free) * page_size
 
+    def sample_count(self):
+        return int(self.db.execute("SELECT value FROM meta WHERE key = 'samples'").fetchone()[0])
+
+    def sample_bytes(self):
+        """Average bytes of a sample row (the database divided by the samples it holds)."""
+        count = self.sample_count()
+        return self.used_bytes() / count if count >= 1000 else DEFAULT_SAMPLE_BYTES
+
+    def recording_bytes(self, rec_id=None):
+        if rec_id is None:
+            samples = self.db.execute("SELECT coalesce(sum(samples), 0) FROM recording").fetchone()[0]
+        else:
+            row = self.db.execute("SELECT samples FROM recording WHERE id = ?", (rec_id,)).fetchone()
+            samples = row[0] if row else 0
+        return int(samples * self.sample_bytes())
+
     def log_bytes(self):
-        """What counts towards the log's limit: everything but the recordings."""
+        """What counts towards the log's limit: everything but the samples in recording windows."""
         return max(0, self.used_bytes() - self.recording_bytes())
 
     def enforce(self, limit_bytes, max_age_ms=0, now=None, recording_limit_bytes=None):
-        """Applies the limits: recordings beyond their quota go first (oldest whole recordings, not the open one);
-        then the log: the blocks and events of the oldest trips (their summaries stay), and the oldest trip summaries
-        above MAX_TRIPS. Returns the number of dropped log blocks."""
+        """Applies the limits: recordings beyond their quota go first (oldest whole recordings with their samples,
+        not the open one); then the log: the oldest samples outside recording windows, trip by trip (their summaries
+        stay), and the oldest trip summaries above MAX_TRIPS. Returns the number of dropped samples."""
+        dropped = 0
         if recording_limit_bytes is not None:
             while self.recording_bytes() > recording_limit_bytes:
-                row = self.db.execute("SELECT id FROM recordings WHERE open = 0 ORDER BY started LIMIT 1").fetchone()
+                row = self.db.execute("SELECT id FROM recording WHERE open = 0 ORDER BY start_time LIMIT 1").fetchone()
                 if row is None:
                     break
-                self.delete_recording(row[0])
-        dropped = 0
+                dropped += self.delete_recording(row[0])
         if max_age_ms:
             now = now if now is not None else int(time.time() * 1000)
             dropped += self._drop_before(now - max_age_ms)
@@ -290,12 +350,15 @@ class Store:
             cutoff = self._next_cutoff()
             if cutoff is None:
                 break
-            dropped += self._drop_before(cutoff)
+            removed = self._drop_before(cutoff)
+            dropped += removed
             self.db.execute("PRAGMA wal_checkpoint(PASSIVE)")
-        excess = self.db.execute("SELECT count(*) FROM trips").fetchone()[0] - MAX_TRIPS
+            if not removed and self._next_cutoff() == cutoff:
+                break  # only recordings left
+        excess = self.db.execute("SELECT count(*) FROM trip").fetchone()[0] - MAX_TRIPS
         if excess > 0:
-            self.db.execute("DELETE FROM trips WHERE id IN (SELECT id FROM trips WHERE open = 0 "
-                            "ORDER BY started LIMIT ?)", (excess,))
+            self.db.execute("DELETE FROM trip WHERE id IN (SELECT id FROM trip WHERE open = 0 "
+                            "ORDER BY start_time LIMIT ?)", (excess,))
         total = limit_bytes + (recording_limit_bytes or 0)
         if self.file_bytes() > total * 1.25:
             # a limit was lowered: give the free pages back (writes, so only then)
@@ -304,61 +367,86 @@ class Store:
         return dropped
 
     def delete_recording(self, rec_id):
+        """Deletes a recording and the samples in its window. Returns their number."""
+        row = self.db.execute("SELECT start_time, end_time FROM recording WHERE id = ?", (rec_id,)).fetchone()
+        if row is None:
+            return 0
         self.db.execute("BEGIN")
         try:
-            self.db.execute("DELETE FROM rblocks WHERE rec = ?", (rec_id,))
-            self.db.execute("DELETE FROM recordings WHERE id = ?", (rec_id,))
-            self.db.execute("COMMIT")
-        except BaseException:
-            self.db.execute("ROLLBACK")
-            raise
-
-    def _next_cutoff(self):
-        """End of the oldest closed trip that still has samples, else the oldest tenth of the logged time."""
-        first, last, first_end = self.db.execute("SELECT min(t0), max(t1), min(t1) FROM blocks").fetchone()
-        if first is None:
-            first, last = self.db.execute("SELECT min(t), max(t) FROM events").fetchone()
-            if first is None:
-                return None
-        row = self.db.execute("SELECT ended FROM trips WHERE open = 0 AND raw = 1 AND ended >= ? "
-                              "ORDER BY started LIMIT 1", (first,)).fetchone()
-        if row is not None and row[0] < last:
-            cutoff = row[0] + 1
-        else:
-            cutoff = first + max(1, (last - first) // 10) + 1
-        # at least one whole block
-        return max(cutoff, first_end + 1) if first_end is not None else cutoff
-
-    def _drop_before(self, cutoff):
-        """Drops the blocks that end and the events before cutoff; trips that started before it lose their raw
-        data."""
-        self.db.execute("BEGIN")
-        try:
-            dropped = self.db.execute("DELETE FROM blocks WHERE t0 < ? AND t1 < ?", (cutoff, cutoff)).rowcount
-            self.db.execute("DELETE FROM events WHERE t < ?", (cutoff,))
-            self.db.execute("UPDATE trips SET raw = 0 WHERE raw = 1 AND open = 0 AND started < ?", (cutoff,))
+            dropped = 0
+            for signal_id in self.signals.values():
+                dropped += self.db.execute("DELETE FROM sample WHERE signal_id = ? AND timestamp BETWEEN ? AND ?",
+                                           (signal_id,) + tuple(row)).rowcount
+            self.db.execute("DELETE FROM recording WHERE id = ?", (rec_id,))
+            self._count_down(dropped)
             self.db.execute("COMMIT")
         except BaseException:
             self.db.execute("ROLLBACK")
             raise
         return dropped
 
+    def _first_sample(self):
+        firsts = [self.db.execute("SELECT min(timestamp) FROM sample WHERE signal_id = ?", (signal_id,)).fetchone()[0]
+                  for signal_id in self.signals.values()]
+        return min([t for t in firsts if t is not None], default=None)
+
+    def _next_cutoff(self):
+        """End of the oldest closed trip that still has samples, else the oldest tenth of the logged time; samples
+        in recording windows do not count (they are kept)."""
+        firsts = [self.db.execute(
+            "SELECT min(timestamp) FROM sample x WHERE signal_id = ? AND NOT EXISTS (SELECT 1 FROM recording r "
+            "WHERE x.timestamp BETWEEN r.start_time AND r.end_time)", (signal_id,)).fetchone()[0]
+            for signal_id in self.signals.values()]
+        first = min([t for t in firsts if t is not None], default=None)
+        if first is None:
+            return None
+        last = max(self.db.execute("SELECT max(timestamp) FROM sample WHERE signal_id = ?", (signal_id,)).fetchone()[0]
+                   or 0 for signal_id in self.signals.values())
+        row = self.db.execute("SELECT end_time FROM trip WHERE open = 0 AND raw = 1 AND end_time >= ? "
+                              "ORDER BY start_time LIMIT 1", (first,)).fetchone()
+        if row is not None and row[0] < last:
+            return row[0] + 1
+        return first + max(1, (last - first) // 10) + 1
+
+    def _drop_before(self, cutoff):
+        """Drops the samples before cutoff that are not in a recording window; trips that started before it lose
+        their raw data."""
+        self.db.execute("BEGIN")
+        try:
+            dropped = 0
+            for signal_id in self.signals.values():
+                dropped += self.db.execute(
+                    "DELETE FROM sample WHERE signal_id = ? AND timestamp < ? AND NOT EXISTS (SELECT 1 FROM recording r "
+                    "WHERE sample.timestamp BETWEEN r.start_time AND r.end_time)", (signal_id, cutoff)).rowcount
+            self.db.execute("UPDATE trip SET raw = 0 WHERE raw = 1 AND open = 0 AND start_time < ?", (cutoff,))
+            self._count_down(dropped)
+            self.db.execute("COMMIT")
+        except BaseException:
+            self.db.execute("ROLLBACK")
+            raise
+        return dropped
+
+    def _count_down(self, dropped):
+        if dropped:
+            self.db.execute("UPDATE meta SET value = max(0, CAST(value AS INTEGER) - ?) WHERE key = 'samples'",
+                            (dropped,))
+
     def clear(self):
         """Deletes everything (the files too) and starts an empty database."""
         self.close()
         self._remove_files(self.path)
         self._remove_files(self.path + ".damaged")
-        self.recovered = None
+        self._remove_files(self.path + ".old-schema")
+        self.recovered = self.old_schema = None
         self._open()
 
     def stats(self):
-        trips = self.db.execute("SELECT count(*) FROM trips").fetchone()[0]
-        recordings = self.db.execute("SELECT count(*) FROM recordings").fetchone()[0]
-        oldest = self.db.execute("SELECT min(t0) FROM blocks").fetchone()[0]
+        trips = self.db.execute("SELECT count(*) FROM trip").fetchone()[0]
+        recordings = self.db.execute("SELECT count(*) FROM recording").fetchone()[0]
         recording_bytes = self.recording_bytes()
         return {"usedBytes": max(0, self.used_bytes() - recording_bytes), "fileBytes": self.file_bytes(),
                 "recordingBytes": recording_bytes, "trips": trips, "recordings": recordings,
-                "keys": len(self.keys), "oldestSample": oldest}
+                "signals": len(self.signals), "samples": self.sample_count(), "oldestSample": self._first_sample()}
 
 
 class Queries:
@@ -370,55 +458,60 @@ class Queries:
     def close(self):
         self.db.close()
 
-    def _key_ids(self, names=None):
-        rows = self.db.execute("SELECT id, name FROM keys ORDER BY name").fetchall()
+    def _signal_ids(self, names=None):
+        rows = self.db.execute("SELECT id, name FROM signal ORDER BY name").fetchall()
         if names is None:
             return rows
         wanted = set(names)
-        return [(key_id, name) for key_id, name in rows if name in wanted]
+        return [(signal_id, name) for signal_id, name in rows if name in wanted]
 
     # --- trips and recordings -------------------------------------------------------
 
     def trips(self, start=None, end=None, before=None, limit=50):
         """Trips overlapping [start, end), newest first; before = id for paging (only older ones)."""
-        rows, more = self._list("SELECT id, started, ended, open, raw, summary FROM trips", start, end, before, limit)
+        rows, more = self._list(TRIP_SELECT, start, end, before, limit)
         return {"trips": [trip_row(row) for row in rows], "more": more}
 
     def recordings(self, start=None, end=None, before=None, limit=50):
-        rows, more = self._list("SELECT id, started, ended, open, reason, label, bytes FROM recordings",
-                                start, end, before, limit)
-        return {"recordings": [recording_row(row) for row in rows], "more": more}
+        rows, more = self._list(RECORDING_SELECT, start, end, before, limit)
+        sample_bytes = self._sample_bytes()
+        return {"recordings": [recording_row(row, sample_bytes) for row in rows], "more": more}
+
+    def _sample_bytes(self):
+        page_size = self.db.execute("PRAGMA page_size").fetchone()[0]
+        pages = self.db.execute("PRAGMA page_count").fetchone()[0] - self.db.execute("PRAGMA freelist_count")\
+            .fetchone()[0]
+        count = int(self.db.execute("SELECT value FROM meta WHERE key = 'samples'").fetchone()[0])
+        return pages * page_size / count if count >= 1000 else DEFAULT_SAMPLE_BYTES
 
     def _list(self, sql, start, end, before, limit):
         limit = max(1, min(int(limit), MAX_LIST))
         where, params = [], []
         if start is not None:
-            where.append("ended >= ?")
+            where.append("end_time >= ?")
             params.append(int(start))
         if end is not None:
-            where.append("started < ?")
+            where.append("start_time < ?")
             params.append(int(end))
         if before is not None:
             where.append("id < ?")
             params.append(int(before))
         if where:
             sql += " WHERE " + " AND ".join(where)
-        rows = self.db.execute(sql + " ORDER BY started DESC, id DESC LIMIT ?", params + [limit + 1]).fetchall()
+        rows = self.db.execute(sql + " ORDER BY start_time DESC, id DESC LIMIT ?", params + [limit + 1]).fetchall()
         return rows[:limit], len(rows) > limit
 
     def trip(self, trip_id):
-        row = self.db.execute("SELECT id, started, ended, open, raw, summary FROM trips WHERE id = ?",
-                              (int(trip_id),)).fetchone()
+        row = self.db.execute(TRIP_SELECT + " WHERE id = ?", (int(trip_id),)).fetchone()
         if row is None:
             raise QueryError("no trip %s" % trip_id)
         return {"trip": trip_row(row)}
 
     def recording(self, rec_id):
-        row = self.db.execute("SELECT id, started, ended, open, reason, label, bytes FROM recordings WHERE id = ?",
-                              (int(rec_id),)).fetchone()
+        row = self.db.execute(RECORDING_SELECT + " WHERE id = ?", (int(rec_id),)).fetchone()
         if row is None:
             raise QueryError("no recording %s" % rec_id)
-        return recording_row(row)
+        return recording_row(row, self._sample_bytes())
 
     def range_of(self, params, now):
         """[start, end) from start/end, a trip or a recording; start/end narrow a trip or recording."""
@@ -443,133 +536,92 @@ class Queries:
             raise QueryError("end must be after start")
         return start, end
 
-    # --- samples --------------------------------------------------------------------
+    # --- signals and samples --------------------------------------------------------
 
-    def _blocks(self, key_id, start, end, recording):
-        """Decoded (times, values) of the blocks of a key overlapping [start, end), in order."""
-        if recording is None:
-            sql, params = "SELECT t0, data FROM blocks WHERE key = ?", [key_id]
-        else:
-            sql, params = "SELECT t0, data FROM rblocks WHERE rec = ? AND key = ?", [int(recording), key_id]
-        sql += " AND t0 >= ? AND t0 < ? AND t1 >= ? ORDER BY t0"
-        for t0, data in self.db.execute(sql, params + [start - MAX_BLOCK_MS, end, start]):
-            yield codec.decode(t0, data)
-
-    def _before(self, key_id, start, recording):
-        """The value held at start: the last sample before it."""
-        if recording is None:
-            sql, params = "SELECT t0, data FROM blocks WHERE key = ?", [key_id]
-        else:
-            sql, params = "SELECT t0, data FROM rblocks WHERE rec = ? AND key = ?", [int(recording), key_id]
-        rows = self.db.execute(sql + " AND t0 < ? ORDER BY t0 DESC LIMIT 2", params + [start]).fetchall()
-        best = None
-        for t0, data in rows:
-            times, values = codec.decode(t0, data)
-            for t, value in zip(times, values):
-                if t < start and (best is None or t >= best[0]):
-                    best = (t, value)
-        return best[1] if best else None
-
-    def keys(self, recording=None):
+    def signals(self):
         result = []
-        table, extra = ("blocks", "") if recording is None else ("rblocks", " AND rec = %d" % int(recording))
-        for key_id, name in self._key_ids():
-            first = self.db.execute("SELECT min(t0) FROM %s WHERE key = ?%s" % (table, extra), (key_id,)).fetchone()[0]
-            if first is None:
-                continue
-            t0, data = self.db.execute("SELECT t0, data FROM %s WHERE key = ?%s ORDER BY t0 DESC LIMIT 1"
-                                       % (table, extra), (key_id,)).fetchone()
-            times, values = codec.decode(t0, data)
-            last = max(range(len(times)), key=lambda i: times[i])
-            result.append({"key": name, "first": first, "last": times[last], "value": values[last]})
-        return {"keys": result}
+        for signal_id, name, unit, description, source, first_seen in self.db.execute(
+                "SELECT id, name, unit, description, source, first_seen FROM signal ORDER BY name").fetchall():
+            first = self.db.execute("SELECT min(timestamp) FROM sample WHERE signal_id = ?", (signal_id,)).fetchone()[0]
+            last = value = None
+            if first is not None:
+                last, value = self.db.execute("SELECT timestamp, value FROM sample WHERE signal_id = ? "
+                                              "ORDER BY timestamp DESC LIMIT 1", (signal_id,)).fetchone()
+            result.append({"name": name, "key": name, "unit": unit, "description": description, "source": source,
+                           "firstSeen": first_seen, "first": first, "last": last, "value": value})
+        return {"signals": result}
 
-    def samples(self, start, end, keys=None, points=300, limit=5000, recording=None):
-        """Series per key in [start, end) of the log or of a recording.
+    def samples(self, start, end, keys=None, points=300, limit=5000):
+        """Series per signal in [start, end).
         points > 0: downsampled into that many equal time buckets: t = bucket start, v = average, min, max of the
-        samples in it; empty buckets are left out. Buckets of SUMMARY_BUCKET_MS or more come from the block
-        summaries (a block counts in the bucket of its first sample).
+        samples in it (for texts: the last value, min/max null); empty buckets are left out.
         points = 0: the raw samples, up to limit values in all (more = true if cut).
-        before = the value held at start (last sample before it). Keys without data there are left out."""
+        before = the value held at start (last sample before it). Signals without data there are left out."""
         points = int(points)
         if points < 0 or points > MAX_POINTS:
             raise QueryError("points must be 0..%d" % MAX_POINTS)
-        key_ids = self._key_ids(keys)
+        signal_ids = self._signal_ids(keys)
         series, more = {}, False
         if points:
-            if points * len(key_ids) > MAX_VALUES:
-                raise QueryError("too many values (keys x points > %d), ask for fewer keys or points" % MAX_VALUES)
+            if points * len(signal_ids) > MAX_VALUES:
+                raise QueryError("too many values (signals x points > %d), ask for fewer signals or points"
+                                 % MAX_VALUES)
             bucket = max(1, math.ceil((end - start) / points))
-            for key_id, name in key_ids:
-                if bucket >= SUMMARY_BUCKET_MS:
-                    buckets = self._summary_buckets(key_id, start, end, bucket, recording)
-                else:
-                    buckets = {}
-                    for times, values in self._blocks(key_id, start, end, recording):
-                        for t, value in zip(times, values):
-                            if start <= t < end:
-                                entry = buckets.get((t - start) // bucket)
-                                if entry is None:
-                                    buckets[(t - start) // bucket] = [value, 1, value, value]
-                                else:
-                                    entry[0] += value
-                                    entry[1] += 1
-                                    entry[2] = min(entry[2], value)
-                                    entry[3] = max(entry[3], value)
-                order = sorted(buckets)
-                before = self._before(key_id, start, recording)
-                if not order and before is None:
-                    continue  # no data of this key here
-                series[name] = {"t": [start + b * bucket for b in order],
-                                "v": [round(buckets[b][0] / buckets[b][1], 4) for b in order],
-                                "min": [buckets[b][2] for b in order],
-                                "max": [buckets[b][3] for b in order],
-                                "before": before}
+            for signal_id, name in signal_ids:
+                rows = self.db.execute(
+                    "SELECT (timestamp - ?) / ? AS b, avg(value), min(value), max(value), "
+                    "sum(typeof(value) = 'text'), value, max(timestamp) FROM sample "
+                    "WHERE signal_id = ? AND timestamp >= ? AND timestamp < ? GROUP BY b ORDER BY b",
+                    (start, bucket, signal_id, start, end)).fetchall()
+                before = self._before(signal_id, start)
+                if not rows and before is None:
+                    continue
+                entry = {"t": [], "v": [], "min": [], "max": [], "before": before}
+                for b, average, low, high, texts, last, _ in rows:
+                    entry["t"].append(start + b * bucket)
+                    if texts:
+                        entry["v"].append(last)
+                        entry["min"].append(None)
+                        entry["max"].append(None)
+                    else:
+                        entry["v"].append(round(average, 4))
+                        entry["min"].append(low)
+                        entry["max"].append(high)
+                series[name] = entry
             return {"start": start, "end": end, "points": points, "bucket": bucket, "series": series}
         budget = max(1, min(int(limit), MAX_VALUES))
-        for key_id, name in key_ids:
-            times_out, values_out = [], []
-            for times, values in self._blocks(key_id, start, end, recording):
-                for t, value in zip(times, values):
-                    if start <= t < end:
-                        if len(times_out) >= budget:
-                            more = True
-                            break
-                        times_out.append(t)
-                        values_out.append(value)
-                if more:
-                    break
-            before = self._before(key_id, start, recording)
-            if times_out or before is not None:
-                series[name] = {"t": times_out, "v": values_out, "before": before}
-            budget -= len(times_out)
+        for index, (signal_id, name) in enumerate(signal_ids):
+            rows = self.db.execute("SELECT timestamp, value FROM sample WHERE signal_id = ? AND timestamp >= ? "
+                                   "AND timestamp < ? ORDER BY timestamp LIMIT ?",
+                                   (signal_id, start, end, budget + 1)).fetchall()
+            if len(rows) > budget:
+                rows, more = rows[:budget], True
+            before = self._before(signal_id, start)
+            if rows or before is not None:
+                series[name] = {"t": [t for t, _ in rows], "v": [v for _, v in rows], "before": before}
+            budget -= len(rows)
             if budget <= 0:
-                more = more or key_id != key_ids[-1][0]
+                more = more or index < len(signal_ids) - 1
                 break
         return {"start": start, "end": end, "points": 0, "series": series, "more": more}
 
-    def _summary_buckets(self, key_id, start, end, bucket, recording):
-        if recording is None:
-            sql, params = "FROM blocks WHERE key = ?", [key_id]
-        else:
-            sql, params = "FROM rblocks WHERE rec = ? AND key = ?", [int(recording), key_id]
-        rows = self.db.execute("SELECT (max(t0, ?) - ?) / ?, sum(vsum), sum(n), min(vmin), max(vmax) " + sql
-                               + " AND t0 >= ? AND t0 < ? AND t1 >= ? GROUP BY 1",
-                               [start, start, bucket] + params + [start - MAX_BLOCK_MS, end, start]).fetchall()
-        return {b: [total, count, low, high] for b, total, count, low, high in rows if count}
+    def _before(self, signal_id, start):
+        row = self.db.execute("SELECT value FROM sample WHERE signal_id = ? AND timestamp < ? "
+                              "ORDER BY timestamp DESC LIMIT 1", (signal_id, start)).fetchone()
+        return row[0] if row else None
 
-    def events(self, start, end, topic=None, limit=1000):
-        """Events in [start, end), oldest first; topic = exact topic or prefix ending in ".*"."""
+    def events(self, start, end, pattern=None, limit=1000):
+        """Text samples (gear "drive", call state, ...) in [start, end), oldest first; pattern = a signal name or a
+        prefix ending in ".*"."""
         limit = max(1, min(int(limit), MAX_EVENTS))
-        sql, params = "SELECT t, topic, data FROM events WHERE t >= ? AND t < ?", [start, end]
-        if topic:
-            if topic.endswith(".*"):
-                sql += " AND substr(topic, 1, ?) = ?"
-                params += [len(topic) - 1, topic[:-1]]
-            else:
-                sql += " AND topic = ?"
-                params.append(topic)
-        rows = self.db.execute(sql + " ORDER BY t, id LIMIT ?", params + [limit + 1]).fetchall()
-        return {"start": start, "end": end, "events": [{"t": t, "topic": tp, "data": json.loads(data)}
-                                                       for t, tp, data in rows[:limit]],
+        names = [(signal_id, name) for signal_id, name in self._signal_ids()
+                 if not pattern or name == pattern or (pattern.endswith(".*") and name.startswith(pattern[:-1]))]
+        rows = []
+        for signal_id, name in names:
+            rows += [(t, name, value) for t, value in self.db.execute(
+                "SELECT timestamp, value FROM sample WHERE signal_id = ? AND timestamp >= ? AND timestamp < ? "
+                "AND typeof(value) = 'text' ORDER BY timestamp LIMIT ?", (signal_id, start, end, limit + 1))]
+        rows.sort()
+        return {"start": start, "end": end, "events": [{"t": t, "key": name, "value": value}
+                                                       for t, name, value in rows[:limit]],
                 "more": len(rows) > limit}

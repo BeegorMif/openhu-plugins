@@ -6,9 +6,10 @@ use the interface below (README.md).
 Config (plugin data dir, config.json; the page and "set" change it):
     enabled           logging on (default off: nothing is recorded until the user switches it on)
     groups            {"vehicle": true, "openhu": true, "health": true, "position": false}
-    interval          seconds between samples (1-60, default 5), for every key without its own rate
-    rates             {"<key or pattern>": seconds (0.1-3600) or "update"}, e.g. {"vehicle.engine.*": "update",
-                      "vehicle.speed.kmh": 1}; the most specific pattern wins; "update" = every update on the bus
+    interval          seconds between readings of the head unit values (1-60, default 5)
+    rates             {"<signal or pattern>": seconds (0.1-3600) or "update"}, default {"vehicle.*": 5}, e.g.
+                      {"vehicle.engine.*": "update", "vehicle.speed.kmh": 1}; the most specific pattern wins;
+                      "update" = every change as it arrives (also for signals without a rate)
     limitMB           size limit of the database (default 1024); the oldest raw samples go first
     maxAgeDays        raw samples older than this are dropped (0 = no limit)
     stopMinutes       a trip ends after standing still this long (default 10)
@@ -18,11 +19,11 @@ Config (plugin data dir, config.json; the page and "set" change it):
                       "above": 3000}], "preSeconds": 5, "postSeconds": 10, "maxSeconds": 600, "limitMB": 256}
 
 Bus (details in README.md):
-    logger.query   {id, cmd: trips|trip|recordings|keys|samples|events|live|status, ...}
+    logger.query   {id, cmd: trips|trip|recordings|signals|samples|events|live|status, ...}
                                                        -> logger.result {id, cmd, ok, ...}
     logger.command {id, cmd: set|record|deleteRecording|clear, ...}  -> logger.result if id is given
     logger.state   (published) settings, storage use, open trip - for the page
-    logger.live    (published every interval) current values and the open trip
+    logger.live    (published every second) current values and the open trip
     logger.trip    (one-shot) {event: start|end, trip}
     logger.recording (one-shot) {event: start|end, recording}
 """
@@ -44,7 +45,7 @@ sys.path.insert(0, HERE)
 
 import openhu  # noqa: E402
 from logstore import QueryError, Store  # noqa: E402
-from recorder import OPENHU_TOPICS, Recorder, valid_rate  # noqa: E402
+from recorder import METADATA_TOPIC, OPENHU_TOPICS, Recorder, valid_rate  # noqa: E402
 
 log = logging.getLogger("logger")
 
@@ -52,7 +53,7 @@ DEFAULTS = {
     "enabled": False,
     "groups": {"vehicle": True, "openhu": True, "health": True, "position": False},
     "interval": 5,
-    "rates": {},
+    "rates": {"vehicle.*": 5},
     "limitMB": 1024,
     "maxAgeDays": 0,
     "stopMinutes": 10,
@@ -102,7 +103,7 @@ def save_config(path, config):
 
 
 def read_health(data_dir):
-    """hu.* values of the head unit, from local files (rounded, so they change less often)."""
+    """headunit.* values (recorder.HEADUNIT_SIGNALS), from local files, rounded so they change less often."""
     values = {}
     temps = []
     for path in glob.glob("/sys/class/thermal/thermal_zone*/temp"):
@@ -112,20 +113,20 @@ def read_health(data_dir):
         except (OSError, ValueError):
             pass
     if temps:
-        values["hu.cpuTemp"] = round(max(temps))
+        values["headunit.cpu_temp_c"] = round(max(temps))
     try:
-        values["hu.load"] = round(os.getloadavg()[0], 1)
+        values["headunit.cpu_load"] = round(os.getloadavg()[0], 1)
     except OSError:
         pass
     try:
         with open("/proc/meminfo") as file:
             for line in file:
                 if line.startswith("MemAvailable:"):
-                    values["hu.memFreeMB"] = int(line.split()[1]) // 1024
+                    values["headunit.memory_free_mb"] = int(line.split()[1]) // 1024
     except (OSError, ValueError, IndexError):
         pass
     try:
-        values["hu.diskFreeMB"] = shutil.disk_usage(data_dir).free // (1024 * 1024)
+        values["headunit.disk_free_mb"] = shutil.disk_usage(data_dir).free // (1024 * 1024)
     except OSError:
         pass
     return values
@@ -157,10 +158,13 @@ class LoggerPlugin:
         self.config.update(overrides or {})
         self.api = api or openhu.OpenHU()
         self.health = health
-        self.store = Store(os.path.join(self.data_dir, "logger.db"))
+        info = system_info()
+        self.store = Store(os.path.join(self.data_dir, "logger.db"), info.get("loggerVersion"))
+        if self.store.old_schema:
+            log.info("database of an older version moved to %s", self.store.old_schema)
         self.reader = self.store.reader()
         self.read_lock = asyncio.Lock()
-        self.recorder = Recorder(self.store, self.config, system_info())
+        self.recorder = Recorder(self.store, self.config, info)
         self.recorder.restore(now_ms())
         self.error = ""
         self.stopping = asyncio.Event()
@@ -168,6 +172,7 @@ class LoggerPlugin:
         self.api.on("vehicle.*", self.on_topic)
         for topic in OPENHU_TOPICS:
             self.api.on(topic, self.on_topic)
+        self.api.on(METADATA_TOPIC, self.on_signals_info)
         self.api.on("logger.query", self.on_query)
         self.api.on("logger.command", self.on_command)
 
@@ -176,6 +181,12 @@ class LoggerPlugin:
     async def on_topic(self, topic, data):
         self.recorder.on_topic(topic, data, now_ms())
         await self.announce()
+
+    async def on_signals_info(self, topic, data):
+        try:
+            self.recorder.on_signals_info(data)
+        except sqlite3.Error as error:
+            log.warning("signal info: %s", error)
 
     async def announce(self):
         while self.recorder.announcements:
@@ -200,7 +211,7 @@ class LoggerPlugin:
             log.warning("size limit: %s", error)
 
     async def tick_loop(self):
-        last_flush = last_enforce = last_state = last_interval = time.monotonic()
+        last_flush = last_enforce = last_state = last_interval = last_live = time.monotonic()
         self.enforce()
         while not self.stopping.is_set():
             try:
@@ -210,15 +221,18 @@ class LoggerPlugin:
                 pass
             t = now_ms()
             current = time.monotonic()
-            # health and logger.live at the interval, samples at the fastest rate
+            # head unit values at the interval; samples at the fastest rate; trips and logger.live every second
             interval = current - last_interval >= float(self.config["interval"]) - 0.02
             if interval:
                 last_interval = current
+            second = current - last_live >= 0.98
+            if second:
+                last_live = current
             if self.config["enabled"]:
                 health = self.health(self.data_dir) if interval and self.config["groups"].get("health") else None
                 self.recorder.tick(t, health)
             await self.announce()
-            if interval and self.api.connected:
+            if second and self.api.connected:
                 await self.api.safe(self.api.publish("logger.live", **self.recorder.live(t)))
             if current - last_flush >= float(self.config["flushSeconds"]):
                 last_flush = current
@@ -244,7 +258,8 @@ class LoggerPlugin:
         return dict(config, usage=usage, trip=self.recorder.trip, recording=self.recorder.public_recording(),
                     vehicleData=self.recorder.vehicle_data,
                     error=self.recorder.error or self.error,
-                    recovered=os.path.basename(self.store.recovered) if self.store.recovered else "")
+                    recovered=os.path.basename(self.store.recovered) if self.store.recovered else "",
+                    oldSchema=os.path.basename(self.store.old_schema) if self.store.old_schema else "")
 
     async def publish_state(self):
         if self.api.connected:
@@ -407,18 +422,17 @@ class LoggerPlugin:
             return reader.trip(data.get("trip"))
         if command == "recordings":
             return reader.recordings(data.get("start"), data.get("end"), data.get("before"), data.get("limit", 50))
-        if command == "keys":
-            return reader.keys(data.get("recording"))
+        if command in ("signals", "keys"):
+            return reader.signals()
         if command == "samples":
             start, end = reader.range_of(data, now)
-            keys = data.get("keys")
+            keys = data.get("keys", data.get("signals"))
             if keys is not None and not isinstance(keys, list):
                 raise QueryError("keys must be a list")
-            return reader.samples(start, end, keys, data.get("points", 300), data.get("limit", 5000),
-                                  data.get("recording"))
+            return reader.samples(start, end, keys, data.get("points", 300), data.get("limit", 5000))
         if command == "events":
             start, end = reader.range_of(data, now)
-            return reader.events(start, end, data.get("topic"), data.get("limit", 1000))
+            return reader.events(start, end, data.get("key") or data.get("topic"), data.get("limit", 1000))
         raise QueryError("unknown query %s" % command)
 
     # --- main -----------------------------------------------------------------------

@@ -14,8 +14,8 @@ Item {
     readonly property var groups: info.groups || {}
     readonly property var usage: info.usage || {}
     readonly property var limits: [100, 250, 500, 1024, 2048, 4096, 8192, 16384]
-    // rate of vehicle.*: seconds (whole or tenths) or "update" (every update on the bus); unset = the interval
-    readonly property var vehicleRate: (info.rates || {})["vehicle.*"] === undefined ? (info.interval || 5)
+    // rate of vehicle.*: seconds (whole or tenths) or "update" (every change); unset = every change
+    readonly property var vehicleRate: (info.rates || {})["vehicle.*"] === undefined ? "update"
                                                                                    : info.rates["vehicle.*"]
     // 0 = every n seconds, 1 = every 0.n seconds, 2 = every change
     readonly property int vehicleMode: vehicleRate === "update" ? 2 : (Number(vehicleRate) < 1 ? 1 : 0)
@@ -153,9 +153,10 @@ Item {
                         }
                     }
 
-                    // the other values (Android Auto, head unit): every n seconds
+                    // head unit values (CPU, memory, disk): read every n seconds
                     RowLayout {
                         Layout.fillWidth: true
+                        visible: !!page.groups.health
                         Text {
                             Layout.fillWidth: true
                             text: qsTrId("org.openhu.logger.main.interval")
@@ -293,10 +294,11 @@ Item {
                 }
                 Text {
                     Layout.fillWidth: true
-                    visible: !!page.info.error || !!page.info.recovered
+                    visible: !!page.info.error || !!page.info.recovered || !!page.info.oldSchema
                     wrapMode: Text.WordWrap
                     text: page.info.error ? qsTrId("org.openhu.logger.main.error").arg(page.info.error)
-                                          : qsTrId("org.openhu.logger.main.recovered").arg(page.info.recovered || "")
+                          : page.info.recovered ? qsTrId("org.openhu.logger.main.recovered").arg(page.info.recovered)
+                                                : qsTrId("org.openhu.logger.main.old_schema").arg(page.info.oldSchema || "")
                     color: "#ff8a80"
                     font.pixelSize: Theme.fontSmall
                 }

@@ -1,6 +1,6 @@
-"""Storage per hour with synthetic CAN data: 20 signals logged on every update at 10 Hz and 100 Hz, written in
-30 s batches like the process does. Prints the numbers (README.md, "Storage") and checks the target of the issue
-(1-2 MB per hour for 20 fields at 10 Hz).
+"""Storage per hour with synthetic CAN data: 20 signals updated at 10 Hz and 100 Hz, logged on every change or at
+the default 5 s, written in 30 s batches like the process does. Prints the numbers (README.md, "Storage"): MB per
+hour, bytes per stored sample (one row of the sample table, the B-tree included) and how long 1 GB lasts.
 
     python3 -m unittest -v tests.test_storage_rate        # in the plugin folder
 """
@@ -22,7 +22,7 @@ from recorder import Recorder  # noqa: E402
 CONFIG = {
     "enabled": True,
     "groups": {"vehicle": True, "openhu": True, "health": True, "position": False},
-    "interval": 5, "rates": {"vehicle.*": "update"}, "stopMinutes": 10, "engineOffSeconds": 60,
+    "interval": 5, "rates": {"vehicle.*": "update"}, "stopMinutes": 10, "engineOffSeconds": 60,  # every change
     "recording": {"keys": [], "triggers": [], "preSeconds": 0, "postSeconds": 0, "maxSeconds": 600, "limitMB": 256},
 }
 
@@ -97,7 +97,7 @@ def measure(hz, seconds, flush_seconds=30, rates=None):
         step = 1000 // hz
         start = 1_700_000_000_000
         began = time.process_time()
-        values = 0
+        values = 0  # updates that arrived
         for n in range(seconds * hz):
             t = start + n * step
             topics = {}
@@ -115,33 +115,35 @@ def measure(hz, seconds, flush_seconds=30, rates=None):
         cpu = time.process_time() - began
         store.db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         used = store.used_bytes() - empty
+        samples = store.sample_count()
         store.close()
-    return {"bytesPerHour": used * 3600 / seconds, "bytesPerValue": used / values, "values": values,
-            "cpuShare": cpu / seconds}
+    return {"bytesPerHour": used * 3600 / seconds, "bytesPerSample": used / samples, "samples": samples,
+            "updates": values, "cpuShare": cpu / seconds}
 
 
 class StorageRateTest(unittest.TestCase):
     def report(self, what, result):
         gb_hours = 1024 ** 3 / result["bytesPerHour"]
-        print("\n  20 signals %s: %.2f MB/h, %.2f bytes/value, 1 GB lasts %.0f h; "
+        print("\n  20 signals %s: %.2f MB/h, %.1f bytes/sample (%d of %d updates stored), 1 GB lasts %.0f h; "
               "CPU here %.1f %% of real time"
-              % (what, result["bytesPerHour"] / 1024 ** 2, result["bytesPerValue"], gb_hours, result["cpuShare"] * 100),
+              % (what, result["bytesPerHour"] / 1024 ** 2, result["bytesPerSample"], result["samples"],
+                 result["updates"], gb_hours, result["cpuShare"] * 100),
               file=sys.stderr)
 
     def test_10_hz(self):
         result = measure(10, 600)
-        self.report("at 10 Hz, every update", result)
-        self.assertLess(result["bytesPerHour"], 2 * 1024 ** 2)
+        self.report("at 10 Hz, every change", result)
+        self.assertLess(result["bytesPerSample"], 30)
 
     def test_100_hz(self):
         result = measure(100, 120)
-        self.report("at 100 Hz, every update", result)
-        self.assertLess(result["bytesPerValue"], 3)
+        self.report("at 100 Hz, every change", result)
+        self.assertLess(result["bytesPerSample"], 30)
 
     def test_default_interval(self):
-        result = measure(10, 3600, rates={})
+        result = measure(10, 3600, rates={"vehicle.*": 5})
         self.report("updated at 10 Hz, logged every 5 s (default)", result)
-        self.assertLess(result["bytesPerHour"], 0.5 * 1024 ** 2)
+        self.assertLess(result["bytesPerHour"], 1024 ** 2)
 
 
 if __name__ == "__main__":

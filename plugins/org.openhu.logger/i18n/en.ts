@@ -41,7 +41,7 @@
     </message>
     <message id="org.openhu.logger.main.interval">
         <source></source>
-        <translation>Other values every (seconds)</translation>
+        <translation>Head unit values every (seconds)</translation>
     </message>
     <message id="org.openhu.logger.main.limit">
         <source></source>
@@ -70,6 +70,10 @@
     <message id="org.openhu.logger.main.no_vehicle_data">
         <source></source>
         <translation>No vehicle data received yet. Install and set up the CAN bus plugin for vehicle data.</translation>
+    </message>
+    <message id="org.openhu.logger.main.old_schema">
+        <source></source>
+        <translation>The data of an older version of the logger was moved to %1; a new database was started.</translation>
     </message>
     <message id="org.openhu.logger.main.oldest">
         <source></source>

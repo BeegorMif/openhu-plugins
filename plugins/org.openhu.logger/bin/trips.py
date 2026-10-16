@@ -45,6 +45,7 @@ class Trips:
                 self.trip["maxSpeed"] = max(self.trip["maxSpeed"], self.speed)
             elif was_moving or self.stopped_since is None:
                 self.stopped_since = t
+                self._snapshot("atStop")
         elif key in ("vehicle.engine.running", "vehicle.engine.on", "vehicle.engine.rpm"):
             running = bool(value) if key != "vehicle.engine.rpm" else float(value) > 0
             self._step(t)
@@ -56,13 +57,14 @@ class Trips:
                     changes.append(self._start(t, "engine"))
             elif was_running:
                 self.engine_off_since = t
+                self._snapshot("atEngineOff")
         elif key == "vehicle.odometer.km" and self.trip is not None:
             self.trip.setdefault("odometerStart", float(value))
             self.trip["odometerEnd"] = float(value)
         elif key == "vehicle.fuel.liters" and self.trip is not None:
             self.trip.setdefault("fuelStart", float(value))
             self.trip["fuelEnd"] = float(value)
-        elif key == "projection.state.connected":
+        elif key == "androidauto.connected":
             self._step(t)
             self.aa = bool(value)
         self._refresh(t)
@@ -93,20 +95,31 @@ class Trips:
             "duration": 0, "movingTime": 0, "aaTime": 0, "maxSpeed": self.speed if self.moving else 0.0,
             "speedDistance": 0.0, "last": t,
         }
+        self.last = t
         if not self.moving:
             self.stopped_since = t
-        self.last = t
+            self._snapshot("atStop")
         self._refresh(t)
         return ("start", self.trip)
 
+    def _snapshot(self, name):
+        """Duration and Android Auto time at this moment: a trip that ends here later (standstill, engine off) gets
+        these, not the minutes counted while waiting for the end rule."""
+        if self.trip is not None:
+            self.trip[name] = [self.trip["duration"], self.trip["aaTime"]]
+
     def end(self, t, reason, now=None):
-        """Ends the open trip at time t (not before its start). With now (> t): the time between t and now is not
-        part of the trip (the minutes standing still before a trip ends)."""
+        """Ends the open trip at time t (not before its start). With now (> t): the end rule fired later than t, the
+        time between them is not part of the trip (duration and Android Auto time as they were at t)."""
         trip = self.trip
-        if now is None:
-            self._step(t)  # up to the end (logging switched off while driving)
-        else:
+        snapshot = trip.get({"standstill": "atStop", "engine": "atEngineOff"}.get(reason, ""))
+        if now is not None and snapshot is not None:
+            trip["duration"], trip["aaTime"] = snapshot
+        elif now is not None:
             trip["duration"] = max(0, trip["duration"] - max(0, now - t))
+            trip["aaTime"] = min(trip["aaTime"], trip["duration"])
+        else:
+            self._step(t)  # up to the end (logging switched off while driving)
         trip["end"] = max(trip["start"], t)
         trip["open"] = False
         trip["endReason"] = reason
@@ -126,9 +139,13 @@ class Trips:
             self.trip = trip
             self.last = now
             self.stopped_since = last
+            trip["atStop"] = [trip.get("lastDuration", trip["duration"]), trip.get("lastAa", trip["aaTime"])]
             return []
         trip["open"] = False
         trip["end"] = max(trip["start"], last)
+        # as it was at the last activity, not at the last write
+        trip["duration"] = trip.get("lastDuration", trip["duration"])
+        trip["aaTime"] = min(trip.get("lastAa", trip["aaTime"]), trip["duration"])
         trip["endReason"] = "power"
         self._summarize(trip)
         return [("end", trip)]
@@ -153,6 +170,7 @@ class Trips:
             return
         if self.moving or self.engine:
             self.trip["last"] = t
+            self.trip["lastDuration"], self.trip["lastAa"] = self.trip["duration"], self.trip["aaTime"]
         self.trip["end"] = max(self.trip["end"], t)
         self._summarize(self.trip)
 

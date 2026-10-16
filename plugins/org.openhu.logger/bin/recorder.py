@@ -1,18 +1,20 @@
-"""What the logger records: bus topics -> keys, rates, events, trips, high-rate recordings, write batches (no I/O of
-its own besides Store; times in ms since 1970).
+"""What the logger records: bus topics -> signals, rates, trips, high-rate recordings, write batches (no I/O of its own
+besides Store; times in ms since 1970).
 
-Keys are "<topic>.<field>" (one level of nested objects: "<topic>.<field>.<sub>"), e.g. "vehicle.speed.kmh".
-- numbers: written at the rate of their key (config "rates", default "interval"):
-    seconds (0.1 ... 3600)  sample-and-hold: at most one sample per period, only if the value changed
-    "update"                every update that arrives on the bus, changed or not
-- booleans: a sample (0/1) right away when they change, and an event
-- texts (gear "drive", call state, ...): an event when they change
-Groups (switches in the config): vehicle (vehicle.* without vehicle.position), position (vehicle.position),
-openhu (Android Auto connected/transport, call state, media source; no numbers, names or titles) and health
-(hu.*: values of the head unit itself, read by the process).
+Signals:
+- vehicle data: "<topic>.<field>" (one level of nested objects: "<topic>.<field>.<sub>"), e.g. "vehicle.speed.kmh",
+  any field a source publishes; unit and description from the topic "signals.info" if the source publishes it
+- OpenHU state and head unit values: fixed names with descriptions (OPENHU_SIGNALS, HEADUNIT_SIGNALS)
+Values are written only when they change:
+- numbers at the rate of their signal (config "rates", e.g. {"vehicle.*": 5}): seconds (0.1 ... 3600), at most one
+  sample per period with the time the value arrived, or "update": every change as it arrives; signals without a rate
+  on every change
+- booleans and texts (gear "drive", call state) right away
+Groups (switches in the config): vehicle (vehicle.* without vehicle.position), position (vehicle.position), openhu
+(Android Auto, call state, media source; no numbers, names or titles) and health (headunit.*, read by the process).
 
-High-rate recordings (config "recording") take every update of their keys, separately from the log and with their
-own quota: started by hand (start_recording) or while a trigger holds (e.g. rpm above 3000), with the
+High-rate recordings (config "recording") are time windows in which their signals are written on every change,
+whatever their rate: started by hand (start_recording) or while a trigger holds (e.g. rpm above 3000), with the
 preSeconds before the trigger and postSeconds after it.
 """
 
@@ -22,51 +24,59 @@ import math
 from logstore import public_trip
 from trips import Trips
 
-# topic -> fields logged (the openhu group; nothing personal)
-OPENHU_TOPICS = {
-    "projection.state": ("connected",),
-    "projection.transport": ("transport",),
-    "phone.status": ("callState",),
-    "media.status": ("source", "state"),
+# (topic, field) -> (signal, unit, description): the openhu group, nothing personal
+OPENHU_SIGNALS = {
+    ("projection.state", "connected"): ("androidauto.connected", None, "Android Auto connected"),
+    ("projection.transport", "transport"): ("androidauto.transport", None, "How Android Auto is connected (usb, wifi)"),
+    ("phone.status", "callState"): ("phone.call_state", None, "Phone call state (idle, incoming, in_call, ...)"),
+    ("media.status", "source"): ("media.source", None, "Media source (androidauto, radio, ...)"),
+    ("media.status", "state"): ("media.state", None, "Media playback state (playing, paused, stopped)"),
 }
+OPENHU_TOPICS = sorted({topic for topic, _ in OPENHU_SIGNALS})
+# signal -> (unit, description): the health group, read by the process (logger.read_health)
+HEADUNIT_SIGNALS = {
+    "headunit.cpu_temp_c": ("°C", "Head unit CPU temperature (hottest thermal zone)"),
+    "headunit.cpu_load": (None, "Head unit CPU load (1 min average, 1.0 = one core busy)"),
+    "headunit.memory_free_mb": ("MB", "Free memory of the head unit (available to programs)"),
+    "headunit.disk_free_mb": ("MB", "Free space on the head unit's data partition"),
+}
+METADATA_TOPIC = "signals.info"
 MAX_TEXT = 64
-# values kept in memory while the database cannot be written (disk full); the oldest go first
+# samples kept in memory while the database cannot be written (disk full); the oldest go first
 MAX_BUFFER = 500_000
 UPDATE = "update"
 
 
-def group_of(topic):
-    if topic == "vehicle.position":
+def group_of(name):
+    if name.startswith("vehicle.position."):
         return "position"
-    if topic.startswith("vehicle."):
+    if name.startswith("vehicle."):
         return "vehicle"
-    if topic in OPENHU_TOPICS:
-        return "openhu"
-    if topic.startswith("hu."):
+    if name.startswith("headunit."):
         return "health"
-    return None
+    return "openhu"
+
+
+def loggable(value):
+    if isinstance(value, bool) or (isinstance(value, str) and len(value) <= MAX_TEXT):
+        return True
+    return isinstance(value, (int, float)) and math.isfinite(value)
 
 
 def flatten(topic, data):
-    """[(key, value)] of the loggable fields: numbers, booleans, short texts; one level of nested objects."""
+    """[(signal, value)] of the loggable fields of a topic: numbers, booleans, short texts; one level of nested
+    objects for vehicle data, the fixed fields for OpenHU topics."""
     fields = []
-
-    def add(name, value):
-        if isinstance(value, bool) or (isinstance(value, str) and len(value) <= MAX_TEXT):
-            fields.append((name, value))
-        elif isinstance(value, (int, float)) and math.isfinite(value):
-            fields.append((name, value))
-
-    allowed = OPENHU_TOPICS.get(topic)
     for field, value in (data or {}).items():
-        if allowed is not None and field not in allowed:
-            continue
-        if isinstance(value, dict) and allowed is None:
-            for sub, inner in value.items():
-                if not isinstance(inner, dict):
-                    add("%s.%s.%s" % (topic, field, sub), inner)
-        else:
-            add("%s.%s" % (topic, field), value)
+        if not topic.startswith("vehicle."):
+            known = OPENHU_SIGNALS.get((topic, field))
+            if known is not None and loggable(value):
+                fields.append((known[0], value))
+        elif isinstance(value, dict):
+            fields += [("%s.%s.%s" % (topic, field, sub), inner) for sub, inner in value.items()
+                       if not isinstance(inner, dict) and loggable(inner)]
+        elif loggable(value):
+            fields.append(("%s.%s" % (topic, field), value))
     return fields
 
 
@@ -94,44 +104,13 @@ def valid_rate(value):
 
 
 def trigger_holds(trigger, value):
-    if "above" in trigger and not value > trigger["above"]:
+    if "above" in trigger and not (is_number(value) and value > trigger["above"]):
         return False
-    if "below" in trigger and not value < trigger["below"]:
+    if "below" in trigger and not (is_number(value) and value < trigger["below"]):
         return False
     if "equals" in trigger and value != trigger["equals"]:
         return False
     return any(condition in trigger for condition in ("above", "below", "equals"))
-
-
-class Buffers:
-    """Samples per key waiting for the next write: {key: ([times], [values])}"""
-
-    def __init__(self):
-        self.series = {}
-        self.count = 0
-
-    def add(self, key, t, value):
-        times, values = self.series.setdefault(key, ([], []))
-        times.append(t)
-        values.append(float(value))
-        self.count += 1
-
-    def take(self):
-        series, self.series, self.count = self.series, {}, 0
-        return series
-
-    def put_back(self, series):
-        """After a failed write: the rows go back in front, the oldest beyond MAX_BUFFER are dropped."""
-        for key, (times, values) in series.items():
-            newer = self.series.get(key, ([], []))
-            self.series[key] = (times + newer[0], values + newer[1])
-        self.count = sum(len(times) for times, _ in self.series.values())
-        while self.count > MAX_BUFFER:
-            key = max(self.series, key=lambda k: len(self.series[k][0]))
-            times, values = self.series[key]
-            cut = max(1, len(times) // 2)
-            self.series[key] = (times[cut:], values[cut:])
-            self.count -= cut
 
 
 class Recorder:
@@ -140,23 +119,25 @@ class Recorder:
         self.config = config
         self.info = dict(info or {})
         self.trips = Trips()
-        self.values = {}            # key -> latest value
-        self.written = {}           # key -> value of its last sample in the log
-        self.due = {}               # key -> time of its next sample (fixed rates)
-        self.changed_at = {}        # key -> time its value last changed (the time of its sample)
-        self.last_sample = {}       # key -> time of its last sample
+        self.values = {}            # signal -> latest value
+        self.written = {}           # signal -> value of its last sample
+        self.changed_at = {}        # signal -> time its value last changed (the time of its sample)
+        self.last_sample = {}       # signal -> time of its last sample
+        self.due = {}               # signal -> time of its next sample (fixed rates)
         self.rate_cache = {}
-        self.log = Buffers()        # samples of the log not yet written
-        self.events = []            # (t, topic, data)
+        self.samples = []           # (t, signal, value) not yet written
         self.pending_trips = []     # ended trips not yet written
         self.recording = None       # the open recording (dict) or None
         self.pending_recordings = []
-        self.rec = Buffers()        # samples of recordings not yet written ((recording id, key) as key)
-        self.pre = collections.deque()  # (t, key, value) of the last preSeconds, for a triggered recording
+        self.pre = collections.deque()  # (t, signal, value) of the last preSeconds, for a triggered recording
         self.active_triggers = set()
         self.announcements = []     # (topic, data) for the bus: logger.trip, logger.recording
         self.vehicle_data = False   # a vehicle.* topic arrived (the CAN plugin or another source runs)
         self.error = ""             # last write error, "" after a successful write
+        for (topic, _), (name, unit, description) in OPENHU_SIGNALS.items():
+            store.describe(name, unit, description, "openhu:" + topic)
+        for name, (unit, description) in HEADUNIT_SIGNALS.items():
+            store.describe(name, unit, description, "headunit")
         self.apply_config()
 
     def apply_config(self):
@@ -168,80 +149,92 @@ class Recorder:
     def enabled(self, group):
         return bool(self.config["enabled"]) and bool(self.config["groups"].get(group))
 
-    def rate_of(self, key):
-        """Seconds between samples of key, or UPDATE."""
-        rate = self.rate_cache.get(key)
+    def rate_of(self, name):
+        """Seconds between samples of a signal, or UPDATE (every change)."""
+        rate = self.rate_cache.get(name)
         if rate is None:
             rates = self.config.get("rates") or {}
-            pattern = best_match(rates, key)
-            rate = rates[pattern] if pattern is not None and valid_rate(rates[pattern]) else self.config["interval"]
-            self.rate_cache[key] = rate
+            pattern = best_match(rates, name)
+            rate = rates[pattern] if pattern is not None and valid_rate(rates[pattern]) else UPDATE
+            self.rate_cache[name] = rate
         return rate
 
     def fastest_rate(self):
-        """Seconds between ticks: the shortest fixed rate in use."""
+        """Seconds between ticks: the shortest fixed rate in use, at most 1 (trips and the live state)."""
         rates = [rate for rate in (self.config.get("rates") or {}).values() if is_number(rate) and valid_rate(rate)]
-        return min([float(self.config["interval"])] + rates)
+        return min([1.0] + rates)
 
-    def recorded(self, key):
-        return best_match(self.config["recording"].get("keys") or [], key) is not None
+    def recorded(self, name):
+        return best_match(self.config["recording"].get("keys") or [], name) is not None
 
     # --- input ----------------------------------------------------------------------
 
+    def on_signals_info(self, data):
+        """Units and descriptions of a source: {"source": ..., "signals": {"vehicle.speed.kmh": {"unit": "km/h",
+        "description": "Vehicle speed"}}}"""
+        source = data.get("source") if isinstance(data.get("source"), str) else None
+        for name, info in (data.get("signals") or {}).items():
+            if isinstance(name, str) and isinstance(info, dict):
+                text = {key: str(info[key])[:200] for key in ("unit", "description") if info.get(key)}
+                self.store.describe(name, text.get("unit"), text.get("description"), source)
+
     def on_topic(self, topic, data, t):
-        group = group_of(topic)
-        if group in ("vehicle", "position"):
+        if topic.startswith("vehicle."):
             self.vehicle_data = True
-        if group is None or not self.enabled(group):
+        for name, value in flatten(topic, data):
+            self.on_value(name, value, t)
+
+    def on_value(self, name, value, t):
+        if not self.enabled(group_of(name)):
             return
-        changed = {}
-        for key, value in flatten(topic, data):
-            known = key in self.values
-            old = self.values.get(key)
-            self.values[key] = value
-            if not known or old != value:
-                self.changed_at[key] = t
-            if isinstance(value, bool):
-                if not known or old != value or not isinstance(old, bool):
-                    self._sample(t, key, value)
-                    changed[key[len(topic) + 1:]] = value
-            elif isinstance(value, str):
-                if not known or old != value:
-                    changed[key[len(topic) + 1:]] = value
-            elif self.rate_of(key) == UPDATE:
-                self._sample(t, key, value)
-            if not isinstance(value, str):
-                self._record_value(t, key, value)
-            self._trip_changes(self.trips.update(t, key, value))
+        if name.startswith("vehicle.") and name not in self.store.signal_info:
+            self.store.describe(name, source=name.rsplit(".", 1)[0])
+        known = name in self.values
+        old = self.values.get(name)
+        changed = not known or old != value or type(old) is not type(value)
+        self.values[name] = value
         if changed:
-            self._event(t, topic, changed)
+            self.changed_at[name] = t
+            recorded = self.recorded(name)
+            if not is_number(value) or self.rate_of(name) == UPDATE or (recorded and self.recording is not None):
+                self._sample(t, name, value)
+            elif recorded and self.config["recording"].get("triggers") and self.config["recording"].get("preSeconds"):
+                self.pre.append((t, name, value))
+                horizon = t - self.config["recording"]["preSeconds"] * 1000
+                while self.pre and self.pre[0][0] < horizon:
+                    self.pre.popleft()
+        self._check_triggers(name, value, t)
+        self._trip_changes(self.trips.update(t, name, value))
 
     def tick(self, t, health=None):
-        """Every fastest_rate(): health values (if given), samples of the numbers whose period is due, trip end rules,
-        end of recordings."""
-        if health and self.enabled("health"):
-            self.values.update(health)
-        for key, value in self.values.items():
-            if not is_number(value):
+        """At least every second: health values (if given), samples of the numbers whose period is due, trip end
+        rules, end of recordings."""
+        if health:
+            for name, value in health.items():
+                self.on_value(name, value, t)
+        for name, value in self.values.items():
+            if not is_number(value) or self.written.get(name) == value:
                 continue
-            rate = self.rate_of(key)
-            if rate == UPDATE or t < self.due.get(key, t):
+            rate = self.rate_of(name)
+            if rate == UPDATE or t < self.due.get(name, t):
                 continue
             # the next period starts now; a tick a few ms early still counts (timer jitter)
-            self.due[key] = t + int(rate * 1000) - 20
-            if self.written.get(key) != value:
-                # at the time the value arrived (it is held since then), not the time of the tick
-                self._sample(max(self.changed_at.get(key, t), self.last_sample.get(key, 0)), key, value)
+            self.due[name] = t + int(rate * 1000) - 20
+            # at the time the value arrived (it is held since then), not the time of the tick
+            self._sample(self._held_time(name, t), name, value)
         self._trip_changes(self.trips.tick(t))
         self._recording_tick(t)
 
-    def _sample(self, t, key, value):
-        self.log.add(key, t, value)
-        self.written[key] = value
-        self.last_sample[key] = t
+    def _held_time(self, name, t):
+        """Time for the sample of a held value: when it arrived, after the signal's previous sample."""
+        arrived = self.changed_at.get(name, t)
+        last = self.last_sample.get(name)
+        return arrived if last is None else max(arrived, last + 1)
 
-    def _event(self, t, topic, data):
-        self.events.append((t, topic, data))
+    def _sample(self, t, name, value):
+        self.samples.append((t, name, value))
+        self.written[name] = value
+        self.last_sample[name] = t
 
     def _trip_changes(self, changes):
         for kind, trip in changes:
@@ -251,51 +244,39 @@ class Recorder:
                     self.store.write(trips=[trip])  # gives it its id
                 except Exception as error:  # written with the next flush
                     self.error = str(error)
-                self._event(trip["start"], "logger.trip", {"event": "start", "trip": trip.get("id")})
             else:
-                self._event(trip["end"], "logger.trip", {"event": "end", "trip": trip.get("id"),
-                                                         "reason": trip["endReason"]})
                 self.pending_trips.append(trip)
                 self._try_flush()
             self.announcements.append(("logger.trip", {"event": kind, "trip": public_trip(trip)}))
 
     # --- recordings -----------------------------------------------------------------
 
-    def _record_value(self, t, key, value):
+    def _check_triggers(self, name, value, t):
         settings = self.config["recording"]
-        if not self.recorded(key):
-            return
-        if self.recording is not None:
-            self.rec.add((self.recording["id"], key), t, value)
-        elif settings.get("triggers") and settings.get("preSeconds", 0) > 0:
-            self.pre.append((t, key, float(value)))
-            horizon = t - settings["preSeconds"] * 1000
-            while self.pre and self.pre[0][0] < horizon:
-                self.pre.popleft()
         for index, trigger in enumerate(settings.get("triggers") or []):
-            if trigger.get("key") != key or isinstance(value, str):
+            if trigger.get("key") != name:
                 continue
             if trigger_holds(trigger, value):
-                if not self.active_triggers:
-                    label = "%s %s" % (key, " ".join("%s %s" % (condition, trigger[condition])
-                                                     for condition in ("above", "below", "equals")
-                                                     if condition in trigger))
-                    if self.recording is None:
-                        self.start_recording(t, "trigger", label)
+                if not self.active_triggers and self.recording is None:
+                    label = "%s %s" % (name, " ".join("%s %s" % (condition, trigger[condition])
+                                                      for condition in ("above", "below", "equals")
+                                                      if condition in trigger))
+                    self.start_recording(t, label)
                 self.active_triggers.add(index)
-                if self.recording is not None and self.recording["reason"] == "trigger":
+                if self.recording is not None and self.recording["trigger"] != "manual":
                     self.recording["holdUntil"] = t + settings.get("postSeconds", 10) * 1000
             else:
                 self.active_triggers.discard(index)
 
-    def start_recording(self, t, reason, label="", seconds=None):
-        """reason "manual" (ends after seconds or with stop_recording) or "trigger". Returns the recording."""
+    def start_recording(self, t, trigger="manual", label="", seconds=None):
+        """trigger "manual" (ends after seconds or with stop_recording) or the condition that started it. Returns
+        the recording."""
         if self.recording is not None:
             return self.recording
         settings = self.config["recording"]
-        start = self.pre[0][0] if self.pre and reason == "trigger" else t
+        start = self.pre[0][0] if self.pre and trigger != "manual" else t
         limit = min(seconds or settings.get("maxSeconds", 600), settings.get("maxSeconds", 600))
-        self.recording = {"id": None, "start": start, "end": t, "open": True, "reason": reason, "label": label,
+        self.recording = {"id": None, "start": start, "end": t, "open": True, "trigger": trigger, "label": label,
                           "until": t + int(limit * 1000), "holdUntil": t}
         try:
             self.store.write(recordings=[self.recording])
@@ -303,12 +284,9 @@ class Recorder:
             self.error = str(error)
             self.recording = None
             return None
-        if reason == "trigger":
-            for pre_t, key, value in self.pre:
-                self.rec.add((self.recording["id"], key), pre_t, value)
+        if trigger != "manual":
+            self.samples += list(self.pre)
         self.pre.clear()
-        self._event(t, "logger.recording", {"event": "start", "recording": self.recording["id"], "reason": reason,
-                                            "label": label})
         self.announcements.append(("logger.recording", {"event": "start", "recording": self.public_recording()}))
         return self.recording
 
@@ -316,13 +294,17 @@ class Recorder:
         recording = self.recording
         if recording is None:
             return None
+        # the values held at the end belong to the window
+        for name, value in self.values.items():
+            if self.recorded(name) and self.written.get(name) != value:
+                self._sample(self._held_time(name, t), name, value)
         recording.update(end=max(recording["start"], t), open=False, endReason=why)
         self.recording = None
         self.active_triggers.clear()
         self.pending_recordings.append(recording)
-        self._event(t, "logger.recording", {"event": "end", "recording": recording["id"], "reason": why})
         self._try_flush()
-        self.announcements.append(("logger.recording", {"event": "end", "recording": self.public_recording(recording)}))
+        self.announcements.append(("logger.recording", {"event": "end", "recording": self.public_recording(recording),
+                                                        "reason": why}))
         return recording
 
     def _recording_tick(self, t):
@@ -333,16 +315,18 @@ class Recorder:
         limit = self.config["recording"].get("limitMB", 256) * 1024 * 1024
         if t >= recording["until"]:
             self.stop_recording(t, "time")
-        elif recording["reason"] == "trigger" and not self.active_triggers and t >= recording["holdUntil"]:
+        elif recording["trigger"] != "manual" and not self.active_triggers and t >= recording["holdUntil"]:
             self.stop_recording(t, "trigger")
-        elif self.store.recording_bytes(recording["id"]) + self.rec.count * 2 > limit:
+        elif self.store.recording_bytes() + len(self.samples) * self.store.sample_bytes() > limit:
             self.stop_recording(t, "quota")
 
     def public_recording(self, recording=None):
         recording = recording if recording is not None else self.recording
         if recording is None:
             return None
-        return {key: recording[key] for key in ("id", "start", "end", "open", "reason", "label")}
+        result = {key: recording[key] for key in ("id", "start", "end", "open", "trigger", "label")}
+        result["reason"] = "manual" if recording["trigger"] == "manual" else "trigger"
+        return result
 
     # --- trips ----------------------------------------------------------------------
 
@@ -373,22 +357,19 @@ class Recorder:
         self.recording = None
         self.active_triggers.clear()
         self.pre.clear()
-        self.written.clear()
-        self.due.clear()
-        self.log.take()
-        self.rec.take()
-        self.events.clear()
-        self.pending_trips.clear()
-        self.pending_recordings.clear()
+        for table in (self.written, self.due, self.last_sample):
+            table.clear()
+        self.samples = []
+        self.pending_trips = []
+        self.pending_recordings = []
 
     def disable(self, t):
         """Logging switched off: the trip and a recording end, what is buffered is written."""
         self.end_trip(t, "off")
         self.stop_recording(t, "off")
         self._try_flush()
-        self.values.clear()
-        self.written.clear()
-        self.due.clear()
+        for table in (self.values, self.written, self.due, self.changed_at):
+            table.clear()
         self.pre.clear()
 
     # --- writing --------------------------------------------------------------------
@@ -400,25 +381,22 @@ class Recorder:
             self.error = str(error)
 
     def flush(self):
-        """Writes the buffered samples, events, ended trips and recordings and the summary of the open trip in one
-        transaction. On an error (disk full) the rows stay buffered (bounded) and the error is raised."""
+        """Writes the buffered samples, ended trips and recordings and the open trip and recording in one
+        transaction. On an error (disk full) the samples stay buffered (bounded) and the error is raised."""
         trips = list(self.pending_trips)
         if self.trips.trip is not None:
             trips.append(self.trips.trip)
         recordings = list(self.pending_recordings)
         if self.recording is not None:
             recordings.append(self.recording)
-        if not (self.log.count or self.rec.count or self.events or trips or recordings):
+        if not (self.samples or trips or recordings):
             return
-        series, rseries, events = self.log.take(), self.rec.take(), self.events
-        self.events = []
+        samples, self.samples = self.samples, []
         try:
-            self.store.write(series, events, trips, recordings, rseries)
+            self.store.write(samples, trips, recordings)
         except Exception as error:
             self.error = str(error)
-            self.log.put_back(series)
-            self.rec.put_back(rseries)
-            self.events = (events + self.events)[-MAX_BUFFER:]
+            self.samples = (samples + self.samples)[-MAX_BUFFER:]
             raise
         self.error = ""
         self.pending_trips = []
