@@ -6,9 +6,9 @@
   "plugins": [
     {
       "id": "org.openhu.camera",
-      "name": "Rückfahrkamera",
-      "version": "1.0.0",
-      "description": "Kamerabild mit Hilfslinien im Inhaltsbereich oder als Vollbild, automatisch beim Rückwärtsgang (CAN-Plugin) oder per Aktion camera.show / camera.hide / camera.toggle.",
+      "name": "Reverse camera",
+      "version": "1.1.0",
+      "description": "Camera picture with guide lines in the content area or full screen, automatically in reverse gear (CAN plugin) or with the actions camera.show / camera.hide / camera.toggle.",
       "arch": [
         "all"
       ],
@@ -16,15 +16,15 @@
       "permissions": [
         "camera"
       ],
-      "archive": "dist/org.openhu.camera-1.0.0.tar.gz",
-      "sha256": "11e927cbe6fadc96e45d50f8c5365c3e70cff507d24002c136252d6554a93e22",
-      "size": 6591
+      "archive": "dist/org.openhu.camera-1.1.0.tar.gz",
+      "sha256": "5fd4c96c5a8d6b6e919d267de300724198dd5cb9e9771a1e7f4de9a35dbb9704",
+      "size": 9200
     },
     {
       "id": "org.openhu.can",
-      "name": "CAN-Bus",
-      "version": "1.0.0",
-      "description": "Fahrzeugdaten (Geschwindigkeit, Gang, Licht …) und Lenkradtasten vom CAN-Bus über SocketCAN. Fahrzeugprofile beschreiben die CAN-IDs.",
+      "name": "CAN bus",
+      "version": "1.1.0",
+      "description": "Vehicle data (speed, gear, lights …) and steering wheel keys from the CAN bus via SocketCAN. Vehicle profiles describe the CAN IDs.",
       "arch": [
         "all"
       ],
@@ -33,15 +33,15 @@
         "can",
         "input"
       ],
-      "archive": "dist/org.openhu.can-1.0.0.tar.gz",
-      "sha256": "7e6191380324595cd1d2bb74e1fdfe8d31b1e94c2c8819a31a201adafc761158",
-      "size": 9045
+      "archive": "dist/org.openhu.can-1.1.0.tar.gz",
+      "sha256": "8327e194c151e8dd60946ec97cf6b23e98ee55074dd9fba696b97a29dafd7ffe",
+      "size": 11272
     },
     {
       "id": "org.openhu.radio",
       "name": "Radio",
-      "version": "1.0.0",
-      "description": "FM/AM/DAB+-Radio mit einem RTL-SDR-USB-Stick: Sendersuche, Favoriten und RDS (Sendername, Radiotext, PI; RDS braucht redsea), Senderlogos aus eigenen Bilddateien; DAB+ mit welle-cli (DLS, Slideshow). Zum Testen ohne Stick: simulierter Stick mit Internetradio-Streams.",
+      "version": "1.1.0",
+      "description": "FM/AM/DAB+ radio with an RTL-SDR USB stick: station scan, favorites and RDS (station name, radio text, PI; RDS needs redsea), station logos from your own image files; DAB+ with welle-cli (DLS, slideshow). For testing without a stick: a simulated stick with internet radio streams.",
       "arch": [
         "all"
       ],
@@ -50,15 +50,15 @@
         "audio",
         "usb"
       ],
-      "archive": "dist/org.openhu.radio-1.0.0.tar.gz",
-      "sha256": "4178a9a38c36b8a49a2f99ceeb55712c4bd2dac8fe5c819ca28df7a05e874eef",
-      "size": 42549
+      "archive": "dist/org.openhu.radio-1.1.0.tar.gz",
+      "sha256": "6f9d5c2ffc08b76ae37a73d23a0fbf1e6b36b8d23671c76d8451bde4f629c27e",
+      "size": 47126
     },
     {
       "id": "org.openhu.swc",
-      "name": "Lenkradtasten",
-      "version": "1.0.0",
-      "description": "Tasten von Eingabegeräten (USB-Lenkradadapter, IR-Fernbedienungen, Multimedia-Tastaturen) als OpenHU-Aktionen, mit Anlern-Modus.",
+      "name": "Steering wheel keys",
+      "version": "1.1.0",
+      "description": "Keys of input devices (USB steering wheel adapters, IR remote controls, multimedia keyboards) as OpenHU actions, with a learn mode.",
       "arch": [
         "all"
       ],
@@ -66,9 +66,9 @@
       "permissions": [
         "input"
       ],
-      "archive": "dist/org.openhu.swc-1.0.0.tar.gz",
-      "sha256": "acba177df15d4a6bd93f1ab5f6777133b703b82c2c18802f87417e84bbb713ba",
-      "size": 6992
+      "archive": "dist/org.openhu.swc-1.1.0.tar.gz",
+      "sha256": "5d3da9372cd91b95e6d789bf96da121d9441f89cc324849df026d66a7efe87fb",
+      "size": 9592
     }
   ]
 }
