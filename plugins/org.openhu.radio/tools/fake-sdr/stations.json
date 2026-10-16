@@ -1,17 +1,17 @@
 {
-  "_comment": "Simulated stations, Hannover (Lower Saxony). FM frequencies of the real transmitters (Hannover-Hemmingen, Telemax, ffn Barsinghausen), the streams are the stations' public web streams. Own list: plugin data dir fake-sdr-stations.json, format in fakesdr.py. Logos: only the two self-made test pictures, no station logos (trademarks).",
+  "_comment": "Simulated stations, Hannover (Lower Saxony). FM frequencies of the real transmitters (Hannover-Hemmingen, Telemax, ffn Barsinghausen), the streams are the stations' public web streams. Own list: plugin data dir fake-sdr-stations.json, format in fakesdr.py. Logos: only the two self-made test pictures, no station logos (trademarks). PI codes: the real ones from the FMLIST data on sender-tabelle.de (UKW/TV-Arbeitskreis), NDR 1 with its Hannover regional PI.",
   "fm": [
     {"frequency": 87.6, "name": "Testton 440 Hz", "ps": "TESTTON", "tone": 440, "rt": "Simulierter Sender ohne Netzwerk", "logo": "logos/testton-fm.png"},
-    {"frequency": 88.6, "name": "NDR Info", "ps": "NDR INFO", "url": "https://icecast.ndr.de/ndr/ndrinfo/niedersachsen/mp3/128/stream.mp3"},
-    {"frequency": 90.9, "name": "NDR 1 Niedersachsen", "ps": "NDR1 NDS", "url": "https://icecast.ndr.de/ndr/ndr1niedersachsen/hannover/mp3/128/stream.mp3"},
-    {"frequency": 92.6, "name": "N-JOY", "ps": "N-JOY", "url": "https://icecast.ndr.de/ndr/njoy/live/mp3/128/stream.mp3"},
-    {"frequency": 94.0, "name": "Deutschlandfunk", "ps": "DLF", "url": "https://st01.sslstream.dlf.de/dlf/01/128/mp3/stream.mp3"},
-    {"frequency": 96.2, "name": "NDR 2", "ps": "NDR 2", "url": "https://icecast.ndr.de/ndr/ndr2/niedersachsen/mp3/128/stream.mp3"},
-    {"frequency": 98.7, "name": "NDR Kultur", "ps": "NDR KULT", "url": "https://icecast.ndr.de/ndr/ndrkultur/live/mp3/128/stream.mp3"},
-    {"frequency": 100.0, "name": "Radio Hannover", "ps": "RADIO H", "url": "http://radio-hannover.divicon-stream.net/rhann_livestrea_zqu6-mp3-128"},
-    {"frequency": 101.9, "name": "radio ffn", "ps": "FFN", "url": "https://player.ffn.de/radioffn.mp3"},
-    {"frequency": 104.9, "name": "Radio 21", "ps": "RADIO 21", "url": "https://radio21.streamabc.net/radio21-hannover-mp3-192-3735655"},
-    {"frequency": 106.5, "name": "Leibniz.FM", "ps": "LEIBNIZ", "url": "https://server3.streamserver-unlimited.de:10519/stream", "level": -24}
+    {"frequency": 88.6, "pi": "0xD384", "name": "NDR Info", "ps": "NDR INFO", "url": "https://icecast.ndr.de/ndr/ndrinfo/niedersachsen/mp3/128/stream.mp3"},
+    {"frequency": 90.9, "pi": "0xD481", "name": "NDR 1 Niedersachsen", "ps": "NDR1 NDS", "url": "https://icecast.ndr.de/ndr/ndr1niedersachsen/hannover/mp3/128/stream.mp3"},
+    {"frequency": 92.6, "pi": "0xD385", "name": "N-JOY", "ps": "N-JOY", "url": "https://icecast.ndr.de/ndr/njoy/live/mp3/128/stream.mp3"},
+    {"frequency": 94.0, "pi": "0xD210", "name": "Deutschlandfunk", "ps": "DLF", "url": "https://st01.sslstream.dlf.de/dlf/01/128/mp3/stream.mp3"},
+    {"frequency": 96.2, "pi": "0xD382", "name": "NDR 2", "ps": "NDR 2", "url": "https://icecast.ndr.de/ndr/ndr2/niedersachsen/mp3/128/stream.mp3"},
+    {"frequency": 98.7, "pi": "0xD383", "name": "NDR Kultur", "ps": "NDR KULT", "url": "https://icecast.ndr.de/ndr/ndrkultur/live/mp3/128/stream.mp3"},
+    {"frequency": 100.0, "pi": "0x1B82", "name": "Radio Hannover", "ps": "RADIO H", "url": "http://radio-hannover.divicon-stream.net/rhann_livestrea_zqu6-mp3-128"},
+    {"frequency": 101.9, "pi": "0xD388", "name": "radio ffn", "ps": "FFN", "url": "https://player.ffn.de/radioffn.mp3"},
+    {"frequency": 104.9, "pi": "0xD38A", "name": "Radio 21", "ps": "RADIO 21", "url": "https://radio21.streamabc.net/radio21-hannover-mp3-192-3735655"},
+    {"frequency": 106.5, "pi": "0x108C", "name": "Leibniz.FM", "ps": "LEIBNIZ", "url": "https://server3.streamserver-unlimited.de:10519/stream", "level": -24}
   ],
   "am": [
     {"frequency": 549, "name": "Deutschlandfunk (AM, historisch)", "ps": "DLF", "url": "https://st01.sslstream.dlf.de/dlf/01/128/mp3/stream.mp3"},

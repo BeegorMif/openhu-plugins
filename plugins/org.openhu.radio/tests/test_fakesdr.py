@@ -70,10 +70,14 @@ class FakeSdrTest(unittest.TestCase):
         self.assertEqual(radiolib.parse_rtl_power(lines), [87.6, 96.2, 108.0])
 
     def test_redsea_line(self):
-        line = fakesdr.redsea_line({"name": "NDR 1 Niedersachsen"}, "Artist - Title")
-        self.assertEqual(radiolib.parse_redsea(line), {"ps": "NDR 1 Ni", "rt": "Artist - Title"})
-        line = fakesdr.redsea_line({"name": "Testton", "ps": "TESTTON", "rt": "fixed"}, "ignored")
-        self.assertEqual(radiolib.parse_redsea(line), {"ps": "TESTTON", "rt": "fixed"})
+        line = fakesdr.redsea_line({"name": "NDR 1 Niedersachsen", "pi": "0xd481"}, "Artist - Title")
+        self.assertEqual(radiolib.parse_redsea(line), {"pi": "0xD481", "ps": "NDR 1 Ni", "rt": "Artist - Title"})
+        line = fakesdr.redsea_line({"name": "Testton", "ps": "TESTTON", "rt": "fixed", "pi": "D3FF"}, "ignored")
+        self.assertEqual(radiolib.parse_redsea(line), {"pi": "0xD3FF", "ps": "TESTTON", "rt": "fixed"})
+        # without "pi": derived from the name, always the same, D = Germany
+        derived = radiolib.parse_redsea(fakesdr.redsea_line({"name": "N-JOY"}))["pi"]
+        self.assertRegex(derived, r"^0xD[0-9A-F]{3}$")
+        self.assertEqual(fakesdr.station_pi({"name": "N-JOY", "pi": "none"}), derived)
         self.assertEqual(radiolib.parse_redsea(fakesdr.redsea_line({"name": "N-JOY"}))["rt"], "N-JOY")
         self.assertEqual(len(json.loads(fakesdr.redsea_line({"name": "x"}, "y" * 100))["radiotext"]), 64)
 
@@ -133,6 +137,8 @@ class FakeSdrTest(unittest.TestCase):
                 self.assertEqual(radiolib.clamp_frequency(band, station["frequency"]), station["frequency"])
                 self.assertTrue(station.get("url") or station.get("tone"), station)
                 self.assertLessEqual(len(station.get("ps", "")), 8)
+                if "pi" in station:
+                    self.assertEqual(radiolib.normalize_pi(station["pi"]), station["pi"])
         # every FM station is found by the scan
         low, high, step = fakesdr.parse_power_range("87.5M:108M:100k")
         self.assertEqual(radiolib.parse_rtl_power(fakesdr.rtl_power_lines(stations, low, high, step)),
@@ -230,7 +236,8 @@ class FakeSdrProcessTest(ProcessTestCase):
         redsea.stdin.write(self.read_audio(rtl, 0.2, rate))
         redsea.stdin.flush()
         line = redsea.stdout.readline().decode()
-        self.assertEqual(radiolib.parse_redsea(line), {"ps": "TESTTON", "rt": "Testton 440 Hz"})
+        self.assertEqual(radiolib.parse_redsea(line),
+                         {"pi": fakesdr.station_pi(STATIONS["fm"][0]), "ps": "TESTTON", "rt": "Testton 440 Hz"})
         redsea.stdin.close()
         self.assertEqual(redsea.wait(5), 0)
 

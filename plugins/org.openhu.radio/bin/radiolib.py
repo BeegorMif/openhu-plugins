@@ -72,22 +72,54 @@ def frequency_key(band, frequency):
     return "%.1f" % frequency if band == "fm" else "%d" % round(frequency)
 
 
-def remember_name(names, band, frequency, ps):
-    """Stores the RDS name of a frequency in names ({band: {key: name}}); True if it changed."""
-    ps = (ps or "").strip()
-    if not ps:
+def remember(table, band, frequency, value):
+    """Stores a value per frequency in table ({band: {key: value}}), e.g. the RDS name or PI; True if it changed."""
+    value = (value or "").strip()
+    if not value:
         return False
-    band_names = names.setdefault(band, {})
+    band_values = table.setdefault(band, {})
     key = frequency_key(band, frequency)
-    if band_names.get(key) == ps:
+    if band_values.get(key) == value:
         return False
-    band_names[key] = ps
+    band_values[key] = value
     return True
 
 
+def remember_name(names, band, frequency, ps):
+    """Stores the RDS name of a frequency in names ({band: {key: name}}); True if it changed."""
+    return remember(names, band, frequency, ps)
+
+
+def normalize_pi(value):
+    """RDS PI code as "0xD382" (from "0xd382", "D382", 0xD382); None if it is no 16 bit code (or 0)."""
+    try:
+        code = value if isinstance(value, int) and not isinstance(value, bool) else int(str(value).strip(), 16)
+    except (TypeError, ValueError):
+        return None
+    return "0x%04X" % code if 0 < code <= 0xFFFF else None
+
+
+def pi_frequency(config, pi, current=None):
+    """FM frequency for a PI code (tunePi): of the remembered frequencies with this PI the strongest one of the last
+    scan (the current one if it is as strong or no levels are known); None if no frequency is known for it."""
+    pi = normalize_pi(pi)
+    if pi is None:
+        return None
+    levels = config.get("levels", {}).get("fm", {})
+    candidates = [float(key) for key, value in config.get("pis", {}).get("fm", {}).items() if value == pi]
+    if not candidates:
+        return None
+    current_key = frequency_key("fm", current) if current is not None else None
+
+    def rank(frequency):
+        key = frequency_key("fm", frequency)
+        return (levels.get(key, float("-inf")), key == current_key, -frequency)
+    return max(candidates, key=rank)
+
+
 def band_summary(config):
-    """Both bands for radio.state "bands": range, stations, presets and remembered names (e.g. for Android Auto,
-    which lists the stations of all bands)."""
+    """Both bands for radio.state "bands": range, stations, presets, remembered names and RDS PI codes (e.g. for
+    Android Auto, which lists the stations of all bands)."""
     result = {}
     for band, spec in BANDS.items():
         result[band] = {
@@ -98,6 +130,7 @@ def band_summary(config):
             "stations": config.get("stations", {}).get(band, []),
             "presets": config.get("presets", {}).get(band, []),
             "names": config.get("names", {}).get(band, {}),
+            "pis": config.get("pis", {}).get(band, {}),
         }
     return result
 
@@ -215,6 +248,11 @@ def action_command(action, radio_is_source):
 
 def parse_rtl_power(lines, threshold_db=10.0):
     """rtl_power CSV -> frequencies (MHz, 0.1 raster) of stations clearly above the noise floor."""
+    return sorted(parse_rtl_power_levels(lines, threshold_db))
+
+
+def parse_rtl_power_levels(lines, threshold_db=10.0):
+    """rtl_power CSV -> {frequency (MHz): level (dB)} of the stations clearly above the noise floor."""
     bins = {}
     for line in lines:
         parts = [part.strip() for part in line.split(",")]
@@ -229,26 +267,31 @@ def parse_rtl_power(lines, threshold_db=10.0):
             frequency = round((low + step * index) / 1e6, 1)
             bins[frequency] = max(value, bins.get(frequency, value))
     if not bins:
-        return []
+        return {}
 
     floor = statistics.median(bins.values())
     frequencies = sorted(bins)
-    stations = []
+    stations = {}
     for index, frequency in enumerate(frequencies):
         level = bins[frequency]
         neighbours = [bins[frequencies[j]] for j in (index - 1, index + 1) if 0 <= j < len(frequencies)]
         if level >= floor + threshold_db and all(level >= other for other in neighbours):
-            stations.append(frequency)
+            stations[frequency] = level
     return stations
 
 
 def parse_redsea(line):
-    """One redsea JSON line -> {"ps": ..., "rt": ...} with the fields it contains."""
+    """One redsea JSON line -> {"pi": "0xD382", "ps": ..., "rt": ...} with the fields it contains."""
     try:
         data = json.loads(line)
     except ValueError:
         return {}
+    if not isinstance(data, dict):
+        return {}
     result = {}
+    pi = normalize_pi(data.get("pi")) if data.get("pi") is not None else None
+    if pi:
+        result["pi"] = pi
     if data.get("ps"):
         result["ps"] = data["ps"].strip()
     if data.get("radiotext"):

@@ -44,9 +44,41 @@ class RadioLibTest(unittest.TestCase):
         self.assertTrue(radiolib.remember_name(names, "am", 1008, "AM TEST"))
         self.assertEqual(names, {"fm": {"96.2": "NDR 2"}, "am": {"1008": "AM TEST"}})
 
+    def test_pi(self):
+        self.assertEqual(radiolib.normalize_pi("0xd382"), "0xD382")
+        self.assertEqual(radiolib.normalize_pi("D382"), "0xD382")
+        self.assertEqual(radiolib.normalize_pi(0xD382), "0xD382")
+        self.assertEqual(radiolib.normalize_pi(" 0x1b82 "), "0x1B82")
+        for bad in (None, "", "xyz", 0, 0x10000, True, "0x"):
+            self.assertIsNone(radiolib.normalize_pi(bad), bad)
+
+        pis = {}
+        self.assertTrue(radiolib.remember(pis, "fm", 96.2, "0xD382"))
+        self.assertFalse(radiolib.remember(pis, "fm", 96.2, "0xD382"))
+        self.assertFalse(radiolib.remember(pis, "fm", 96.2, None))
+        self.assertEqual(pis, {"fm": {"96.2": "0xD382"}})
+
+    def test_pi_frequency(self):
+        # NDR 2 on three transmitters, levels of the last scan for two of them
+        config = {"pis": {"fm": {"96.2": "0xD382", "87.6": "0xD382", "102.6": "0xD382", "88.6": "0xD384"}},
+                  "levels": {"fm": {"96.2": -12.0, "87.6": -25.5, "88.6": -10.0}}}
+        self.assertEqual(radiolib.pi_frequency(config, "0xD382"), 96.2)
+        self.assertEqual(radiolib.pi_frequency(config, "d382", current=102.6), 96.2)
+        self.assertEqual(radiolib.pi_frequency(config, 0xD384), 88.6)
+        self.assertIsNone(radiolib.pi_frequency(config, "0xD385"))
+        self.assertIsNone(radiolib.pi_frequency(config, "garbage"))
+        # no levels: the current frequency if it has the PI, else the lowest
+        config.pop("levels")
+        self.assertEqual(radiolib.pi_frequency(config, "0xD382", current=102.6), 102.6)
+        self.assertEqual(radiolib.pi_frequency(config, "0xD382", current=88.6), 87.6)
+        self.assertIsNone(radiolib.pi_frequency({}, "0xD382"))
+
     def test_band_summary(self):
-        config = {"stations": {"fm": [96.2, 101.9]}, "presets": {"am": [1008]}, "names": {"fm": {"96.2": "NDR 2"}}}
+        config = {"stations": {"fm": [96.2, 101.9]}, "presets": {"am": [1008]}, "names": {"fm": {"96.2": "NDR 2"}},
+                  "pis": {"fm": {"96.2": "0xD382"}}}
         bands = radiolib.band_summary(config)
+        self.assertEqual(bands["fm"]["pis"], {"96.2": "0xD382"})
+        self.assertEqual(bands["am"]["pis"], {})
         self.assertEqual(set(bands), {"fm", "am"})
         self.assertEqual(bands["fm"]["stations"], [96.2, 101.9])
         self.assertEqual(bands["fm"]["names"], {"96.2": "NDR 2"})
@@ -125,10 +157,14 @@ class RadioLibTest(unittest.TestCase):
             "2026-10-10, 12:00:00, 101000000, 102000000, 100000, 10, -40, -40, -40, -20, -25, -40, -40, -40, -40, -40",
         ]
         self.assertEqual(radiolib.parse_rtl_power(lines), [101.3])
+        self.assertEqual(radiolib.parse_rtl_power_levels(lines), {101.3: -20.0})
+        self.assertEqual(radiolib.parse_rtl_power_levels([]), {})
 
     def test_redsea(self):
-        self.assertEqual(radiolib.parse_redsea('{"pi":"0xD3C2","ps":"NDR 2   ","radiotext":"Musik "}'),
-                         {"ps": "NDR 2", "rt": "Musik"})
+        self.assertEqual(radiolib.parse_redsea('{"pi":"0xd382","ps":"NDR 2   ","radiotext":"Musik "}'),
+                         {"pi": "0xD382", "ps": "NDR 2", "rt": "Musik"})
+        self.assertEqual(radiolib.parse_redsea('{"pi":"0x0000","ps":"X"}'), {"ps": "X"})
+        self.assertEqual(radiolib.parse_redsea('[1, 2]'), {})
         self.assertEqual(radiolib.parse_redsea("garbage"), {})
 
 
