@@ -45,7 +45,7 @@ async def drive(api, hz, minutes, stop):
         # pedal: 0-100 %, more while accelerating, ~15-25 % to hold the speed, 0 while braking or coasting
         throttle = 0.0 if target < speed - 0.5 else min(100.0, 15.0 + speed * 0.12 + max(0.0, target - speed) * 6)
         await api.publish("vehicle.engine", running=True, rpm=round(rpm),
-                          throttle=round(max(0.0, throttle + rng.gauss(0, 0.5)), 1))
+                          throttle=round(min(100.0, max(0.0, throttle + rng.gauss(0, 0.5))), 1))
         await api.publish("vehicle.climate", outsideTemp=round(18 + rng.gauss(0, 0.2), 1))
         await asyncio.sleep(dt)
         t += dt
