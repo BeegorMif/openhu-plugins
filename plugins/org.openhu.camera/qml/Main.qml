@@ -101,7 +101,7 @@ Item {
                 spacing: Theme.spacing / 2
 
                 Text {
-                    text: "Kamera"
+                    text: qsTrId("org.openhu.camera.main.camera")
                     color: Theme.textDim
                     font.pixelSize: Theme.fontSmall
                 }
@@ -120,38 +120,38 @@ Item {
                 }
 
                 Text {
-                    text: "Anzeige beim Rückwärtsgang"
+                    text: qsTrId("org.openhu.camera.main.display_in_reverse")
                     color: Theme.textDim
                     font.pixelSize: Theme.fontSmall
                 }
                 RadioButton {
-                    text: "Vollbild über allem"
+                    text: qsTrId("org.openhu.camera.main.display_overlay")
                     checked: cameraConfig.data.display === "overlay"
                     onClicked: page.set("display", "overlay")
                 }
                 RadioButton {
-                    text: "Im Inhaltsbereich (wie Radio)"
+                    text: qsTrId("org.openhu.camera.main.display_page")
                     checked: cameraConfig.data.display !== "overlay"
                     onClicked: page.set("display", "page")
                 }
 
                 Switch {
-                    text: "Im Menü anzeigen"
+                    text: qsTrId("org.openhu.camera.main.show_in_dock")
                     checked: page.inDock
                     onToggled: api.request("plugin.setDock", { id: page.pluginId, dock: checked })
                 }
                 Switch {
-                    text: "Automatisch beim Rückwärtsgang"
+                    text: qsTrId("org.openhu.camera.main.auto_reverse")
                     checked: cameraConfig.data.autoReverse !== false
                     onToggled: page.set("autoReverse", checked)
                 }
                 Switch {
-                    text: "Spiegeln"
+                    text: qsTrId("org.openhu.camera.main.mirror")
                     checked: !!cameraConfig.data.mirror
                     onToggled: page.set("mirror", checked)
                 }
                 Switch {
-                    text: "Hilfslinien"
+                    text: qsTrId("org.openhu.camera.main.guides")
                     checked: cameraConfig.data.guides !== false
                     onToggled: page.set("guides", checked)
                 }
@@ -159,7 +159,7 @@ Item {
                     Layout.fillWidth: true
                     Layout.topMargin: Theme.spacing
                     visible: cameraConfig.data.display === "overlay"
-                    text: "Vollbild testen"
+                    text: qsTrId("org.openhu.camera.main.test_overlay")
                     highlighted: true
                     onClicked: api.emitEvent("camera.command", { cmd: "show" })
                 }

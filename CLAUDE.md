@@ -4,9 +4,10 @@ The official OpenHU plugins and the plugin store repository: `index.json` plus t
 
 ## This repo
 - `plugins/<id>/`: `manifest.json` (version, permissions, `shared` files), `bin/` (Python process talking to OpenHU's WebSocket API), `qml/` (page), `tests/`, README. `common/openhu.py` is copied to each plugin's `lib/` when the archive is built.
+- Texts: IDs `<plugin id>.<page>.<key>` (`qsTrId` in QML, `openhu.Texts` in the process), English and German in `plugins/<id>/i18n/{en,de}.ts` plus the compiled `.qm` (committed). `tools/openhu-translations` syncs and compiles them, `--check` runs in CI (`tests/test_translations.py`). Manifest name/description are the English texts.
 - `org.openhu.radio`: FM/AM via `rtl_fm` (+ `redsea` for RDS), DAB+ via `welle-cli` (web server mode, port 7979), logos from the user's `logos/` folder, PI codes. Start the tools with `radiolib.spawn` (they end with the plugin). `tools/fake-sdr/` simulates a stick with internet streams (`rtl_fm`, `rtl_power`, `redsea`, `welle-cli`, `stations.json` for Hannover), for development only.
 - Bump the plugin version in the manifest with every change. The `index.yml` workflow builds the archives and `index.json` after a merge, so don't commit them yourself.
-- Tests: `python3 -m unittest discover -s tests` per plugin (CI: `tests.yml`, with ffmpeg/sox for the fake stick).
+- Tests: `python3 -m unittest discover -s tests` per plugin and at the top level (CI: `tests.yml`, with ffmpeg/sox for the fake stick, qt6-l10n-tools for the translations).
 - Test in the VM: a `file` store source placed first in `~/.openhu/sources.list` wins, or copy the plugin directory together with `lib/openhu.py`.
 
 ## The OpenHU project

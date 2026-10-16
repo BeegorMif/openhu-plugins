@@ -1,0 +1,228 @@
+#!/usr/bin/env python3
+"""Translations of the plugins: plugins/<id>/i18n/<language>.ts and the compiled .qm (openhu/docs/plugins.md).
+
+    tools/openhu-translations [plugin dir ...]          sync the .ts files with the code, compile the .qm
+    tools/openhu-translations --add fr [plugin dir ...] add a language (every ID untranslated)
+    tools/openhu-translations --check [plugin dir ...]  CI: fail when something is missing (writes nothing)
+
+Without plugin dirs: every plugin under plugins/. One .ts file per language, English too, holds the texts of the
+QML (qsTrId("<id>.<page>.<key>")), of the process (string literals "<id>.<area>.<key>" in bin/*.py, translated by
+openhu.Texts from the .ts at runtime) and the plugin's name and description in the dock and the store
+("<id>.name", "<id>.description"; the manifest holds the English ones). After a sync, write the texts with
+`linguist i18n/en.ts i18n/de.ts` or a text editor and run the tool again to compile them.
+
+--check fails when a .ts file lacks an ID of the code or has one the code no longer uses, when a text is
+untranslated in any language, when the QML has a text literal instead of an ID (`text: "..."`; a line with
+`// untranslated` is exempt, e.g. symbols or examples) or when a .qm file does not match its .ts, or when the manifest's name/description is not the English text. The .qm files are
+committed, so the archives do not need Qt to be built; compiling needs lrelease (Debian: qt6-l10n-tools).
+"""
+
+import argparse
+import glob
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import xml.etree.ElementTree as ElementTree
+from xml.sax.saxutils import escape
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+DEFAULT_LANGUAGES = ("en", "de")
+QSTRID = re.compile(r"""\bqsTrId\(\s*(["'])(.*?)\1""")
+# a property with a text that should be an ID; anything with a letter in it
+TEXT_LITERAL = re.compile(r"""\b(text|title|placeholderText|label|description)\s*:\s*"([^"]*[^\W\d_][^"]*)\"""")
+
+
+def plugin_id(plugin_dir):
+    return os.path.basename(os.path.normpath(plugin_dir))
+
+
+def sources(plugin_dir, folder, extensions):
+    for root, dirs, names in os.walk(os.path.join(plugin_dir, folder)):
+        dirs[:] = sorted(d for d in dirs if d != "__pycache__")
+        for name in sorted(names):
+            if name.endswith(extensions):
+                yield os.path.join(root, name)
+
+
+def code_ids(plugin_dir):
+    """IDs used by the plugin: QML qsTrId(), process literals, name and description -> {id: first place}."""
+    prefix = plugin_id(plugin_dir) + "."
+    ids = {prefix + "name": "manifest.json", prefix + "description": "manifest.json"}
+    problems = []
+    for path in sources(plugin_dir, "qml", (".qml", ".js")):
+        with open(path, encoding="utf-8") as file:
+            for number, line in enumerate(file, 1):
+                place = "%s:%d" % (os.path.relpath(path, plugin_dir), number)
+                for match in QSTRID.finditer(line):
+                    text_id = match.group(2)
+                    if not text_id.startswith(prefix):
+                        problems.append("%s: ID %s does not start with %s" % (place, text_id, prefix))
+                    ids.setdefault(text_id, place)
+                if "// untranslated" not in line:
+                    for match in TEXT_LITERAL.finditer(line):
+                        problems.append('%s: text without an ID: %s: "%s" (qsTrId, or "// untranslated")'
+                                        % (place, match.group(1), match.group(2)))
+    process_id = re.compile(r"""(["'])(%s[A-Za-z0-9_.]+)\1""" % re.escape(prefix))
+    for path in sources(plugin_dir, "bin", (".py",)):
+        with open(path, encoding="utf-8") as file:
+            for number, line in enumerate(file, 1):
+                for match in process_id.finditer(line):
+                    ids.setdefault(match.group(2), "%s:%d" % (os.path.relpath(path, plugin_dir), number))
+    return ids, problems
+
+
+def read_ts(path):
+    """(language, {id: (translation, finished)})"""
+    root = ElementTree.parse(path).getroot()
+    messages = {}
+    for message in root.iter("message"):
+        translation = message.find("translation")
+        text = (translation.text or "") if translation is not None else ""
+        kind = translation.get("type") if translation is not None else "unfinished"
+        if kind in ("vanished", "obsolete"):
+            continue
+        messages[message.get("id")] = (text, bool(text) and kind != "unfinished")
+    return root.get("language"), messages
+
+
+def format_ts(language, messages):
+    """Same layout as OpenHU's translations/*.ts (lupdate -idbased, no source texts), sorted by ID."""
+    lines = ['<?xml version="1.0" encoding="utf-8"?>', "<!DOCTYPE TS>",
+             '<TS version="2.1" language="%s">' % language, "<context>", "    <name></name>"]
+    for text_id in sorted(messages):
+        text, finished = messages[text_id]
+        lines.append('    <message id="%s">' % escape(text_id, {'"': "&quot;"}))
+        lines.append("        <source></source>")
+        if finished:
+            lines.append("        <translation>%s</translation>" % escape(text))
+        else:
+            lines.append('        <translation type="unfinished">%s</translation>' % escape(text))
+        lines.append("    </message>")
+    lines += ["</context>", "</TS>", ""]
+    return "\n".join(lines)
+
+
+def lrelease():
+    for candidate in ("/usr/lib/qt6/bin/lrelease", shutil.which("lrelease6"), shutil.which("lrelease")):
+        if candidate and os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+def compile_qm(tool, ts, qm):
+    # Qt 6.8 (Debian trixie) needs -idbased, newer ones say it is deprecated
+    result = subprocess.run([tool, "-silent", "-idbased", ts, "-qm", qm], capture_output=True, text=True)
+    output = (result.stdout + result.stderr).replace("future version", "future version\n")
+    for line in output.splitlines():
+        if line.strip() and "-idbased is deprecated" not in line:
+            print("lrelease: " + line, file=sys.stderr)
+    if result.returncode != 0:
+        sys.exit("lrelease failed for " + ts)
+
+
+def ts_files(plugin_dir):
+    return sorted(glob.glob(os.path.join(plugin_dir, "i18n", "*.ts")))
+
+
+def sync(plugin_dir, add, tool):
+    ids, problems = code_ids(plugin_dir)
+    for problem in problems:
+        print("warning: " + problem, file=sys.stderr)
+    i18n = os.path.join(plugin_dir, "i18n")
+    os.makedirs(i18n, exist_ok=True)
+    languages = [os.path.basename(path)[:-3] for path in ts_files(plugin_dir)] or list(DEFAULT_LANGUAGES)
+    languages += [language for language in add if language not in languages]
+    for language in languages:
+        path = os.path.join(i18n, language + ".ts")
+        old = read_ts(path)[1] if os.path.isfile(path) else {}
+        messages = {text_id: old.get(text_id, ("", False)) for text_id in ids}
+        content = format_ts(language, messages)
+        with open(path, "w", encoding="utf-8") as file:
+            file.write(content)
+        missing = sorted(text_id for text_id, (_, finished) in messages.items() if not finished)
+        print("%s: %d texts%s" % (os.path.relpath(path, REPO), len(messages),
+                                  ", untranslated: " + ", ".join(missing) if missing else ""))
+        if tool:
+            compile_qm(tool, path, path[:-3] + ".qm")
+    if not tool:
+        print("warning: lrelease not found (qt6-l10n-tools), the .qm files were not compiled", file=sys.stderr)
+
+
+def check(plugin_dir, tool):
+    errors = []
+    ids, problems = code_ids(plugin_dir)
+    errors += problems
+    files = ts_files(plugin_dir)
+    languages = [os.path.basename(path)[:-3] for path in files]
+    for language in DEFAULT_LANGUAGES:
+        if language not in languages:
+            errors.append("i18n/%s.ts missing (run tools/openhu-translations)" % language)
+    # the manifest's name and description are the English ones (store entries of plugins not installed yet)
+    english = read_ts(os.path.join(plugin_dir, "i18n", "en.ts"))[1] if "en" in languages else {}
+    with open(os.path.join(plugin_dir, "manifest.json"), encoding="utf-8") as file:
+        manifest = json.load(file)
+    for key in ("name", "description"):
+        text_id = plugin_id(plugin_dir) + "." + key
+        if text_id in english and english[text_id][0] != manifest.get(key, ""):
+            errors.append("manifest.json: %s differs from %s in i18n/en.ts" % (key, text_id))
+    with tempfile.TemporaryDirectory() as tmp:
+        for path in files:
+            name = os.path.relpath(path, plugin_dir)
+            language, messages = read_ts(path)
+            if language != os.path.basename(path)[:-3]:
+                errors.append("%s: language=\"%s\"" % (name, language))
+            for text_id in sorted(set(ids) - set(messages)):
+                errors.append("%s: %s missing (used in %s; run tools/openhu-translations)" % (name, text_id, ids[text_id]))
+            for text_id in sorted(set(messages) - set(ids)):
+                errors.append("%s: %s is not used any more (run tools/openhu-translations)" % (name, text_id))
+            for text_id in sorted(set(messages) & set(ids)):
+                if not messages[text_id][1]:
+                    errors.append("%s: %s untranslated" % (name, text_id))
+            qm = path[:-3] + ".qm"
+            if not os.path.isfile(qm):
+                errors.append("%s missing (run tools/openhu-translations)" % os.path.relpath(qm, plugin_dir))
+            elif tool:
+                fresh = os.path.join(tmp, os.path.basename(qm))
+                compile_qm(tool, path, fresh)
+                with open(qm, "rb") as committed, open(fresh, "rb") as compiled:
+                    if committed.read() != compiled.read():
+                        errors.append("%s does not match %s (run tools/openhu-translations)"
+                                      % (os.path.relpath(qm, plugin_dir), name))
+    return errors
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("--check", action="store_true", help="only check, fail on problems")
+    parser.add_argument("--add", action="append", default=[], metavar="LANGUAGE", help="add a language")
+    parser.add_argument("plugins", nargs="*", help="plugin folders (default: plugins/*)")
+    args = parser.parse_args()
+    plugins = args.plugins or sorted(path for path in glob.glob(os.path.join(REPO, "plugins", "*"))
+                                     if os.path.isfile(os.path.join(path, "manifest.json")))
+    tool = lrelease()
+
+    if not args.check:
+        for plugin_dir in plugins:
+            sync(plugin_dir, args.add, tool)
+        return 0
+
+    if not tool:
+        print("warning: lrelease not found (qt6-l10n-tools), the .qm files are not compared", file=sys.stderr)
+    failed = False
+    for plugin_dir in plugins:
+        errors = check(plugin_dir, tool)
+        for error in errors:
+            print("%s: %s" % (plugin_id(plugin_dir), error))
+        failed = failed or bool(errors)
+    if not failed:
+        print("translations complete: " + " ".join(plugin_id(path) for path in plugins))
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

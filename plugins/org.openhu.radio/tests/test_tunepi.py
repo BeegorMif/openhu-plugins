@@ -15,6 +15,10 @@ class Api:
 
     def __init__(self):
         self.published = []
+        self.handlers = {}
+
+    def on(self, pattern, callback):
+        self.handlers[pattern] = callback
 
     async def publish(self, topic, **data):
         self.published.append((topic, data))
@@ -35,6 +39,7 @@ class TunePiTest(unittest.TestCase):
         radio.DATA_DIR = openhu.DATA_DIR = self.data.name
         self.plugin = radio.RadioPlugin()
         self.plugin.api = Api()
+        self.plugin.texts.set_language("en")
         self.plugin.config.update(band="am", frequency={"fm": 101.9, "am": 1008},
                                   pis={"fm": {"96.2": "0xD382", "87.6": "0xD382", "88.6": "0xD384"}},
                                   levels={"fm": {"96.2": -10.0, "87.6": -20.0}})
@@ -64,6 +69,14 @@ class TunePiTest(unittest.TestCase):
         # the next tune clears it
         asyncio.run(self.plugin.handle_command({"cmd": "tune", "value": 1017}))
         self.assertEqual(self.state()["error"], "")
+
+    def test_error_follows_language(self):
+        # the error is kept as a text ID: published again in the new language after a switch (ui.language)
+        self.plugin.texts.follow(self.plugin.api, self.plugin.publish_state)
+        asyncio.run(self.plugin.handle_command({"cmd": "tunePi", "value": "0xD385"}))
+        self.assertEqual(self.state()["error"], "Station with PI 0xD385 unknown")
+        asyncio.run(self.plugin.api.handlers["ui.language"]("ui.language", {"language": "de"}))
+        self.assertEqual(self.state()["error"], "Sender mit PI 0xD385 unbekannt")
 
     def test_rds_remembers_pi_and_name(self):
         class Reader:

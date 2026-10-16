@@ -1,9 +1,9 @@
 {
   "id": "org.openhu.camera",
-  "name": "Rückfahrkamera",
-  "version": "1.0.0",
+  "name": "Reverse camera",
+  "version": "1.1.0",
   "api": 2,
-  "description": "Kamerabild mit Hilfslinien im Inhaltsbereich oder als Vollbild, automatisch beim Rückwärtsgang (CAN-Plugin) oder per Aktion camera.show / camera.hide / camera.toggle.",
+  "description": "Camera picture with guide lines in the content area or full screen, automatically in reverse gear (CAN plugin) or with the actions camera.show / camera.hide / camera.toggle.",
   "arch": ["all"],
   "ui": {"page": "qml/Main.qml", "overlay": "qml/Overlay.qml", "icon": "icon.svg", "dock": true},
   "process": {"exec": "bin/camera.py", "restart": "on-failure"},

@@ -8,7 +8,11 @@
     await api.action("media.next")                     # same as a steering wheel button
     await api.run(on_connect)                          # connects and reconnects forever
 
-Environment (set by OpenHU): OPENHU_API_URL, OPENHU_PLUGIN_ID, OPENHU_PLUGIN_DIR, OPENHU_DATA_DIR.
+    texts = Texts()                                     # texts of the process in the shell's language
+    texts.follow(api, on_change)                       # ...also after a switch
+    texts.tr("org.example.speed.error.no_sensor")      # i18n/<language>.ts, like qsTrId() in QML
+
+Environment (set by OpenHU): OPENHU_API_URL, OPENHU_PLUGIN_ID, OPENHU_PLUGIN_DIR, OPENHU_DATA_DIR, OPENHU_LANGUAGE.
 OPENHU_API_TOKEN (optional, not set by OpenHU): API token, only needed from another computer, e.g. while developing
 a plugin against a head unit (OPENHU_API_URL=ws://<head unit>:5520). On the head unit itself no token is needed.
 """
@@ -18,6 +22,8 @@ import inspect
 import json
 import logging
 import os
+import re
+import xml.etree.ElementTree as ElementTree
 
 import websockets
 
@@ -58,6 +64,76 @@ def save_config(config):
     with open(path + ".tmp", "w") as file:
         json.dump(config, file, indent=2)
     os.replace(path + ".tmp", path)
+
+
+def load_ts(path):
+    """Text ID -> translation of a Qt .ts file (lrelease -idbased); untranslated and removed entries are left out."""
+    texts = {}
+    try:
+        root = ElementTree.parse(path).getroot()
+    except (OSError, ElementTree.ParseError):
+        return texts
+    for message in root.iter("message"):
+        translation = message.find("translation")
+        if message.get("id") and translation is not None and translation.text \
+                and translation.get("type") not in ("unfinished", "vanished", "obsolete"):
+            texts[message.get("id")] = translation.text
+    return texts
+
+
+class Text:
+    """A text ID with its arguments, translated each time it is shown (str()). Keep messages as Text (e.g. an error
+    in the published state), so they follow a language switch when they are published again."""
+
+    def __init__(self, texts, text_id, *args):
+        self.texts, self.id, self.args = texts, text_id, args
+
+    def __str__(self):
+        return self.texts.tr(self.id, *self.args)
+
+    def __repr__(self):
+        return "Text(%r)" % str(self)
+
+
+class Texts:
+    """Texts of a plugin process in the language of the shell. They live in the same files as the texts of the
+    plugin's QML, i18n/<language>.ts (IDs "<plugin id>.<area>.<key>", openhu/docs/translations.md), arguments are
+    %1, %2, ... like qsTrId(...).arg(...). An ID without a translation comes back as the ID, like in QML; a language
+    without a file falls back to English."""
+
+    def __init__(self, directory=None, language=None):
+        self.directory = directory or os.path.join(PLUGIN_DIR, "i18n")
+        self.language = None
+        self.texts = {}
+        self.set_language(language or os.environ.get("OPENHU_LANGUAGE") or "en")
+
+    def set_language(self, language):
+        """Loads the texts of a language; True if it changed."""
+        if language == self.language:
+            return False
+        self.language = language
+        path = os.path.join(self.directory, language + ".ts")
+        self.texts = load_ts(path if os.path.isfile(path) else os.path.join(self.directory, "en.ts"))
+        return True
+
+    def tr(self, text_id, *args):
+        text = self.texts.get(text_id, text_id)
+        return re.sub(r"%(\d+)", lambda m: str(args[int(m.group(1)) - 1]) if 0 < int(m.group(1)) <= len(args)
+                      else m.group(0), text)
+
+    def text(self, text_id, *args):
+        """A Text: translated when it is shown, in the language of that moment."""
+        return Text(self, text_id, *args)
+
+    def follow(self, api, on_change=None):
+        """Follows a language switch of the shell (topic ui.language), then calls on_change() (sync or async), e.g.
+        to publish the state again with the new texts. Call before api.run()."""
+        async def on_language(topic, data):
+            if self.set_language(data.get("language") or "en") and on_change is not None:
+                result = on_change()
+                if inspect.isawaitable(result):
+                    await result
+        api.on("ui.language", on_language)
 
 
 class OpenHU:
