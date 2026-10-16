@@ -1,4 +1,4 @@
-"""Recorder: signal names and descriptions, groups and privacy, rates (sample-and-hold, every change), texts and
+"""Recorder: signal names and units, groups and privacy, rates (sample-and-hold, every change), texts and
 booleans, trips into the store, recordings (windows, pre/post, quota)."""
 
 import copy
@@ -104,21 +104,21 @@ class RecorderTest(unittest.TestCase):
         events = self.reader.events(0, 10 * S, "vehicle.gear.*")["events"]
         self.assertEqual([(e["t"], e["value"]) for e in events], [(1 * S, "reverse"), (3 * S, "drive")])
 
-    def test_descriptions(self):
+    def test_units_and_sources(self):
         r = self.recorder
         r.on_topic("projection.state", {"connected": True}, 0)
-        r.tick(S, {"headunit.cpu_load": 0.5})
+        r.tick(S, {"headunit.cpu_temp_c": 50})
         r.on_topic("vehicle.speed", {"kmh": 10}, 2 * S)
         r.on_signals_info({"source": "org.openhu.can", "signals": {
-            "vehicle.speed.kmh": {"unit": "km/h", "description": "Vehicle speed"},
-            "vehicle.engine.rpm": {"unit": "rpm", "description": "Engine speed"}}})
+            "vehicle.speed.kmh": {"unit": "km/h", "description": "ignored"},
+            "vehicle.engine.rpm": {"unit": "rpm"}}})
         r.on_topic("vehicle.engine", {"rpm": 900}, 3 * S)
         r.tick(3 * S)
         r.flush()
         aa = self.signal("androidauto.connected")
-        self.assertEqual((aa["description"], aa["source"]), ("Android Auto connected", "openhu:projection.state"))
-        self.assertEqual(self.signal("headunit.cpu_load")["description"],
-                         "Head unit CPU load (1 min average, 1.0 = one core busy)")
+        self.assertEqual((aa["unit"], aa["source"]), (None, "openhu:projection.state"))
+        self.assertEqual(self.signal("headunit.cpu_temp_c")["unit"], "°C")
+        self.assertNotIn("description", aa)
         for name, unit in (("vehicle.speed.kmh", "km/h"), ("vehicle.engine.rpm", "rpm")):
             signal = self.signal(name)
             self.assertEqual((signal["unit"], signal["source"]), (unit, "org.openhu.can"))

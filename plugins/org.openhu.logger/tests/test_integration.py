@@ -169,7 +169,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("Bob", json.dumps(everything))
         self.assertNotIn("+49123", json.dumps(everything))
         signals = {s["name"]: s for s in (await self.ask("logger.query", cmd="signals"))["signals"]}
-        self.assertEqual(signals["androidauto.connected"]["description"], "Android Auto connected")
+        self.assertEqual(signals["androidauto.connected"]["source"], "openhu:projection.state")
         self.assertEqual(signals["vehicle.speed.kmh"]["unit"], "km/h")  # from signals.info
 
         live = bus.values["logger.live"]

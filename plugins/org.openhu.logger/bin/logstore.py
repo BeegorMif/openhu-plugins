@@ -1,9 +1,10 @@
 """SQLite storage of the logger: signals, samples, trips, recordings, the size limits and the queries.
 
-Plain tables, readable with any SQLite tool (times in ms since 1970):
-    meta       (key, value)                     schema version, logger version
-    signal     (id, name, unit, description, source, first_seen)
-               one row per logged signal, created when it first appears; unit/description/source if known
+Plain tables, readable with any SQLite tool (times in ms since 1970); every table and column is described by a
+comment in its CREATE TABLE (SCHEMA), which SQLite keeps, so `.schema` and DB browsers show it:
+    meta       (key, value)                     schema version, logger version, sample count
+    signal     (id, name, unit, source, first_seen)
+               one row per logged signal, created when it first appears; unit/source if known
     sample     (signal_id, timestamp, value)    WITHOUT ROWID, primary key (signal_id, timestamp); value without a
                type: integers take 1-6 bytes (0 and 1, e.g. booleans, none), decimals 8, texts ("drive") as text
     trip       (id, start_time, end_time, open, raw, start_reason, end_reason, distance_km, duration_s,
@@ -25,7 +26,7 @@ import os
 import sqlite3
 import time
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 # trip summaries are kept after their samples are gone (a few hundred bytes each), up to this many
 MAX_TRIPS = 100_000
 # limits of one query, so an answer stays a reasonable bus message
@@ -38,20 +39,72 @@ DEFAULT_SAMPLE_BYTES = 20
 # tables of the first version (compressed blocks), which is moved aside
 OLD_TABLES = {"keys", "blocks", "events", "trips", "recordings", "rblocks"}
 
+# The comments are part of the schema: SQLite keeps the CREATE TABLE text (sqlite_master.sql). No ";" in comments.
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
-CREATE TABLE IF NOT EXISTS signal(id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL, unit TEXT, description TEXT,
-    source TEXT, first_seen INTEGER);
-CREATE TABLE IF NOT EXISTS sample(signal_id INTEGER NOT NULL, timestamp INTEGER NOT NULL, value,
-    PRIMARY KEY (signal_id, timestamp)) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS trip(id INTEGER PRIMARY KEY, start_time INTEGER NOT NULL, end_time INTEGER NOT NULL,
-    open INTEGER NOT NULL DEFAULT 1, raw INTEGER NOT NULL DEFAULT 1, start_reason TEXT, end_reason TEXT,
-    distance_km REAL, duration_s REAL, max_speed_kmh REAL, avg_speed_kmh REAL, aa_time_s REAL, fuel_l REAL,
-    consumption_l_100km REAL, summary TEXT);
+CREATE TABLE IF NOT EXISTS meta(
+    -- Facts about this database, one row per key
+    key TEXT PRIMARY KEY,  -- schema_version, logger_version (plugin version that last opened it), samples (rows in sample, for the size estimate)
+    value TEXT             -- the value as text
+);
+CREATE TABLE IF NOT EXISTS signal(
+    -- One row per logged signal, created when it first appears
+    id INTEGER PRIMARY KEY,   -- referenced by sample.signal_id
+    name TEXT UNIQUE NOT NULL, -- <topic>.<field> of the bus (vehicle.speed.kmh) or a fixed name (androidauto.connected, headunit.cpu_load)
+    unit TEXT,                -- unit of the values (km/h, rpm, °C, MB), NULL if not known
+    source TEXT,              -- where the values come from: a bus topic (vehicle.speed), openhu:<topic>, headunit, or the source named in signals.info
+    first_seen INTEGER        -- time of the first value, ms since the Unix epoch (UTC)
+);
+CREATE TABLE IF NOT EXISTS sample(
+    -- Values of the signals, written when they change (at most one per signal and rate period)
+    signal_id INTEGER NOT NULL, -- signal.id
+    timestamp INTEGER NOT NULL, -- when the value arrived, ms since the Unix epoch (UTC)
+    value,                      -- integer, real or text without a declared type, unit see signal.unit, booleans as 0/1, the value holds until the next sample of the signal
+    PRIMARY KEY (signal_id, timestamp)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS trip(
+    -- One row per trip: from moving or engine on to engine off or standing still (summary kept when its samples are dropped)
+    id INTEGER PRIMARY KEY,      -- trip number, in the order the trips started
+    start_time INTEGER NOT NULL, -- ms since the Unix epoch (UTC)
+    end_time INTEGER NOT NULL,   -- ms since the Unix epoch (UTC), the current time while the trip is open
+    open INTEGER NOT NULL DEFAULT 1, -- 1 while the trip is running
+    raw INTEGER NOT NULL DEFAULT 1,  -- 0 once its samples were dropped for space
+    start_reason TEXT,           -- speed or engine
+    end_reason TEXT,             -- engine (off), standstill, power (closed after a power cut), off (logging switched off)
+    distance_km REAL,            -- km, from the odometer if reported, else speed over time
+    duration_s REAL,             -- seconds, without the waiting time of the end rule
+    max_speed_kmh REAL,          -- km/h
+    avg_speed_kmh REAL,          -- km/h, distance / duration
+    aa_time_s REAL,              -- seconds Android Auto was connected during the trip
+    fuel_l REAL,                 -- litres used (drop of the tank content), NULL if not reported
+    consumption_l_100km REAL,    -- l/100 km, NULL if not reported
+    summary TEXT                 -- JSON with the rest (movingTime ms, distanceSource, os, loggerVersion, ...)
+);
 CREATE INDEX IF NOT EXISTS trip_start_time ON trip(start_time);
-CREATE TABLE IF NOT EXISTS recording(id INTEGER PRIMARY KEY, start_time INTEGER NOT NULL, end_time INTEGER NOT NULL,
-    open INTEGER NOT NULL DEFAULT 1, trigger TEXT NOT NULL, label TEXT, samples INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS recording(
+    -- High-rate recordings: time windows in which their signals were written on every change, the samples are in sample
+    id INTEGER PRIMARY KEY,      -- recording number
+    start_time INTEGER NOT NULL, -- ms since the Unix epoch (UTC), including the time before a trigger
+    end_time INTEGER NOT NULL,   -- ms since the Unix epoch (UTC)
+    open INTEGER NOT NULL DEFAULT 1, -- 1 while recording
+    trigger TEXT NOT NULL,       -- manual, or the condition that started it (vehicle.engine.rpm above 3000)
+    label TEXT,                  -- name given when started by hand
+    samples INTEGER NOT NULL DEFAULT 0 -- samples in the window (for the recordings' quota)
+);
 """
+# columns copied from a database of schema version 2 (which had signal.description)
+MIGRATE_FROM_2 = {
+    "meta": "key, value",
+    "signal": "id, name, unit, source, first_seen",
+    "sample": "signal_id, timestamp, value",
+    "trip": "id, start_time, end_time, open, raw, start_reason, end_reason, distance_km, duration_s, max_speed_kmh, "
+            "avg_speed_kmh, aa_time_s, fuel_l, consumption_l_100km, summary",
+    "recording": "id, start_time, end_time, open, trigger, label, samples",
+}
+
+
+def schema_statements():
+    return [statement.strip() for statement in SCHEMA.split(";\n") if statement.strip()]
+
 
 # trip dict (the interface) <-> columns; the rest goes into summary
 TRIP_COLUMNS = {
@@ -124,9 +177,10 @@ class Store:
         self.path = path
         self.version = version or ""
         self.signals = {}        # name -> id
-        self.signal_info = {}    # name -> {unit, description, source} known so far (from the sources)
+        self.signal_info = {}    # name -> {unit, source} known so far (from the sources)
         self.recovered = None    # name of a damaged database that was put aside
         self.old_schema = None   # name of a database of the first version that was put aside
+        self.migrated = None     # schema version a database was migrated from
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         try:
             self._open()
@@ -160,14 +214,49 @@ class Store:
         if new:
             # only possible before the first table (and before WAL); lets a lowered limit shrink the file
             self.db.execute("PRAGMA auto_vacuum=INCREMENTAL")
+        if "signal" in tables and self._schema_version() == 2:
+            # with a rollback journal: in WAL mode the copy would make the WAL as big as the database
+            self.db.execute("PRAGMA journal_mode=DELETE")
+            self._migrate_from_2()
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA synchronous=NORMAL")
-        self.db.executescript(SCHEMA)
+        for statement in schema_statements():
+            self.db.execute(statement)
         self.db.execute("INSERT OR IGNORE INTO meta VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
         self.db.execute("INSERT OR IGNORE INTO meta VALUES ('samples', '0')")
         if self.version:
             self.db.execute("INSERT OR REPLACE INTO meta VALUES ('logger_version', ?)", (self.version,))
         self.signals = {name: signal_id for signal_id, name in self.db.execute("SELECT id, name FROM signal")}
+
+    def _schema_version(self):
+        try:
+            row = self.db.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()
+        except sqlite3.OperationalError:
+            return None
+        return int(row[0]) if row else None
+
+    def _migrate_from_2(self):
+        """Version 2 had signal.description and no comments in the schema. ALTER TABLE cannot add comments, so the
+        tables are recreated with the current schema and the data is copied, in one transaction (needs free space for
+        a copy of the data while it runs; the old tables' pages are given back afterwards)."""
+        db = self.db
+        db.execute("BEGIN")
+        try:
+            db.execute("DROP INDEX IF EXISTS trip_start_time")
+            for table in MIGRATE_FROM_2:
+                db.execute("ALTER TABLE %s RENAME TO old_%s" % (table, table))
+            for statement in schema_statements():
+                db.execute(statement)
+            for table, columns in MIGRATE_FROM_2.items():
+                db.execute("INSERT INTO %s(%s) SELECT %s FROM old_%s" % (table, columns, columns, table))
+                db.execute("DROP TABLE old_%s" % table)
+            db.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (str(SCHEMA_VERSION),))
+            db.execute("COMMIT")
+        except BaseException:
+            db.execute("ROLLBACK")
+            raise
+        self.migrated = 2
+        db.execute("PRAGMA incremental_vacuum").fetchall()  # the space of the old tables back
 
     def close(self):
         if getattr(self, "db", None) is not None:
@@ -191,26 +280,24 @@ class Store:
 
     # --- signals --------------------------------------------------------------------
 
-    def describe(self, name, unit=None, description=None, source=None):
-        """Unit, description, source of a signal, from its source; written at once for a signal that exists."""
+    def describe(self, name, unit=None, source=None):
+        """Unit and source of a signal, from its source; written at once for a signal that exists."""
         info = self.signal_info.setdefault(name, {})
         changed = False
-        for key, value in (("unit", unit), ("description", description), ("source", source)):
+        for key, value in (("unit", unit), ("source", source)):
             if value and info.get(key) != value:
                 info[key] = value
                 changed = True
         if changed and name in self.signals:
-            self.db.execute("UPDATE signal SET unit = coalesce(?, unit), description = coalesce(?, description), "
-                            "source = coalesce(?, source) WHERE id = ?",
-                            (info.get("unit"), info.get("description"), info.get("source"), self.signals[name]))
+            self.db.execute("UPDATE signal SET unit = coalesce(?, unit), source = coalesce(?, source) WHERE id = ?",
+                            (info.get("unit"), info.get("source"), self.signals[name]))
 
     def signal_id(self, name, t):
         signal_id = self.signals.get(name)
         if signal_id is None:
             info = self.signal_info.get(name, {})
-            self.db.execute("INSERT OR IGNORE INTO signal(name, unit, description, source, first_seen) "
-                            "VALUES (?, ?, ?, ?, ?)",
-                            (name, info.get("unit"), info.get("description"), info.get("source"), t))
+            self.db.execute("INSERT OR IGNORE INTO signal(name, unit, source, first_seen) VALUES (?, ?, ?, ?)",
+                            (name, info.get("unit"), info.get("source"), t))
             signal_id = self.db.execute("SELECT id FROM signal WHERE name = ?", (name,)).fetchone()[0]
             self.signals[name] = signal_id
         return signal_id
@@ -540,14 +627,14 @@ class Queries:
 
     def signals(self):
         result = []
-        for signal_id, name, unit, description, source, first_seen in self.db.execute(
-                "SELECT id, name, unit, description, source, first_seen FROM signal ORDER BY name").fetchall():
+        for signal_id, name, unit, source, first_seen in self.db.execute(
+                "SELECT id, name, unit, source, first_seen FROM signal ORDER BY name").fetchall():
             first = self.db.execute("SELECT min(timestamp) FROM sample WHERE signal_id = ?", (signal_id,)).fetchone()[0]
             last = value = None
             if first is not None:
                 last, value = self.db.execute("SELECT timestamp, value FROM sample WHERE signal_id = ? "
                                               "ORDER BY timestamp DESC LIMIT 1", (signal_id,)).fetchone()
-            result.append({"name": name, "key": name, "unit": unit, "description": description, "source": source,
+            result.append({"name": name, "key": name, "unit": unit, "source": source,
                            "firstSeen": first_seen, "first": first, "last": last, "value": value})
         return {"signals": result}
 

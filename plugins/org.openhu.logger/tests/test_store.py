@@ -3,6 +3,7 @@ size limits, old and damaged files."""
 
 import os
 import random
+import re
 import sqlite3
 import sys
 import tempfile
@@ -44,11 +45,22 @@ class StoreTest(unittest.TestCase):
         tables = {name for (name,) in self.sql("SELECT name FROM sqlite_master WHERE type = 'table'")}
         self.assertEqual(tables, {"meta", "signal", "sample", "trip", "recording"})
         meta = dict(self.sql("SELECT key, value FROM meta"))
-        self.assertEqual((meta["schema_version"], meta["logger_version"]), ("2", "1.1.0"))
+        self.assertEqual((meta["schema_version"], meta["logger_version"]), ("3", "1.1.0"))
+
+    def test_schema_is_described(self):
+        """Every table and column carries a comment in the CREATE TABLE text that SQLite keeps."""
+        for table, sql in self.sql("SELECT name, sql FROM sqlite_master WHERE type = 'table'"):
+            lines = sql.splitlines()
+            self.assertTrue(lines[1].strip().startswith("--"), table)  # what the table holds
+            columns = [name for _, name, *_ in self.sql("PRAGMA table_info(%s)" % table)]
+            for column in columns:
+                line = next(line for line in lines if re.match(r"\s*%s\b" % column, line))
+                self.assertIn("--", line, "%s.%s" % (table, column))
+        self.assertIn("ms since the Unix epoch (UTC)", self.sql("SELECT sql FROM sqlite_master WHERE name = 'sample'")[0][0])
 
     def test_values_keep_their_type(self):
         """Readable with any SQLite tool: integers, decimals, texts as they are; float noise removed."""
-        self.store.describe("vehicle.speed.kmh", "km/h", "Vehicle speed", "org.openhu.can")
+        self.store.describe("vehicle.speed.kmh", "km/h", "org.openhu.can")
         self.store.write([(1, "vehicle.speed.kmh", 50.370000000000005), (2, "vehicle.speed.kmh", 51.0),
                           (1, "vehicle.gear.gear", "drive"), (1, "vehicle.gear.reverse", True),
                           (2, "vehicle.gear.reverse", False)])
@@ -57,12 +69,11 @@ class StoreTest(unittest.TestCase):
         self.assertEqual(rows, [("vehicle.gear.gear", 1, "drive", "text"), ("vehicle.gear.reverse", 1, 1, "integer"),
                                 ("vehicle.gear.reverse", 2, 0, "integer"), ("vehicle.speed.kmh", 1, 50.37, "real"),
                                 ("vehicle.speed.kmh", 2, 51, "integer")])
-        signal = self.sql("SELECT name, unit, description, source, first_seen FROM signal WHERE name = ?",
-                          "vehicle.speed.kmh")[0]
-        self.assertEqual(signal, ("vehicle.speed.kmh", "km/h", "Vehicle speed", "org.openhu.can", 1))
-        # metadata arriving later updates the row
-        self.store.describe("vehicle.gear.gear", description="Gear")
-        self.assertEqual(self.sql("SELECT description FROM signal WHERE name = 'vehicle.gear.gear'")[0][0], "Gear")
+        signal = self.sql("SELECT name, unit, source, first_seen FROM signal WHERE name = ?", "vehicle.speed.kmh")[0]
+        self.assertEqual(signal, ("vehicle.speed.kmh", "km/h", "org.openhu.can", 1))
+        # a unit arriving later updates the row
+        self.store.describe("vehicle.gear.gear", source="org.openhu.can")
+        self.assertEqual(self.sql("SELECT source FROM signal WHERE name = 'vehicle.gear.gear'")[0][0], "org.openhu.can")
         self.assertEqual(self.store.sample_count(), 5)
         self.assertEqual([normalize(v) for v in (True, 3.0, float("nan"), 1 / 3)], [1, 3, None, 0.333333333333])
 
@@ -142,7 +153,7 @@ class StoreTest(unittest.TestCase):
             self.reader.range_of({"start": 9, "end": 5}, 0)
 
     def test_signals_and_events(self):
-        self.store.describe("a.x", "km/h", "Speed")
+        self.store.describe("a.x", "km/h")
         self.store.write([(S, "a.x", 1), (5 * S, "a.x", 2), (3 * S, "b.y", 7), (S, "vehicle.gear.gear", "drive"),
                           (2 * S, "phone.call_state", "idle"), (3 * S, "vehicle.gear.gear", "park")])
         signals = {s["name"]: s for s in self.reader.signals()["signals"]}
@@ -268,7 +279,65 @@ class StoreTest(unittest.TestCase):
         kept = sqlite3.connect(self.store.old_schema)
         self.assertEqual(kept.execute("SELECT name FROM keys").fetchall(), [("vehicle.speed.kmh",)])
         kept.close()
-        self.assertEqual(self.sql("SELECT value FROM meta WHERE key = 'schema_version'"), [("2",)])
+        self.assertEqual(self.sql("SELECT value FROM meta WHERE key = 'schema_version'"), [("3",)])
+
+    def test_migration_from_version_2(self):
+        """The previous schema (signal.description, no comments) is migrated in place without losing data."""
+        self.reader.close()
+        self.store.close()
+        os.remove(self.path)
+        for suffix in ("-wal", "-shm"):
+            if os.path.exists(self.path + suffix):
+                os.remove(self.path + suffix)
+        old = sqlite3.connect(self.path)
+        old.executescript("""
+            PRAGMA auto_vacuum=INCREMENTAL;
+            CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT);
+            CREATE TABLE signal(id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL, unit TEXT, description TEXT,
+                source TEXT, first_seen INTEGER);
+            CREATE TABLE sample(signal_id INTEGER NOT NULL, timestamp INTEGER NOT NULL, value,
+                PRIMARY KEY (signal_id, timestamp)) WITHOUT ROWID;
+            CREATE TABLE trip(id INTEGER PRIMARY KEY, start_time INTEGER NOT NULL, end_time INTEGER NOT NULL,
+                open INTEGER NOT NULL DEFAULT 1, raw INTEGER NOT NULL DEFAULT 1, start_reason TEXT, end_reason TEXT,
+                distance_km REAL, duration_s REAL, max_speed_kmh REAL, avg_speed_kmh REAL, aa_time_s REAL,
+                fuel_l REAL, consumption_l_100km REAL, summary TEXT);
+            CREATE INDEX trip_start_time ON trip(start_time);
+            CREATE TABLE recording(id INTEGER PRIMARY KEY, start_time INTEGER NOT NULL, end_time INTEGER NOT NULL,
+                open INTEGER NOT NULL DEFAULT 1, trigger TEXT NOT NULL, label TEXT, samples INTEGER NOT NULL DEFAULT 0);
+            INSERT INTO meta VALUES ('schema_version', '2'), ('samples', '3'), ('logger_version', '1.1.0');
+            INSERT INTO signal VALUES (1, 'vehicle.speed.kmh', 'km/h', 'Vehicle speed', 'fake-drive', 1000),
+                (7, 'vehicle.gear.gear', NULL, 'Gear', 'vehicle.gear', 1000);
+            INSERT INTO sample VALUES (1, 1000, 50.37), (1, 2000, 0), (7, 1000, 'drive');
+            INSERT INTO trip VALUES (3, 1000, 2000, 0, 1, 'speed', 'standstill', 0.5, 1.0, 50.37, 30.0, 1.0, NULL,
+                NULL, '{"movingTime": 1000}');
+            INSERT INTO recording VALUES (2, 900, 2100, 0, 'manual', 'test', 3);
+        """)
+        old.close()
+        self.store = Store(self.path, "1.2.0")
+        self.reader = self.store.reader()
+        self.assertEqual(self.store.migrated, 2)
+        self.assertIsNone(self.store.old_schema)
+        self.assertEqual(self.sql("SELECT id, name, unit, source, first_seen FROM signal ORDER BY id"),
+                         [(1, "vehicle.speed.kmh", "km/h", "fake-drive", 1000),
+                          (7, "vehicle.gear.gear", None, "vehicle.gear", 1000)])
+        self.assertEqual(self.sql("SELECT signal_id, timestamp, value, typeof(value) FROM sample ORDER BY 1, 2"),
+                         [(1, 1000, 50.37, "real"), (1, 2000, 0, "integer"), (7, 1000, "drive", "text")])
+        trip = self.reader.trip(3)["trip"]
+        self.assertEqual((trip["distance"], trip["duration"], trip["movingTime"], trip["endReason"]),
+                         (0.5, 1000, 1000, "standstill"))
+        self.assertEqual(self.reader.recording(2)["label"], "test")
+        meta = dict(self.sql("SELECT key, value FROM meta"))
+        self.assertEqual((meta["schema_version"], meta["samples"], meta["logger_version"]), ("3", "3", "1.2.0"))
+        tables = {name for (name,) in self.sql("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        self.assertEqual(tables, {"meta", "signal", "sample", "trip", "recording"})
+        self.assertEqual(self.sql("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'trip_start_time'"),
+                         [("trip_start_time",)])
+        self.assertIn("-- ", self.sql("SELECT sql FROM sqlite_master WHERE name = 'signal'")[0][0])
+        self.assertEqual(self.sql("PRAGMA integrity_check"), [("ok",)])
+        # and it goes on working
+        self.store.write([(3000, "vehicle.speed.kmh", 10)])
+        self.assertEqual(self.reader.samples(0, 4000, ["vehicle.speed.kmh"], points=0)["series"]["vehicle.speed.kmh"]["v"],
+                         [50.37, 0, 10])
 
     def test_failed_write_rolls_back(self):
         with self.assertRaises(sqlite3.Error):

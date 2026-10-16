@@ -25,15 +25,12 @@ from openhu import OpenHU  # noqa: E402
 
 async def drive(api, hz, minutes, stop):
     rng = random.Random()
-    # units and descriptions, like a CAN profile could provide them (the logger keeps them in its signal table)
+    # units, like a CAN profile could provide them (the logger keeps them in its signal table)
     await api.publish("signals.info", source="fake-drive", signals={
-        "vehicle.speed.kmh": {"unit": "km/h", "description": "Vehicle speed"},
-        "vehicle.engine.rpm": {"unit": "rpm", "description": "Engine speed"},
-        "vehicle.engine.throttle": {"unit": "%", "description": "Throttle pedal position"},
-        "vehicle.engine.running": {"description": "Engine running"},
-        "vehicle.gear.gear": {"description": "Selected gear (park, reverse, neutral, drive)"},
-        "vehicle.gear.reverse": {"description": "Reverse gear engaged"},
-        "vehicle.climate.outsideTemp": {"unit": "°C", "description": "Outside temperature"},
+        "vehicle.speed.kmh": {"unit": "km/h"},
+        "vehicle.engine.rpm": {"unit": "rpm"},
+        "vehicle.engine.throttle": {"unit": "%"},
+        "vehicle.climate.outsideTemp": {"unit": "°C"},
     })
     await api.publish("vehicle.engine", running=True, rpm=800)
     await api.publish("vehicle.gear", gear="drive", reverse=False)

@@ -3,8 +3,8 @@ besides Store; times in ms since 1970).
 
 Signals:
 - vehicle data: "<topic>.<field>" (one level of nested objects: "<topic>.<field>.<sub>"), e.g. "vehicle.speed.kmh",
-  any field a source publishes; unit and description from the topic "signals.info" if the source publishes it
-- OpenHU state and head unit values: fixed names with descriptions (OPENHU_SIGNALS, HEADUNIT_SIGNALS)
+  any field a source publishes; the unit from the topic "signals.info" if the source publishes it
+- OpenHU state and head unit values: fixed names (OPENHU_SIGNALS, HEADUNIT_SIGNALS)
 Values are written only when they change:
 - numbers at the rate of their signal (config "rates", e.g. {"vehicle.*": 5}): seconds (0.1 ... 3600), at most one
   sample per period with the time the value arrived, or "update": every change as it arrives; signals without a rate
@@ -24,21 +24,21 @@ import math
 from logstore import public_trip
 from trips import Trips
 
-# (topic, field) -> (signal, unit, description): the openhu group, nothing personal
+# (topic, field) -> (signal, unit): the openhu group, nothing personal
 OPENHU_SIGNALS = {
-    ("projection.state", "connected"): ("androidauto.connected", None, "Android Auto connected"),
-    ("projection.transport", "transport"): ("androidauto.transport", None, "How Android Auto is connected (usb, wifi)"),
-    ("phone.status", "callState"): ("phone.call_state", None, "Phone call state (idle, incoming, in_call, ...)"),
-    ("media.status", "source"): ("media.source", None, "Media source (androidauto, radio, ...)"),
-    ("media.status", "state"): ("media.state", None, "Media playback state (playing, paused, stopped)"),
+    ("projection.state", "connected"): ("androidauto.connected", None),     # Android Auto connected (0/1)
+    ("projection.transport", "transport"): ("androidauto.transport", None),  # usb, wifi
+    ("phone.status", "callState"): ("phone.call_state", None),              # idle, incoming, in_call, ...
+    ("media.status", "source"): ("media.source", None),                     # androidauto, radio, ...
+    ("media.status", "state"): ("media.state", None),                       # playing, paused, stopped
 }
 OPENHU_TOPICS = sorted({topic for topic, _ in OPENHU_SIGNALS})
-# signal -> (unit, description): the health group, read by the process (logger.read_health)
+# signal -> unit: the health group, read by the process (logger.read_health)
 HEADUNIT_SIGNALS = {
-    "headunit.cpu_temp_c": ("°C", "Head unit CPU temperature (hottest thermal zone)"),
-    "headunit.cpu_load": (None, "Head unit CPU load (1 min average, 1.0 = one core busy)"),
-    "headunit.memory_free_mb": ("MB", "Free memory of the head unit (available to programs)"),
-    "headunit.disk_free_mb": ("MB", "Free space on the head unit's data partition"),
+    "headunit.cpu_temp_c": "°C",       # hottest thermal zone
+    "headunit.cpu_load": None,         # load average over 1 minute, 1.0 = one core busy
+    "headunit.memory_free_mb": "MB",   # memory available to programs
+    "headunit.disk_free_mb": "MB",     # free space on the data partition
 }
 METADATA_TOPIC = "signals.info"
 MAX_TEXT = 64
@@ -134,10 +134,10 @@ class Recorder:
         self.announcements = []     # (topic, data) for the bus: logger.trip, logger.recording
         self.vehicle_data = False   # a vehicle.* topic arrived (the CAN plugin or another source runs)
         self.error = ""             # last write error, "" after a successful write
-        for (topic, _), (name, unit, description) in OPENHU_SIGNALS.items():
-            store.describe(name, unit, description, "openhu:" + topic)
-        for name, (unit, description) in HEADUNIT_SIGNALS.items():
-            store.describe(name, unit, description, "headunit")
+        for (topic, _), (name, unit) in OPENHU_SIGNALS.items():
+            store.describe(name, unit, "openhu:" + topic)
+        for name, unit in HEADUNIT_SIGNALS.items():
+            store.describe(name, unit, "headunit")
         self.apply_config()
 
     def apply_config(self):
@@ -170,13 +170,13 @@ class Recorder:
     # --- input ----------------------------------------------------------------------
 
     def on_signals_info(self, data):
-        """Units and descriptions of a source: {"source": ..., "signals": {"vehicle.speed.kmh": {"unit": "km/h",
-        "description": "Vehicle speed"}}}"""
+        """Units of a source: {"source": ..., "signals": {"vehicle.speed.kmh": {"unit": "km/h"}}} (other fields are
+        ignored)."""
         source = data.get("source") if isinstance(data.get("source"), str) else None
         for name, info in (data.get("signals") or {}).items():
             if isinstance(name, str) and isinstance(info, dict):
-                text = {key: str(info[key])[:200] for key in ("unit", "description") if info.get(key)}
-                self.store.describe(name, text.get("unit"), text.get("description"), source)
+                unit = str(info["unit"])[:32] if info.get("unit") else None
+                self.store.describe(name, unit, source)
 
     def on_topic(self, topic, data, t):
         if topic.startswith("vehicle."):
