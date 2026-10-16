@@ -117,6 +117,27 @@ def media_metadata(band, frequency, rds, names):
     }
 
 
+# Media keys while the radio is the current media source (OpenHU sends them to the source, not to the phone, then)
+MEDIA_KEY_COMMANDS = {
+    "media.next": {"cmd": "seek", "value": 1},
+    "media.previous": {"cmd": "seek", "value": -1},
+    "media.play_pause": {"cmd": "toggle"},
+    "media.play": {"cmd": "play"},
+    "media.pause": {"cmd": "stop"},
+}
+
+
+def action_command(action, radio_is_source):
+    """radio.command for an input action, None if the radio does not handle it."""
+    if action == "radio.toggle":
+        return {"cmd": "toggle"}
+    if action in ("radio.next", "radio.previous"):
+        return {"cmd": "seek", "value": 1 if action == "radio.next" else -1}
+    if radio_is_source and action in MEDIA_KEY_COMMANDS:
+        return dict(MEDIA_KEY_COMMANDS[action])
+    return None
+
+
 def parse_rtl_power(lines, threshold_db=10.0):
     """rtl_power CSV -> frequencies (MHz, 0.1 raster) of stations clearly above the noise floor."""
     bins = {}
