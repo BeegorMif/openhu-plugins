@@ -22,6 +22,16 @@ Stations come from a JSON file (OPENHU_FAKE_SDR_STATIONS, default stations.json 
     error   "no-device" or "busy": rtl_fm and rtl_power fail like the real ones
 
 rtl_fm writes the tuned station to a state file (XDG_RUNTIME_DIR/fake-sdr/state.json), redsea reads it.
+
+DAB: welle-cli (the script next to this file) stands in for welle-cli's web server mode, with ensembles from the
+"dab" section:
+
+    "dab": [{"channel": "7A", "ensemble": "0x1188", "label": "NDR NDS", "ecc": "0xE0",
+             "services": [{"sid": "0xD882", "label": "NDR 2 NDS", "shortLabel": "NDR 2", "url": "https://...",
+                           "dls": "fixed text", "slides": ["slides/a.png"], "logo": "..."}]}]
+
+    url/tone like FM (decoded to MP3 with ffmpeg), dls fixed DLS (default: the stream's ICY title, else the label),
+    slides local pictures shown one after the other (slideSeconds, default 20) as the MOT slideshow
 """
 
 import json
@@ -66,7 +76,53 @@ def load_stations(path=None):
                 continue
             stations.append(dict(entry, frequency=frequency))
         result[band] = sorted(stations, key=lambda station: station["frequency"])
+    result["dab"] = []
+    for entry in data.get("dab", []):
+        if not isinstance(entry, dict) or not entry.get("channel"):
+            continue
+        services = [dict(service, sid=dab_id(service.get("sid"))) for service in entry.get("services", [])
+                    if isinstance(service, dict) and dab_id(service.get("sid"))]
+        result["dab"].append(dict(entry, channel=str(entry["channel"]).upper(),
+                                  ensemble=dab_id(entry.get("ensemble")) or "0x0001", services=services))
     return result
+
+
+def dab_id(value):
+    """"0xd882" / "D882" -> "0xD882", None if invalid."""
+    try:
+        code = int(str(value), 16)
+    except (TypeError, ValueError):
+        return None
+    return "0x%04X" % code if 0 < code <= 0xFFFF else None
+
+
+def find_ensemble(stations, channel):
+    return next((entry for entry in stations.get("dab", []) if entry["channel"] == str(channel).upper()), None)
+
+
+def welle_mux(ensemble, services_state, now, device="fake-sdr"):
+    """welle-cli's /mux.json for an ensemble (None: no reception, like welle-cli before it synced).
+    services_state: {sid: {"dls": str, "mot": time of the last slide change}} of the services being decoded."""
+    if not ensemble:
+        return {"ensemble": {"id": "0x0000", "ecc": "0x00", "label": {"label": "", "shortlabel": ""}},
+                "services": [], "receiver": {"hardware": {"name": device}, "software": {"name": "welle.io"}}}
+    services = []
+    for service in ensemble["services"]:
+        sid = service["sid"].lower()
+        state = services_state.get(service["sid"], {})
+        services.append({
+            "sid": sid,
+            "label": {"label": str(service.get("label") or ""),
+                      "shortlabel": str(service.get("shortLabel") or service.get("label") or "")[:8]},
+            "url_mp3": "/mp3/" + sid,
+            "components": [{"componentnr": 0, "primary": True, "transportmode": "audio", "ascty": "DAB+"}],
+            "dls": {"label": state.get("dls", ""), "time": now, "lastchange": now},
+            "mot": {"time": state.get("mot", 0), "lastchange": state.get("mot", 0)},
+        })
+    label = str(ensemble.get("label") or "")
+    return {"ensemble": {"id": ensemble["ensemble"].lower(), "ecc": str(ensemble.get("ecc") or "0xE0").lower(),
+                         "label": {"label": label, "shortlabel": label[:8]}},
+            "services": services, "receiver": {"hardware": {"name": "fake-sdr"}, "software": {"name": "welle.io"}}}
 
 
 def find_station(stations, band, frequency):
@@ -89,6 +145,11 @@ def station_logos(stations, path=None):
                 continue
             key = "%.1f" % station["frequency"] if band == "fm" else "%d" % round(station["frequency"])
             result.setdefault(band, {})[key] = os.path.join(base, os.path.expanduser(str(logo)))
+    for ensemble in stations.get("dab", []):
+        for service in ensemble["services"]:
+            if service.get("logo"):
+                path = os.path.join(base, os.path.expanduser(str(service["logo"])))
+                result.setdefault("dab", {})[service["sid"]] = path
     return result
 
 

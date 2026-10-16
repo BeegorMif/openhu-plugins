@@ -5,14 +5,22 @@ import json
 import os
 import statistics
 
+import dablib
+
 BANDS = {
     # MHz for FM, kHz for AM
     "fm": {"min": 87.5, "max": 108.0, "step": 0.1, "unit": "MHz", "default": 101.3},
     "am": {"min": 531, "max": 1602, "step": 9, "unit": "kHz", "default": 1008},
 }
+# DAB has no frequency raster: a station is a service in an ensemble, its key the service id ("0xD882", dablib)
+DAB = "dab"
+ALL_BANDS = ("fm", "am", DAB)
 
 
 def clamp_frequency(band, frequency):
+    """Frequency on the band's raster; for DAB the normalised service id (None if invalid)."""
+    if band == DAB:
+        return dablib.normalize_sid(frequency)
     spec = BANDS[band]
     frequency = min(spec["max"], max(spec["min"], float(frequency)))
     # snap to the channel raster
@@ -56,8 +64,8 @@ def sox_mpx_to_audio():
             "sinc", "-15k", "rate", "44100", "deemph"]
 
 
-def pacat_command(rate):
-    return ["pacat", "--raw", "--format=s16le", "--rate=%d" % rate, "--channels=1",
+def pacat_command(rate, channels=1):
+    return ["pacat", "--raw", "--format=s16le", "--rate=%d" % rate, "--channels=%d" % channels,
             "--client-name=OpenHU", "--stream-name=Radio"]
 
 
@@ -68,7 +76,9 @@ def start_needed(playing, running):
 
 
 def frequency_key(band, frequency):
-    """Key of a frequency in the remembered station names: "96.2" (FM) / "1008" (AM)."""
+    """Key of a frequency in the remembered station names: "96.2" (FM) / "1008" (AM) / "0xD882" (DAB service)."""
+    if band == DAB:
+        return dablib.normalize_sid(frequency) or str(frequency)
     return "%.1f" % frequency if band == "fm" else "%d" % round(frequency)
 
 
@@ -118,8 +128,8 @@ def pi_frequency(config, pi, current=None):
 
 
 def band_summary(config):
-    """Both bands for radio.state "bands": range, stations, presets, remembered names and RDS PI codes (e.g. for
-    Android Auto, which lists the stations of all bands)."""
+    """All bands for radio.state "bands": range, stations, presets, remembered names and RDS PI codes (e.g. for
+    Android Auto, which lists the stations of all bands); DAB with its services (channel, ensemble, labels)."""
     result = {}
     for band, spec in BANDS.items():
         result[band] = {
@@ -132,21 +142,32 @@ def band_summary(config):
             "names": config.get("names", {}).get(band, {}),
             "pis": config.get("pis", {}).get(band, {}),
         }
+    # DAB: services instead of a frequency range; stations/presets are service ids, names their labels
+    result[DAB] = {
+        "unit": "",
+        "stations": config.get("stations", {}).get(DAB, []),
+        "presets": config.get("presets", {}).get(DAB, []),
+        "names": config.get("names", {}).get(DAB, {}),
+        "services": config.get("dabServices", {}),
+        "channels": list(dablib.DAB_CHANNELS),
+    }
     return result
 
 
-def frequency_label(band, frequency):
-    """"UKW 96,2 MHz" / "MW 1008 kHz" """
+def frequency_label(band, frequency, services=None):
+    """"UKW 96,2 MHz" / "MW 1008 kHz" / "DAB+ 7A · NDR NDS" (services: the DAB services, dabServices)"""
+    if band == DAB:
+        return dablib.channel_label((services or {}).get(frequency_key(band, frequency)))
     if band == "fm":
         return "UKW %s MHz" % ("%.1f" % frequency).replace(".", ",")
     return "MW %d kHz" % round(frequency)
 
 
-def media_metadata(band, frequency, rds, names, cover=""):
-    """media.metadata of the station that plays (home page, Bluetooth car radio, API): radiotext as the title, the
-    station name as the artist, the station logo (data URL) as the cover."""
+def media_metadata(band, frequency, rds, names, cover="", services=None):
+    """media.metadata of the station that plays (home page, Bluetooth car radio, API): radiotext (DAB: DLS) as the
+    title, the station name as the artist, the cover a data URL (DAB slideshow picture, else the station logo)."""
     name = (rds.get("ps") or "").strip() or names.get(band, {}).get(frequency_key(band, frequency), "")
-    label = frequency_label(band, frequency)
+    label = frequency_label(band, frequency, services)
     return {
         "title": (rds.get("rt") or "").strip() or name or label,
         "artist": name or label,
@@ -189,13 +210,17 @@ def name_key(name):
 
 
 def logo_index(files):
-    """File names in logos/ -> {"fm": {"96.2": file}, "am": {"1008": file}, "name": {"ndr2": file}}.
-    A name that is a frequency of a band ("96.2", "96,2", "1008") is that frequency, everything else a station name."""
-    index = {band: {} for band in BANDS}
+    """File names in logos/ -> {"fm": {"96.2": file}, "am": {"1008": file}, "dab": {"0xD882": file},
+    "name": {"ndr2": file}}. A name that is a frequency of a band ("96.2", "96,2", "1008") is that frequency, a DAB
+    service id ("0xD882") that service, everything else a station name."""
+    index = {band: {} for band in ALL_BANDS}
     index["name"] = {}
     for file in sorted(files):
         stem, extension = os.path.splitext(file)
         if extension.lower() not in LOGO_EXTENSIONS or not stem.strip():
+            continue
+        if stem.strip().lower().startswith("0x") and dablib.normalize_sid(stem):
+            index[DAB].setdefault(dablib.normalize_sid(stem), file)
             continue
         try:
             value = float(stem.strip().replace(",", "."))

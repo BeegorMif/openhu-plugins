@@ -33,7 +33,8 @@ jobs:
         run: |
           python3 -m py_compile common/*.py plugins/*/bin/*.py tools/openhu-repo-index \
               plugins/org.openhu.radio/tools/fake-sdr/fakesdr.py plugins/org.openhu.radio/tools/fake-sdr/rtl_fm \
-              plugins/org.openhu.radio/tools/fake-sdr/rtl_power plugins/org.openhu.radio/tools/fake-sdr/redsea
+              plugins/org.openhu.radio/tools/fake-sdr/rtl_power plugins/org.openhu.radio/tools/fake-sdr/redsea \
+              plugins/org.openhu.radio/tools/fake-sdr/welle-cli
 
       # qmllint of OpenHU (Qt 6) with its OpenHU QML module; OpenHU branch of the same name, else main
       - name: QML
