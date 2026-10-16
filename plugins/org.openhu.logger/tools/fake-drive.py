@@ -32,6 +32,7 @@ async def drive(api, hz, minutes, stop):
         "vehicle.engine.throttle": {"unit": "%", "description": "Throttle pedal position"},
         "vehicle.engine.running": {"description": "Engine running"},
         "vehicle.gear.gear": {"description": "Selected gear (park, reverse, neutral, drive)"},
+        "vehicle.gear.reverse": {"description": "Reverse gear engaged"},
         "vehicle.climate.outsideTemp": {"unit": "°C", "description": "Outside temperature"},
     })
     await api.publish("vehicle.engine", running=True, rpm=800)
@@ -44,7 +45,10 @@ async def drive(api, hz, minutes, stop):
         speed = max(0.0, speed + max(-8.0, min(5.0, target - speed)) * dt)
         rpm = 800 + speed * 30 + rng.gauss(0, 10)
         await api.publish("vehicle.speed", kmh=round(speed + rng.gauss(0, 0.05), 2))
-        await api.publish("vehicle.engine", running=True, rpm=round(rpm), throttle=round(max(0.0, target - speed) * 4, 1))
+        # pedal: 0-100 %, more while accelerating, ~15-25 % to hold the speed, 0 while braking or coasting
+        throttle = 0.0 if target < speed - 0.5 else min(100.0, 15.0 + speed * 0.12 + max(0.0, target - speed) * 6)
+        await api.publish("vehicle.engine", running=True, rpm=round(rpm),
+                          throttle=round(max(0.0, throttle + rng.gauss(0, 0.5)), 1))
         await api.publish("vehicle.climate", outsideTemp=round(18 + rng.gauss(0, 0.2), 1))
         await asyncio.sleep(dt)
         t += dt
