@@ -1,7 +1,7 @@
 {
   "id": "org.openhu.camera",
   "name": "Reverse camera",
-  "version": "1.1.0",
+  "version": "1.0.0",
   "api": 2,
   "description": "Camera picture with guide lines in the content area or full screen, automatically in reverse gear (CAN plugin) or with the actions camera.show / camera.hide / camera.toggle.",
   "arch": ["all"],

@@ -1,7 +1,7 @@
 {
   "id": "org.openhu.radio",
   "name": "Radio",
-  "version": "1.1.0",
+  "version": "1.0.0",
   "api": 2,
   "description": "FM/AM/DAB+ radio with an RTL-SDR USB stick: station scan, favorites and RDS (station name, radio text, PI; RDS needs redsea), station logos from your own image files; DAB+ with welle-cli (DLS, slideshow). For testing without a stick: a simulated stick with internet radio streams.",
   "arch": ["all"],
