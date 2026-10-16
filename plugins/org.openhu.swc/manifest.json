@@ -1,7 +1,7 @@
 {
   "id": "org.openhu.swc",
   "name": "Lenkradtasten",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "api": 2,
   "description": "Tasten von Eingabegeräten (USB-Lenkradadapter, IR-Fernbedienungen, Multimedia-Tastaturen) als OpenHU-Aktionen, mit Anlern-Modus.",
   "arch": ["all"],

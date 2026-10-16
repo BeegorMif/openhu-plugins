@@ -28,6 +28,10 @@ Nach jeder Änderung `tools/openhu-repo-index` ausführen und `dist/` + `index.j
 (oder die GitHub-Action `.github/workflows/index.yml` erledigt das nach dem Push).
 Für ein neues Release die `version` im Manifest erhöhen, dann bietet der Store ein Update an.
 
+Versionen: alle Plugins starten mit dem ersten echten Release bei `1.0.0` (die 2.x-Versionen davor waren
+Entwicklungsstände). Der Store bietet nur höhere Versionen als Update an: Geräte mit einem 2.x-Stand die Plugins
+einmal entfernen und neu installieren.
+
 ## Eigenes Repository
 
 Dieses Repository forken oder ein leeres mit gleichem Aufbau anlegen, Plugins unter `plugins/` ablegen,
