@@ -38,6 +38,22 @@
       "size": 11272
     },
     {
+      "id": "org.openhu.logger",
+      "name": "Vehicle data logger",
+      "version": "1.0.0",
+      "description": "Records vehicle data (from the CAN plugin), Android Auto state and head unit values on the device, detects trips and offers the data to other plugins. Offline, off until switched on.",
+      "arch": [
+        "all"
+      ],
+      "api": 2,
+      "permissions": [
+        "storage"
+      ],
+      "archive": "dist/org.openhu.logger-1.0.0.tar.gz",
+      "sha256": "356224367435214f850a4839c1df71ff441c580f22aff56db0e33a5bc46c954e",
+      "size": 40591
+    },
+    {
       "id": "org.openhu.radio",
       "name": "Radio",
       "version": "1.1.0",
