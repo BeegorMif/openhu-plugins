@@ -59,6 +59,12 @@ def pacat_command(rate):
             "--client-name=OpenHU", "--stream-name=Radio"]
 
 
+def start_needed(playing, running):
+    """play: start only if the radio does not play already. Android Auto sends "unmute" (-> play) when it connects;
+    restarting the processes then made the running radio stutter."""
+    return not (playing and running)
+
+
 def frequency_key(band, frequency):
     """Key of a frequency in the remembered station names: "96.2" (FM) / "1008" (AM)."""
     return "%.1f" % frequency if band == "fm" else "%d" % round(frequency)

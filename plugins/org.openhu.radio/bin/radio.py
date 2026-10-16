@@ -269,7 +269,10 @@ class RadioPlugin:
         if self.scanning and command != "stop":
             return
         if command == "play":
-            await self.start()
+            if radiolib.start_needed(self.playing, bool(self.processes)):
+                await self.start()
+            else:
+                await self.publish_state()
         elif command == "stop":
             await self.stop()
         elif command == "toggle":

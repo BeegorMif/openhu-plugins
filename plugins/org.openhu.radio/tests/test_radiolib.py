@@ -7,6 +7,12 @@ import radiolib  # noqa: E402
 
 
 class RadioLibTest(unittest.TestCase):
+    def test_play_while_playing_does_not_restart(self):
+        self.assertTrue(radiolib.start_needed(False, False))
+        self.assertTrue(radiolib.start_needed(True, False))   # processes died: start again
+        self.assertTrue(radiolib.start_needed(False, True))
+        self.assertFalse(radiolib.start_needed(True, True))
+
     def test_frequencies(self):
         self.assertEqual(radiolib.clamp_frequency("fm", 101.34), 101.3)
         self.assertEqual(radiolib.clamp_frequency("fm", 120), 108.0)
