@@ -89,7 +89,8 @@ Rectangle {
     Text {
         anchors.centerIn: parent
         visible: !camera.active || camera.error !== Camera.NoError || devices.videoInputs.length === 0
-        text: devices.videoInputs.length === 0 ? "Keine Kamera gefunden" : (camera.errorString || "Kamera wird gestartet …")
+        text: devices.videoInputs.length === 0 ? qsTrId("org.openhu.camera.view.no_camera")
+                                                : (camera.errorString || qsTrId("org.openhu.camera.view.starting"))
         color: Theme.textDim
         font.pixelSize: Theme.fontNormal
     }

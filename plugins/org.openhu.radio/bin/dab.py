@@ -136,9 +136,9 @@ class DabMixin:
         service = self.dab_service(key)
         decoder = self.dab_decoder()
         if not service:
-            self.error = "Kein DAB-Sender gewählt – Sendersuche starten"
+            self.error = self.texts.text("org.openhu.radio.error.no_dab_station")
         elif not (self.which("welle-cli") and self.which("pacat") and decoder):
-            self.error = "DAB braucht welle-cli, mpg123 und pacat (Pakete welle.io, mpg123, pulseaudio-utils)"
+            self.error = self.texts.text("org.openhu.radio.error.no_welle_cli")
         if self.error:
             self.playing = False
             await self.publish_state()
@@ -170,7 +170,7 @@ class DabMixin:
             try:
                 mux = await read_mux(self.dab_port())
                 if mux["noDevice"]:
-                    await self.dab_failed("Kein RTL-SDR-Stick gefunden")
+                    await self.dab_failed(self.texts.text("org.openhu.radio.error.no_stick"))
                     return False
                 if key in mux["services"]:
                     if reported:
@@ -181,9 +181,9 @@ class DabMixin:
                 pass  # welle-cli still starting
             if not reported and time.monotonic() - started > SYNC_SECONDS:
                 reported = True
-                self.error = "DAB: kein Empfang von %s (Kanal %s)" % (dablib.station_label(service, key),
-                                                                     service.get("channel"))
-                log.warning(self.error)
+                self.error = self.texts.text("org.openhu.radio.error.dab_no_reception",
+                                             dablib.station_label(service, key), service.get("channel"))
+                log.warning("%s", self.error)
                 await self.publish_state()
             await asyncio.sleep(1)
 
@@ -262,9 +262,10 @@ class DabMixin:
         await welle.wait()
         if self.playing and welle in self.processes:
             text = "\n".join(lines)
-            self.error = next((line for line in reversed(lines) if line), "welle-cli beendet")
+            self.error = next((line for line in reversed(lines) if line),
+                              self.texts.text("org.openhu.radio.error.welle_cli_ended"))
             if "Could not start device" in text or "No supported devices" in text:
-                self.error = "Kein RTL-SDR-Stick gefunden"
+                self.error = self.texts.text("org.openhu.radio.error.no_stick")
             log.error("welle-cli: %s", self.error)
             await self.stop_processes()
             self.playing = False
@@ -303,7 +304,7 @@ class DabMixin:
     async def scan_dab(self):
         """All Band III channels one after the other (POST /channel), takes minutes; progress in radio.state.scan."""
         if not self.which("welle-cli"):
-            self.error = "DAB-Sendersuche braucht welle-cli (Paket welle.io)"
+            self.error = self.texts.text("org.openhu.radio.error.dab_scan_no_welle_cli")
             self.scanning = False
             await self.publish_state()
             return
@@ -351,14 +352,15 @@ class DabMixin:
             stderr = [line for line in lines if line]
 
         if self.scan_no_device:
-            self.error = "Kein RTL-SDR-Stick gefunden"
+            self.error = self.texts.text("org.openhu.radio.error.no_stick")
             log.error("DAB scan: %s", self.error)
         elif exited is not None:
             # welle-cli ended during the scan: keep the old station list
-            self.error = "DAB-Sendersuche fehlgeschlagen: " + (stderr or ["welle-cli beendet"])[-1]
+            self.error = self.texts.text("org.openhu.radio.error.dab_scan_failed",
+                                         (stderr or [self.texts.tr("org.openhu.radio.error.welle_cli_ended")])[-1])
             if any("Could not start device" in line or "No supported devices" in line for line in stderr):
-                self.error = "Kein RTL-SDR-Stick gefunden"
-            log.error(self.error)
+                self.error = self.texts.text("org.openhu.radio.error.no_stick")
+            log.error("%s", self.error)
         elif not self.scan_abort:
             services = dablib.merge_scan(found)
             self.config["dabServices"] = services

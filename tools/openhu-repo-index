@@ -8,12 +8,14 @@ Layout:
     plugins/<id>/manifest.json  one folder per plugin
     common/                     shared files, copied into a plugin's lib/ when listed in its
                                 manifest ("shared": ["openhu.py"])
+    plugins/<id>/i18n/          translations, <language>.ts and the compiled .qm (tools/openhu-translations)
 
 Archives are reproducible (sorted entries, fixed timestamps and owners), so unchanged plugins keep
 their checksum. Run it after every change and commit dist/ and index.json; OpenHU installs the
 archives and verifies the sha256 from index.json.
 """
 
+import glob
 import gzip
 import hashlib
 import io
@@ -101,6 +103,11 @@ def main():
             fail("%s: id must match the folder name" % manifest_path)
         if not VERSION_PATTERN.match(manifest["version"]):
             fail("%s: version must look like 1.2.3" % manifest_path)
+
+        # translations: the compiled .qm next to every .ts (tools/openhu-translations; OpenHU loads the .qm)
+        for ts in sorted(glob.glob(os.path.join(plugin_dir, "i18n", "*.ts"))):
+            if not os.path.isfile(ts[:-3] + ".qm"):
+                fail("%s: %s.qm missing, run tools/openhu-translations" % (manifest["id"], os.path.relpath(ts, repo)[:-3]))
 
         data = build_archive(repo, plugin_dir, manifest)
         archive = "dist/%s-%s.tar.gz" % (manifest["id"], manifest["version"])

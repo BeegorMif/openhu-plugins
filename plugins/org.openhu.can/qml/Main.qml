@@ -56,8 +56,8 @@ Item {
             }
             Text {
                 text: canState.data.connected
-                      ? canState.data.interface + " · " + (canState.data.framesPerSecond || 0) + " Frames/s"
-                      : (canState.data.error || "Plugin-Prozess läuft nicht")
+                      ? qsTrId("org.openhu.can.main.frames_per_second").arg(canState.data.interface).arg(canState.data.framesPerSecond || 0)
+                      : (canState.data.error || qsTrId("org.openhu.can.main.process_not_running"))
                 color: Theme.text
                 font.pixelSize: Theme.fontNormal
                 Layout.fillWidth: true
@@ -66,7 +66,7 @@ Item {
             TextField {
                 id: interfaceField
                 Layout.preferredWidth: Theme.dockWidth * 1.3
-                placeholderText: "can0"
+                placeholderText: "can0"  // untranslated: an interface name
                 text: canState.data.interface || ""
                 onAccepted: page.command("interface", text)
             }
@@ -81,7 +81,7 @@ Item {
 
         Text {
             visible: !!canState.data.profileName
-            text: "Profil: " + canState.data.profileName
+            text: qsTrId("org.openhu.can.main.profile").arg(canState.data.profileName)
             color: Theme.textDim
             font.pixelSize: Theme.fontSmall
         }
@@ -126,7 +126,7 @@ Item {
                     Text {
                         anchors.centerIn: parent
                         visible: parent.count === 0
-                        text: "Noch keine Fahrzeugdaten"
+                        text: qsTrId("org.openhu.can.main.no_vehicle_data")
                         color: Theme.textDim
                         font.pixelSize: Theme.fontNormal
                     }
@@ -149,7 +149,7 @@ Item {
                         Layout.fillWidth: true
                         Text {
                             Layout.fillWidth: true
-                            text: "CAN-Monitor"
+                            text: qsTrId("org.openhu.can.main.monitor")
                             color: Theme.text
                             font.pixelSize: Theme.fontNormal
                             font.bold: true

@@ -14,7 +14,7 @@ State: "radio.state" {band, frequency, unit, playing, scanning, scan, rds: {pi, 
 Commands: bus.emit "radio.command" {cmd: "play"|"stop"|"toggle"|"tune"|"step"|"band"|"preset"|"savePreset"|
           "removePreset"|"scan"|"fakeSdr"|"tunePi", value}
           tunePi: value is a PI code ("0xD382"): tunes FM to the strongest remembered frequency with it (level of the
-          last scan), error "... unbekannt" if no frequency is known for it
+          last scan), an error if no frequency is known for it
           band "dab": tune/presets with service ids; step/seek go through the station list; scan runs in the
           background, "stop" cancels it
 Actions: radio.toggle, radio.next, radio.previous (e.g. for steering wheel buttons); media.next/previous (seek),
@@ -45,7 +45,7 @@ sys.path.insert(0, HERE)
 
 import dab  # noqa: E402
 import radiolib  # noqa: E402
-from openhu import DATA_DIR, OpenHU, load_config, save_config, setup_logging  # noqa: E402
+from openhu import DATA_DIR, OpenHU, Texts, load_config, save_config, setup_logging  # noqa: E402
 
 log = logging.getLogger("radio")
 
@@ -83,6 +83,9 @@ class RadioPlugin(dab.DabMixin):
             self.config[table].setdefault(radiolib.DAB, [])
         self.config["names"].setdefault(radiolib.DAB, {})
         self.api = OpenHU()
+        # messages (error) in the shell's language, i18n/<language>.ts; published again after a switch
+        self.texts = Texts(os.path.join(HERE, "..", "i18n"))
+        self.texts.follow(self.api, self.publish_state)
         self.processes = []
         self.tasks = []
         self.playing = False
@@ -151,7 +154,7 @@ class RadioPlugin(dab.DabMixin):
             return
         await self.set_slide("")
         if self.which("rtl_fm") is None or self.which("pacat") is None:
-            self.error = "rtl_fm oder pacat fehlt (Pakete rtl-sdr, pulseaudio-utils)"
+            self.error = self.texts.text("org.openhu.radio.error.no_rtl_fm")
             self.playing = False
             await self.publish_state()
             return
@@ -227,9 +230,10 @@ class RadioPlugin(dab.DabMixin):
         await rtl.wait()
         if self.playing and rtl in self.processes:
             message = stderr.decode(errors="replace").strip().splitlines()
-            self.error = next((line for line in reversed(message) if line), "rtl_fm beendet")
+            self.error = next((line for line in reversed(message) if line),
+                              self.texts.text("org.openhu.radio.error.rtl_fm_ended"))
             if "No supported devices" in stderr.decode(errors="replace"):
-                self.error = "Kein RTL-SDR-Stick gefunden"
+                self.error = self.texts.text("org.openhu.radio.error.no_stick")
             log.error("rtl_fm: %s", self.error)
             await self.stop_processes()
             self.playing = False
@@ -263,7 +267,7 @@ class RadioPlugin(dab.DabMixin):
         # an old error (e.g. unknown PI) would make OpenHU report this tune to Android Auto as failed
         self.error = ""
         if self.band == radiolib.DAB and not self.dab_service(radiolib.clamp_frequency(self.band, frequency)):
-            self.error = "Unbekannter DAB-Sender %s – Sendersuche starten" % frequency
+            self.error = self.texts.text("org.openhu.radio.error.unknown_dab_station", frequency)
             await self.publish_state()
             return
         self.config["frequency"][self.band] = radiolib.clamp_frequency(self.band, frequency)
@@ -280,7 +284,7 @@ class RadioPlugin(dab.DabMixin):
         frequency = radiolib.pi_frequency(self.config, pi, current)
         if frequency is None:
             log.info("tunePi %s: no frequency known", value)
-            self.error = "Sender mit PI %s unbekannt" % (pi or value)
+            self.error = self.texts.text("org.openhu.radio.error.unknown_pi", pi or value)
             await self.publish_state()
             return
         log.info("tunePi %s: %.1f MHz", pi, frequency)
@@ -292,7 +296,7 @@ class RadioPlugin(dab.DabMixin):
 
     async def scan(self):
         if self.band != "fm" or self.which("rtl_power") is None:
-            self.error = "Sendersuche nur für FM, braucht rtl_power"
+            self.error = self.texts.text("org.openhu.radio.error.scan_fm_only")
             await self.publish_state()
             return
         was_playing = self.playing
@@ -308,7 +312,8 @@ class RadioPlugin(dab.DabMixin):
         levels = radiolib.parse_rtl_power_levels(stdout.decode(errors="replace").splitlines())
         stations = sorted(levels)
         if process.returncode != 0 and not stations:
-            self.error = "Sendersuche fehlgeschlagen: " + (stderr.decode(errors="replace").strip().splitlines() or ["?"])[-1]
+            last = (stderr.decode(errors="replace").strip().splitlines() or ["?"])[-1]
+            self.error = self.texts.text("org.openhu.radio.error.scan_failed", last)
         self.config["stations"]["fm"] = stations
         # signal levels for tunePi (the strongest frequency of a programme)
         self.config.setdefault("levels", {})["fm"] = {radiolib.frequency_key("fm", frequency): round(level, 1)
@@ -588,7 +593,7 @@ class RadioPlugin(dab.DabMixin):
             rdsAvailable=bool(self.rds_available()),
             presets=self.config["presets"].get(self.band, []),
             stations=self.config["stations"].get(self.band, []),
-            error=self.error,
+            error=str(self.error),
             simulated=self.simulated(),
             bands=radiolib.band_summary(self.config),
         ))

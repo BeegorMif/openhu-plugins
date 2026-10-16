@@ -1,9 +1,9 @@
 {
   "id": "org.openhu.swc",
-  "name": "Lenkradtasten",
-  "version": "1.0.0",
+  "name": "Steering wheel keys",
+  "version": "1.1.0",
   "api": 2,
-  "description": "Tasten von Eingabegeräten (USB-Lenkradadapter, IR-Fernbedienungen, Multimedia-Tastaturen) als OpenHU-Aktionen, mit Anlern-Modus.",
+  "description": "Keys of input devices (USB steering wheel adapters, IR remote controls, multimedia keyboards) as OpenHU actions, with a learn mode.",
   "arch": ["all"],
   "ui": {"page": "qml/Main.qml", "icon": "icon.svg"},
   "process": {"exec": "bin/swc.py", "restart": "on-failure"},

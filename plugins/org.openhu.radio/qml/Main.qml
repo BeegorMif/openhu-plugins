@@ -14,6 +14,8 @@ Item {
 
     // DAB slideshow picture of the station that plays: {band, station, image}
     BusTopic { id: slide; topic: "radio.slide" }
+    // language of the shell: decimal point of the frequencies
+    BusTopic { id: language; topic: "ui.language" }
 
     readonly property string band: radio.data.band || "fm"
     readonly property bool fm: page.band === "fm"
@@ -37,7 +39,8 @@ Item {
             return "–"
         if (page.dab)
             return page.dabNames[frequency] || String(frequency)
-        return page.fm ? Number(frequency).toFixed(1).replace(".", ",") : String(frequency)
+        return page.fm ? Number(frequency).toFixed(1).replace(".", Qt.locale((language.data || {}).language || "en").decimalPoint)
+                       : String(frequency)
     }
 
     ColumnLayout {
@@ -51,7 +54,7 @@ Item {
             spacing: Theme.spacing
 
             Repeater {
-                model: [{ band: "fm", label: "FM" }, { band: "am", label: "AM" }, { band: "dab", label: "DAB+" }]
+                model: [{ band: "fm", label: "FM" }, { band: "am", label: "AM" }, { band: "dab", label: "DAB+" }]  // untranslated: band names
                 Button {
                     text: modelData.label
                     checkable: true
@@ -63,13 +66,13 @@ Item {
             // Test mode (tools/fake-sdr): internet streams instead of real reception
             Text {
                 visible: radio.data.simulated === true
-                text: "Simulierter Stick"
+                text: qsTrId("org.openhu.radio.main.simulated_stick")
                 color: "#ffb74d"
                 font.pixelSize: Theme.fontSmall
             }
             Text {
                 visible: !radio.data.rdsAvailable && page.fm
-                text: "RDS: redsea nicht installiert"
+                text: qsTrId("org.openhu.radio.main.no_redsea")
                 color: Theme.textDim
                 font.pixelSize: Theme.fontSmall
             }
@@ -123,9 +126,9 @@ Item {
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: radio.data.scanning ? (radio.data.scan
-                            ? "Sendersuche … Kanal %1 (%2/%3), %4 Sender".arg(radio.data.scan.channel)
+                            ? qsTrId("org.openhu.radio.main.scanning_channel").arg(radio.data.scan.channel)
                                 .arg(radio.data.scan.done + 1).arg(radio.data.scan.total).arg(radio.data.scan.found)
-                            : "Sendersuche …")
+                            : qsTrId("org.openhu.radio.main.scanning"))
                         : radio.data.error ? radio.data.error
                         : [radio.data.rds && radio.data.rds.ps, radio.data.rds && radio.data.rds.rt]
                             .filter(function(part) { return part }).join(" · ")
@@ -148,7 +151,8 @@ Item {
             Button { text: "−"; font.pixelSize: Theme.fontLarge; onClicked: page.command("step", -1) }
             Button {
                 // the DAB scan takes minutes and can be cancelled
-                text: radio.data.scanning ? "Abbrechen" : radio.data.playing ? "Stopp" : "Abspielen"
+                text: radio.data.scanning ? qsTrId("org.openhu.radio.main.cancel") : radio.data.playing ? qsTrId("org.openhu.radio.main.stop")
+                    : qsTrId("org.openhu.radio.main.play")
                 highlighted: true
                 font.pixelSize: Theme.fontNormal
                 Layout.preferredWidth: Theme.dockWidth * 1.8
@@ -159,7 +163,7 @@ Item {
             Button { text: "▶▶"; font.pixelSize: Theme.fontNormal; onClicked: page.command("seek", 1) }
             Button { text: "★"; font.pixelSize: Theme.fontLarge; onClicked: page.command("savePreset") }
             Button {
-                text: "Suchlauf"
+                text: qsTrId("org.openhu.radio.main.scan")
                 visible: page.fm || page.dab
                 enabled: !radio.data.scanning
                 onClicked: page.command("scan")
@@ -201,7 +205,7 @@ Item {
             Text {
                 anchors.centerIn: parent
                 visible: parent.count === 0
-                text: page.fm || page.dab ? "Noch keine Sender – Suchlauf starten" : ""
+                text: page.fm || page.dab ? qsTrId("org.openhu.radio.main.no_stations") : ""
                 color: Theme.textDim
                 font.pixelSize: Theme.fontNormal
             }

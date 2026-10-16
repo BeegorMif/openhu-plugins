@@ -1,4 +1,4 @@
-# Plugin unit tests, Python syntax and qmllint (Qt 6) on Debian trixie (the OpenHU target system).
+# Plugin unit tests, translations, Python syntax and qmllint (Qt 6) on Debian trixie (the OpenHU target system).
 name: Tests
 
 on:
@@ -16,22 +16,30 @@ jobs:
         run: |
           apt-get update -qq
           DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-              python3 python3-websockets qt6-declarative-dev-tools qml6-module-qtquick qml6-module-qtquick-controls \
+              python3 python3-websockets qt6-declarative-dev-tools qt6-l10n-tools qml6-module-qtquick qml6-module-qtquick-controls \
               qml6-module-qtquick-layouts qml6-module-qtmultimedia git ca-certificates ffmpeg sox >/dev/null
 
       - uses: actions/checkout@v4
 
       - name: Unit tests
         run: |
+          echo "::group::common, tools"
+          python3 -m unittest discover -s tests -v
+          echo "::endgroup::"
           for tests in plugins/*/tests; do
             echo "::group::$(dirname "$tests")"
             (cd "$(dirname "$tests")" && python3 -m unittest discover -s tests -v)
             echo "::endgroup::"
           done
 
+      # every text ID translated in English and German, .qm files up to date (also part of the unit tests,
+      # here with the full list of problems)
+      - name: Translations
+        run: python3 tools/openhu-translations --check
+
       - name: Python syntax
         run: |
-          python3 -m py_compile common/*.py plugins/*/bin/*.py tools/openhu-repo-index \
+          python3 -m py_compile common/*.py plugins/*/bin/*.py tools/openhu-repo-index tools/openhu-translations \
               plugins/org.openhu.radio/tools/fake-sdr/fakesdr.py plugins/org.openhu.radio/tools/fake-sdr/rtl_fm \
               plugins/org.openhu.radio/tools/fake-sdr/rtl_power plugins/org.openhu.radio/tools/fake-sdr/redsea \
               plugins/org.openhu.radio/tools/fake-sdr/welle-cli

@@ -1,9 +1,9 @@
 {
   "id": "org.openhu.can",
-  "name": "CAN-Bus",
-  "version": "1.0.0",
+  "name": "CAN bus",
+  "version": "1.1.0",
   "api": 2,
-  "description": "Fahrzeugdaten (Geschwindigkeit, Gang, Licht …) und Lenkradtasten vom CAN-Bus über SocketCAN. Fahrzeugprofile beschreiben die CAN-IDs.",
+  "description": "Vehicle data (speed, gear, lights …) and steering wheel keys from the CAN bus via SocketCAN. Vehicle profiles describe the CAN IDs.",
   "arch": ["all"],
   "ui": {"page": "qml/Main.qml", "icon": "icon.svg"},
   "process": {"exec": "bin/can.py", "restart": "on-failure"},

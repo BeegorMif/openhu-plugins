@@ -53,20 +53,20 @@ Item {
                 spacing: Theme.spacing / 2
 
                 Text {
-                    text: "Eingabegeräte"
+                    text: qsTrId("org.openhu.swc.main.input_devices")
                     color: Theme.text
                     font.pixelSize: Theme.fontNormal
                     font.bold: true
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: "Lenkradadapter oder Fernbedienung einschalten. Exklusiv: andere Programme sehen die Tasten nicht."
+                    text: qsTrId("org.openhu.swc.main.devices_hint")
                     wrapMode: Text.WordWrap
                     color: Theme.textDim
                     font.pixelSize: Theme.fontSmall
                 }
                 Switch {
-                    text: "Exklusiv verwenden"
+                    text: qsTrId("org.openhu.swc.main.exclusive")
                     checked: swcState.data.grab !== false
                     onToggled: page.command({ cmd: "grab", value: checked })
                 }
@@ -115,13 +115,13 @@ Item {
                     Layout.fillWidth: true
                     Text {
                         Layout.fillWidth: true
-                        text: "Tastenbelegung"
+                        text: qsTrId("org.openhu.swc.main.key_mapping")
                         color: Theme.text
                         font.pixelSize: Theme.fontNormal
                         font.bold: true
                     }
                     Switch {
-                        text: "Anlernen"
+                        text: qsTrId("org.openhu.swc.main.learn")
                         checked: !!swcState.data.learn
                         onToggled: {
                             page.learned = null
@@ -136,7 +136,8 @@ Item {
                     visible: !!swcState.data.learn
                     Text {
                         Layout.fillWidth: true
-                        text: page.learned ? "Taste " + page.learned.name + " (" + page.learned.code + ")" : "Taste am Lenkrad drücken …"
+                        text: page.learned ? qsTrId("org.openhu.swc.main.learned_key").arg(page.learned.name).arg(page.learned.code)
+                                            : qsTrId("org.openhu.swc.main.press_key")
                         color: Theme.primary
                         font.pixelSize: Theme.fontNormal
                     }
@@ -148,7 +149,7 @@ Item {
                     }
                     Button {
                         visible: !!page.learned
-                        text: "Zuweisen"
+                        text: qsTrId("org.openhu.swc.main.assign")
                         highlighted: true
                         onClicked: {
                             page.command({ cmd: "map", code: page.learned.code, action: actionBox.currentText })
@@ -187,7 +188,7 @@ Item {
                 }
 
                 Button {
-                    text: "Standardbelegung"
+                    text: qsTrId("org.openhu.swc.main.default_mapping")
                     flat: true
                     onClicked: page.command({ cmd: "reset" })
                 }
