@@ -7,7 +7,7 @@
     {
       "id": "org.openhu.camera",
       "name": "Reverse camera",
-      "version": "1.1.0",
+      "version": "1.0.0",
       "description": "Camera picture with guide lines in the content area or full screen, automatically in reverse gear (CAN plugin) or with the actions camera.show / camera.hide / camera.toggle.",
       "arch": [
         "all"
@@ -16,14 +16,14 @@
       "permissions": [
         "camera"
       ],
-      "archive": "dist/org.openhu.camera-1.1.0.tar.gz",
-      "sha256": "5fd4c96c5a8d6b6e919d267de300724198dd5cb9e9771a1e7f4de9a35dbb9704",
-      "size": 9200
+      "archive": "dist/org.openhu.camera-1.0.0.tar.gz",
+      "sha256": "3a8f79ca52840aec5baece268bbee9978ac3a69fd9c70e3a851ec67e2aa36968",
+      "size": 9199
     },
     {
       "id": "org.openhu.can",
       "name": "CAN bus",
-      "version": "1.1.0",
+      "version": "1.0.0",
       "description": "Vehicle data (speed, gear, lights …) and steering wheel keys from the CAN bus via SocketCAN. Vehicle profiles describe the CAN IDs.",
       "arch": [
         "all"
@@ -33,9 +33,9 @@
         "can",
         "input"
       ],
-      "archive": "dist/org.openhu.can-1.1.0.tar.gz",
-      "sha256": "8327e194c151e8dd60946ec97cf6b23e98ee55074dd9fba696b97a29dafd7ffe",
-      "size": 11272
+      "archive": "dist/org.openhu.can-1.0.0.tar.gz",
+      "sha256": "429165a436246405291ace3152a4cef560a5dc8033f20a94a1abe07790331aa3",
+      "size": 11271
     },
     {
       "id": "org.openhu.logger",
@@ -56,7 +56,7 @@
     {
       "id": "org.openhu.radio",
       "name": "Radio",
-      "version": "1.1.0",
+      "version": "1.0.0",
       "description": "FM/AM/DAB+ radio with an RTL-SDR USB stick: station scan, favorites and RDS (station name, radio text, PI; RDS needs redsea), station logos from your own image files; DAB+ with welle-cli (DLS, slideshow). For testing without a stick: a simulated stick with internet radio streams.",
       "arch": [
         "all"
@@ -66,14 +66,14 @@
         "audio",
         "usb"
       ],
-      "archive": "dist/org.openhu.radio-1.1.0.tar.gz",
-      "sha256": "6f9d5c2ffc08b76ae37a73d23a0fbf1e6b36b8d23671c76d8451bde4f629c27e",
+      "archive": "dist/org.openhu.radio-1.0.0.tar.gz",
+      "sha256": "7e47e9b44299d0365293e6b0416aa14887c8fdf883d62efa7d843a63b75c2b79",
       "size": 47126
     },
     {
       "id": "org.openhu.swc",
       "name": "Steering wheel keys",
-      "version": "1.1.0",
+      "version": "1.0.0",
       "description": "Keys of input devices (USB steering wheel adapters, IR remote controls, multimedia keyboards) as OpenHU actions, with a learn mode.",
       "arch": [
         "all"
@@ -82,9 +82,9 @@
       "permissions": [
         "input"
       ],
-      "archive": "dist/org.openhu.swc-1.1.0.tar.gz",
-      "sha256": "5d3da9372cd91b95e6d789bf96da121d9441f89cc324849df026d66a7efe87fb",
-      "size": 9592
+      "archive": "dist/org.openhu.swc-1.0.0.tar.gz",
+      "sha256": "8b4013cd7a5cb09c04332f8630c6717ff9d59f609aadad21cc828e36560fa4ec",
+      "size": 9591
     }
   ]
 }
