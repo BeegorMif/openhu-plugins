@@ -1,7 +1,7 @@
 {
-  "_comment": "Simulated stations, Hannover (Lower Saxony). FM frequencies of the real transmitters (Hannover-Hemmingen, Telemax, ffn Barsinghausen), the streams are the stations' public web streams. Own list: plugin data dir fake-sdr-stations.json, format in fakesdr.py.",
+  "_comment": "Simulated stations, Hannover (Lower Saxony). FM frequencies of the real transmitters (Hannover-Hemmingen, Telemax, ffn Barsinghausen), the streams are the stations' public web streams. Own list: plugin data dir fake-sdr-stations.json, format in fakesdr.py. Logos: only the two self-made test pictures, no station logos (trademarks).",
   "fm": [
-    {"frequency": 87.6, "name": "Testton 440 Hz", "ps": "TESTTON", "tone": 440, "rt": "Simulierter Sender ohne Netzwerk"},
+    {"frequency": 87.6, "name": "Testton 440 Hz", "ps": "TESTTON", "tone": 440, "rt": "Simulierter Sender ohne Netzwerk", "logo": "logos/testton-fm.png"},
     {"frequency": 88.6, "name": "NDR Info", "ps": "NDR INFO", "url": "https://icecast.ndr.de/ndr/ndrinfo/niedersachsen/mp3/128/stream.mp3"},
     {"frequency": 90.9, "name": "NDR 1 Niedersachsen", "ps": "NDR1 NDS", "url": "https://icecast.ndr.de/ndr/ndr1niedersachsen/hannover/mp3/128/stream.mp3"},
     {"frequency": 92.6, "name": "N-JOY", "ps": "N-JOY", "url": "https://icecast.ndr.de/ndr/njoy/live/mp3/128/stream.mp3"},
@@ -15,7 +15,7 @@
   ],
   "am": [
     {"frequency": 549, "name": "Deutschlandfunk (AM, historisch)", "ps": "DLF", "url": "https://st01.sslstream.dlf.de/dlf/01/128/mp3/stream.mp3"},
-    {"frequency": 1008, "name": "AM-Testton 800 Hz", "ps": "AM TEST", "tone": 800}
+    {"frequency": 1008, "name": "AM-Testton 800 Hz", "ps": "AM TEST", "tone": 800, "logo": "logos/testton-am.png"}
   ],
   "error": null
 }

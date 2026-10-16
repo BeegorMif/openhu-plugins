@@ -65,6 +65,44 @@ class RadioLibTest(unittest.TestCase):
         unknown = radiolib.media_metadata("fm", 101.9, {}, names)
         self.assertEqual((unknown["title"], unknown["artist"]), ("UKW 101,9 MHz", "UKW 101,9 MHz"))
         self.assertEqual(radiolib.media_metadata("am", 1008, {}, {})["album"], "MW 1008 kHz")
+        # the station logo as cover
+        self.assertEqual(playing["cover"], "")
+        self.assertEqual(radiolib.media_metadata("fm", 96.2, {}, names, "data:image/png;base64,AA==")["cover"],
+                         "data:image/png;base64,AA==")
+
+    def test_logo_files(self):
+        index = radiolib.logo_index(["96.2.png", "88,6.JPG", "1008.jpeg", "NDR 2.png", "n-joy.jpg", "Radio 21.PNG",
+                                     "notes.txt", ".png", "2.png", "96.2.jpg"])
+        self.assertEqual(index["fm"], {"96.2": "96.2.jpg", "88.6": "88,6.JPG"})
+        self.assertEqual(index["am"], {"1008": "1008.jpeg"})
+        # names: case, spaces and punctuation do not count; a number outside both bands is a name
+        self.assertEqual(index["name"], {"ndr2": "NDR 2.png", "njoy": "n-joy.jpg", "radio21": "Radio 21.PNG",
+                                         "2": "2.png"})
+
+        # frequency first, then the remembered RDS name
+        self.assertEqual(radiolib.find_logo(index, "fm", "96.2", "NDR 2"), "96.2.jpg")
+        self.assertEqual(radiolib.find_logo(index, "fm", "87.6", "NDR 2"), "NDR 2.png")
+        self.assertEqual(radiolib.find_logo(index, "fm", "92.6", "N-JOY   "), "n-joy.jpg")
+        self.assertEqual(radiolib.find_logo(index, "fm", "104.9", "RADIO 21"), "Radio 21.PNG")
+        self.assertIsNone(radiolib.find_logo(index, "fm", "101.9", ""))
+        self.assertIsNone(radiolib.find_logo(index, "fm", "101.9", "FFN"))
+        self.assertEqual(radiolib.find_logo(index, "am", "1008"), "1008.jpeg")
+        self.assertIsNone(radiolib.find_logo(index, "am", "96.2"))
+
+    def test_logo_keys(self):
+        config = {"stations": {"fm": [96.2, 101.9]}, "presets": {"fm": [104.9, 96.2]},
+                  "names": {"fm": {"92.6": "N-JOY"}}}
+        self.assertEqual(radiolib.logo_keys(config, "fm", 87.6), ["101.9", "104.9", "87.6", "92.6", "96.2"])
+        self.assertEqual(radiolib.logo_keys(config, "am", 1008), ["1008"])
+        self.assertEqual(radiolib.logo_keys({}, "am"), [])
+
+    def test_data_url(self):
+        png = b"\x89PNG\r\n\x1a\n" + b"rest"
+        self.assertEqual(radiolib.image_type(png), "image/png")
+        self.assertEqual(radiolib.data_url(png), "data:image/png;base64,iVBORw0KGgpyZXN0")
+        self.assertTrue(radiolib.data_url(b"\xff\xd8\xff\xe0rest").startswith("data:image/jpeg;base64,"))
+        self.assertIsNone(radiolib.data_url(b"<svg/>"))
+        self.assertIsNone(radiolib.data_url(b""))
 
     def test_action_commands(self):
         self.assertEqual(radiolib.action_command("radio.next", False), {"cmd": "seek", "value": 1})

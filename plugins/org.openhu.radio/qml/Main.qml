@@ -3,13 +3,19 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import OpenHU 1.0
 
-// FM/AM radio: frequency, RDS, seek/step, presets and scanned stations.
+// FM/AM radio: frequency, RDS, station logo, seek/step, presets and scanned stations.
 Item {
     id: page
 
     BusTopic { id: radio; topic: "radio.state" }
+    // station logos from logos/ in the plugin data dir: {fm: {"96.2": data URL}, am: {...}}
+    BusTopic { id: logos; topic: "radio.logos" }
 
     readonly property bool fm: radio.data.band !== "am"
+    // key of the current frequency in radio.logos ("96.2" / "1008", radiolib.frequency_key)
+    readonly property string frequencyKey: radio.data.frequency === undefined ? ""
+        : page.fm ? Number(radio.data.frequency).toFixed(1) : String(Math.round(radio.data.frequency))
+    readonly property string logo: ((logos.data || {})[radio.data.band || "fm"] || {})[page.frequencyKey] || ""
 
     function command(cmd, value) {
         api.emitEvent("radio.command", { cmd: cmd, value: value })
@@ -63,6 +69,21 @@ Item {
             radius: Theme.radius
             color: Theme.surface
 
+            Image {
+                id: logoImage
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.leftMargin: Theme.spacing
+                height: parent.height - Theme.spacing * 2
+                width: height
+                visible: page.logo !== ""
+                source: page.logo
+                sourceSize.width: width
+                sourceSize.height: height
+                fillMode: Image.PreserveAspectFit
+                opacity: radio.data.playing ? 1 : 0.6
+            }
+
             Column {
                 anchors.centerIn: parent
                 spacing: Theme.spacing / 3
@@ -92,7 +113,9 @@ Item {
                     color: radio.data.error ? "#ff8a80" : Theme.primary
                     font.pixelSize: Theme.fontNormal
                     elide: Text.ElideRight
-                    width: Math.min(implicitWidth, page.width - Theme.spacing * 6)
+                    // centred: room for the logo on both sides
+                    width: Math.min(implicitWidth, page.width - Theme.spacing * 6
+                                    - (logoImage.visible ? (logoImage.width + Theme.spacing) * 2 : 0))
                 }
             }
         }

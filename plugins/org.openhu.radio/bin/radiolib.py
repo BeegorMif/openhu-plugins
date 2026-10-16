@@ -1,6 +1,8 @@
-"""Radio helpers without I/O (see tests/test_radiolib.py): bands, commands, scan and RDS parsing."""
+"""Radio helpers without I/O (see tests/test_radiolib.py): bands, commands, scan, RDS parsing and station logos."""
 
+import base64
 import json
+import os
 import statistics
 
 BANDS = {
@@ -107,9 +109,9 @@ def frequency_label(band, frequency):
     return "MW %d kHz" % round(frequency)
 
 
-def media_metadata(band, frequency, rds, names):
+def media_metadata(band, frequency, rds, names, cover=""):
     """media.metadata of the station that plays (home page, Bluetooth car radio, API): radiotext as the title, the
-    station name as the artist."""
+    station name as the artist, the station logo (data URL) as the cover."""
     name = (rds.get("ps") or "").strip() or names.get(band, {}).get(frequency_key(band, frequency), "")
     label = frequency_label(band, frequency)
     return {
@@ -118,9 +120,76 @@ def media_metadata(band, frequency, rds, names):
         "album": label,
         "playlist": "",
         "duration": 0,
-        "cover": "",
+        "cover": cover or "",
         "source": "radio",
     }
+
+
+# --- station logos ----------------------------------------------------------------------
+# Files the user puts into logos/ in the plugin's data dir (none are bundled: the logos are the stations' trademarks),
+# named after the frequency ("96.2.png", "1008.jpg") or the station name ("NDR 2.png"). Nothing from the internet.
+
+LOGO_EXTENSIONS = (".png", ".jpg", ".jpeg")
+# The logos travel as data URLs over the API (radio.logos, media.metadata.cover); OpenHU scales them down for
+# Android Auto. Bigger files are skipped: 256x256 is plenty.
+MAX_LOGO_BYTES = 512 * 1024
+
+
+def image_type(data):
+    """MIME type of PNG/JPEG bytes, None for anything else."""
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    return None
+
+
+def data_url(data):
+    """PNG/JPEG bytes -> "data:image/png;base64,...", None for other files."""
+    kind = image_type(data)
+    return "data:%s;base64,%s" % (kind, base64.b64encode(data).decode("ascii")) if kind else None
+
+
+def name_key(name):
+    """Station name for matching logo files: case, spaces and punctuation do not count ("NDR 2" = "ndr2.png")."""
+    return "".join(char for char in (name or "").casefold() if char.isalnum())
+
+
+def logo_index(files):
+    """File names in logos/ -> {"fm": {"96.2": file}, "am": {"1008": file}, "name": {"ndr2": file}}.
+    A name that is a frequency of a band ("96.2", "96,2", "1008") is that frequency, everything else a station name."""
+    index = {band: {} for band in BANDS}
+    index["name"] = {}
+    for file in sorted(files):
+        stem, extension = os.path.splitext(file)
+        if extension.lower() not in LOGO_EXTENSIONS or not stem.strip():
+            continue
+        try:
+            value = float(stem.strip().replace(",", "."))
+        except ValueError:
+            value = None
+        band = next((band for band, spec in BANDS.items()
+                     if value is not None and spec["min"] <= value <= spec["max"]), None)
+        if band:
+            index[band].setdefault(frequency_key(band, value), file)
+        elif name_key(stem):
+            index["name"].setdefault(name_key(stem), file)
+    return index
+
+
+def find_logo(index, band, key, name=""):
+    """Logo file of a station: named after its frequency key, else after its (remembered RDS) name; None if none."""
+    return index.get(band, {}).get(key) or index["name"].get(name_key(name))
+
+
+def logo_keys(config, band, frequency=None):
+    """Frequency keys of a band that can have a logo: scanned stations, presets, remembered names, current station."""
+    frequencies = list(config.get("stations", {}).get(band, [])) + list(config.get("presets", {}).get(band, []))
+    if frequency is not None:
+        frequencies.append(frequency)
+    keys = {frequency_key(band, value) for value in frequencies}
+    keys.update(config.get("names", {}).get(band, {}))
+    return sorted(keys)
 
 
 # Media keys while the radio is the current media source (OpenHU sends them to the source, not to the phone, then)
