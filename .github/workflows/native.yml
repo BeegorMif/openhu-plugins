@@ -1,0 +1,93 @@
+# Native programs of the plugins (plugins/<id>/native/build.sh, e.g. the radio's openhu-dab and redsea), built in
+# Debian trixie for every architecture a plugin names in its manifest (amd64 on x86 runners, arm64 on GitHub's arm
+# runners). Smoke test: the programs start (--version, --help, the error event without a stick). Artifact
+# "native-<arch>": native-<arch>.tar with plugins/*/bin/<arch>/ and the source archives they were built from (sources/).
+# reuse: true takes the binaries from the published archive (dist/) when their sources did not change
+# (build-info.json "sourceHash"), so unchanged plugins keep their archive checksum.
+name: Native programs
+
+on:
+  workflow_call:
+    inputs:
+      reuse:
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    container: debian:trixie
+    steps:
+      - name: Build dependencies
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+              build-essential cmake pkg-config ca-certificates curl patch python3 \
+              librtlsdr-dev libfftw3-dev libfaad-dev zlib1g-dev libsamplerate0-dev \
+              meson ninja-build libsndfile1-dev nlohmann-json3-dev libliquid-dev >/dev/null
+
+      - uses: actions/checkout@v4
+
+      - name: Build
+        env:
+          REUSE: ${{ inputs.reuse }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          test "$(dpkg --print-architecture)" = "$ARCH"
+          mkdir -p sources
+          python3 tools/openhu-repo-index --native-arches | while read -r plugin arch; do
+            [ "$arch" = "$ARCH" ] || continue
+            dir=plugins/$plugin
+            version=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$dir/manifest.json")
+            archive=dist/$plugin-$version-$arch.tar.gz
+            hash=$("$dir/native/build.sh" --source-hash)
+            if [ "$REUSE" = true ] && [ -f "$archive" ] && \
+                tar -xzOf "$archive" "$plugin/bin/$arch/build-info.json" 2>/dev/null | grep -q "\"sourceHash\": \"$hash\""; then
+              echo "::notice::$plugin $arch: sources unchanged, binaries of $archive"
+              tar -xzf "$archive" -C plugins "$plugin/bin/$arch"
+              for source in $(python3 -c 'import json,sys; print(" ".join(json.load(open(sys.argv[1]))["sources"]))' \
+                              "$dir/bin/$arch/build-info.json"); do
+                cp "dist/sources/$source" sources/
+              done
+            else
+              "$dir/native/build.sh" --out "$dir/bin/$arch" --sources sources
+            fi
+          done
+
+      - name: Smoke test
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          for tool in plugins/*/bin/$ARCH/openhu-dab; do
+            [ -x "$tool" ] || continue
+            "$tool" --version
+            "$tool" --help | head -3
+            # no stick in CI: an error event on stderr, exit status 3
+            status=0
+            "$tool" --scan --channels 5C >/dev/null 2>/tmp/events || status=$?
+            cat /tmp/events
+            test "$status" = 3
+            grep -q '"code":"no-device"' /tmp/events
+          done
+          for tool in plugins/*/bin/$ARCH/redsea; do
+            [ -x "$tool" ] || continue
+            "$tool" --version
+          done
+
+      # a tar keeps the executable bits (artifacts do not)
+      - name: Pack
+        run: tar -cf native-${{ matrix.arch }}.tar plugins/*/bin/${{ matrix.arch }} sources
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.arch }}
+          path: native-${{ matrix.arch }}.tar
+          if-no-files-found: error

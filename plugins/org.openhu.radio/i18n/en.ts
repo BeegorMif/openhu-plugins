@@ -5,7 +5,15 @@
     <name></name>
     <message id="org.openhu.radio.description">
         <source></source>
-        <translation>FM/AM/DAB+ radio with an RTL-SDR USB stick: station scan, favorites and RDS (station name, radio text, PI; RDS needs redsea), station logos from your own image files; DAB+ with welle-cli (DLS, slideshow). For testing without a stick: a simulated stick with internet radio streams.</translation>
+        <translation>FM/AM/DAB+ radio with an RTL-SDR USB stick: station scan, favorites, RDS (station name, radio text, PI) and DAB+ with DLS and slideshow (decoders included), station logos from your own image files. For testing without a stick: a simulated stick with internet radio streams.</translation>
+    </message>
+    <message id="org.openhu.radio.error.dab_ended">
+        <source></source>
+        <translation>openhu-dab ended</translation>
+    </message>
+    <message id="org.openhu.radio.error.dab_missing">
+        <source></source>
+        <translation>DAB unavailable, missing: %1</translation>
     </message>
     <message id="org.openhu.radio.error.dab_no_reception">
         <source></source>
@@ -15,9 +23,9 @@
         <source></source>
         <translation>DAB station scan failed: %1</translation>
     </message>
-    <message id="org.openhu.radio.error.dab_scan_no_welle_cli">
+    <message id="org.openhu.radio.error.library_missing">
         <source></source>
-        <translation>The DAB station scan needs welle-cli (package welle.io)</translation>
+        <translation>%1 cannot start: library %2 missing (package %3)</translation>
     </message>
     <message id="org.openhu.radio.error.no_dab_station">
         <source></source>
@@ -31,10 +39,6 @@
         <source></source>
         <translation>No RTL-SDR stick found</translation>
     </message>
-    <message id="org.openhu.radio.error.no_welle_cli">
-        <source></source>
-        <translation>DAB needs welle-cli, mpg123 and pacat (packages welle.io, mpg123, pulseaudio-utils)</translation>
-    </message>
     <message id="org.openhu.radio.error.rtl_fm_ended">
         <source></source>
         <translation>rtl_fm ended</translation>
@@ -47,6 +51,10 @@
         <source></source>
         <translation>Station scan only for FM, needs rtl_power</translation>
     </message>
+    <message id="org.openhu.radio.error.stick_busy">
+        <source></source>
+        <translation>The RTL-SDR stick is in use by another program</translation>
+    </message>
     <message id="org.openhu.radio.error.unknown_dab_station">
         <source></source>
         <translation>Unknown DAB station %1 – start a station scan</translation>
@@ -55,17 +63,13 @@
         <source></source>
         <translation>Station with PI %1 unknown</translation>
     </message>
-    <message id="org.openhu.radio.error.welle_cli_ended">
-        <source></source>
-        <translation>welle-cli ended</translation>
-    </message>
     <message id="org.openhu.radio.main.cancel">
         <source></source>
         <translation>Cancel</translation>
     </message>
-    <message id="org.openhu.radio.main.no_redsea">
+    <message id="org.openhu.radio.main.dab_missing">
         <source></source>
-        <translation>RDS: redsea not installed</translation>
+        <translation>DAB unavailable, missing: %1</translation>
     </message>
     <message id="org.openhu.radio.main.no_stations">
         <source></source>
@@ -74,6 +78,10 @@
     <message id="org.openhu.radio.main.play">
         <source></source>
         <translation>Play</translation>
+    </message>
+    <message id="org.openhu.radio.main.rds_missing">
+        <source></source>
+        <translation>RDS unavailable, missing: %1</translation>
     </message>
     <message id="org.openhu.radio.main.scan">
         <source></source>

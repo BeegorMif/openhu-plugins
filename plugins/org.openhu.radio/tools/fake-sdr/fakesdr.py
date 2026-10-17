@@ -1,7 +1,8 @@
 """Simulated RTL-SDR stick for testing the radio plugin without hardware (dev VM, desktop).
 
-Stands in for rtl_fm, rtl_power and redsea (the scripts next to this file): the radio plugin only starts these
-programs via PATH, so putting this directory first in PATH is all it takes (radio.py does that when "fakeSdr" is on).
+Stands in for rtl_fm, rtl_power, redsea and openhu-dab (the scripts next to this file): the radio plugin finds
+them via PATH while the simulated stick is on ("fakeSdr", radio.py puts this directory first in PATH and prefers it
+over its own bin/<arch>/ tools).
 
 Stations come from a JSON file (OPENHU_FAKE_SDR_STATIONS, default stations.json next to this file):
 
@@ -23,14 +24,14 @@ Stations come from a JSON file (OPENHU_FAKE_SDR_STATIONS, default stations.json 
 
 rtl_fm writes the tuned station to a state file (XDG_RUNTIME_DIR/fake-sdr/state.json), redsea reads it.
 
-DAB: welle-cli (the script next to this file) stands in for welle-cli's web server mode, with ensembles from the
-"dab" section:
+DAB: openhu-dab (the script next to this file) stands in for the plugin's DAB receiver (same options and events,
+PCM on stdout), with ensembles from the "dab" section:
 
     "dab": [{"channel": "7A", "ensemble": "0x1188", "label": "NDR NDS", "ecc": "0xE0",
              "services": [{"sid": "0xD882", "label": "NDR 2 NDS", "shortLabel": "NDR 2", "url": "https://...",
                            "dls": "fixed text", "slides": ["slides/a.png"], "logo": "..."}]}]
 
-    url/tone like FM (decoded to MP3 with ffmpeg), dls fixed DLS (default: the stream's ICY title, else the label),
+    url/tone like FM (decoded to PCM with ffmpeg), dls fixed DLS (default: the stream's ICY title, else the label),
     slides local pictures shown one after the other (slideSeconds, default 20) as the MOT slideshow
 """
 
@@ -52,6 +53,15 @@ ERRORS = {
     "busy": "usb_claim_interface error -6\nFailed to open rtlsdr device #0.",
 }
 TOLERANCE = {"fm": 0.05, "am": 4}  # MHz / kHz
+# Band III channels and their centre frequency in kHz (like dablib.DAB_CHANNELS of the plugin)
+DAB_CHANNELS = {
+    "5A": 174928, "5B": 176640, "5C": 178352, "5D": 180064, "6A": 181936, "6B": 183648, "6C": 185360, "6D": 187072,
+    "7A": 188928, "7B": 190640, "7C": 192352, "7D": 194064, "8A": 195936, "8B": 197648, "8C": 199360, "8D": 201072,
+    "9A": 202928, "9B": 204640, "9C": 206352, "9D": 208064, "10A": 209936, "10B": 211648, "10C": 213360,
+    "10D": 215072, "11A": 216928, "11B": 218640, "11C": 220352, "11D": 222064, "12A": 223936, "12B": 225648,
+    "12C": 227360, "12D": 229072, "13A": 230784, "13B": 232496, "13C": 234208, "13D": 235776, "13E": 237488,
+    "13F": 239200,
+}
 DEFAULT_LEVEL = -10.0
 NOISE_FLOOR = -40.0
 
@@ -98,31 +108,6 @@ def dab_id(value):
 
 def find_ensemble(stations, channel):
     return next((entry for entry in stations.get("dab", []) if entry["channel"] == str(channel).upper()), None)
-
-
-def welle_mux(ensemble, services_state, now, device="fake-sdr"):
-    """welle-cli's /mux.json for an ensemble (None: no reception, like welle-cli before it synced).
-    services_state: {sid: {"dls": str, "mot": time of the last slide change}} of the services being decoded."""
-    if not ensemble:
-        return {"ensemble": {"id": "0x0000", "ecc": "0x00", "label": {"label": "", "shortlabel": ""}},
-                "services": [], "receiver": {"hardware": {"name": device}, "software": {"name": "welle.io"}}}
-    services = []
-    for service in ensemble["services"]:
-        sid = service["sid"].lower()
-        state = services_state.get(service["sid"], {})
-        services.append({
-            "sid": sid,
-            "label": {"label": str(service.get("label") or ""),
-                      "shortlabel": str(service.get("shortLabel") or service.get("label") or "")[:8]},
-            "url_mp3": "/mp3/" + sid,
-            "components": [{"componentnr": 0, "primary": True, "transportmode": "audio", "ascty": "DAB+"}],
-            "dls": {"label": state.get("dls", ""), "time": now, "lastchange": now},
-            "mot": {"time": state.get("mot", 0), "lastchange": state.get("mot", 0)},
-        })
-    label = str(ensemble.get("label") or "")
-    return {"ensemble": {"id": ensemble["ensemble"].lower(), "ecc": str(ensemble.get("ecc") or "0xE0").lower(),
-                         "label": {"label": label, "shortlabel": label[:8]}},
-            "services": services, "receiver": {"hardware": {"name": "fake-sdr"}, "software": {"name": "welle.io"}}}
 
 
 def find_station(stations, band, frequency):

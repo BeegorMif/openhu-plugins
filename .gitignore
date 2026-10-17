@@ -1,2 +1,7 @@
 __pycache__/
 *.pyc
+# native programs built by plugins/<id>/native/build.sh (the index workflow puts them into the archives)
+plugins/*/bin/amd64/
+plugins/*/bin/arm64/
+plugins/*/bin/armhf/
+plugins/*/bin/i386/

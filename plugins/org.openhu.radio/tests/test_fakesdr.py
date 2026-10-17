@@ -30,6 +30,10 @@ STATIONS = {
         {"frequency": 108.0, "name": "Edge", "tone": 600},
     ],
     "am": [{"frequency": 1008, "name": "AM TEST", "tone": 800}],
+    "dab": [{"channel": "12D", "ensemble": "0xF0F0", "label": "OpenHU Test", "services": [
+        {"sid": "0xF001", "label": "Testton DAB", "shortLabel": "Testton", "tone": 440, "dls": "Simuliert",
+         "slides": [os.path.join(FAKE_SDR, "slides", "test-1.png"), os.path.join(FAKE_SDR, "slides", "test-2.png")],
+         "slideSeconds": 0.5}]}],
     "error": None,
 }
 
@@ -268,6 +272,83 @@ class FakeSdrProcessTest(ProcessTestCase):
         # noise while ffmpeg starts, then the file: lavfi sine at 1/8 full scale (RMS about 0.09 with the
         # pre-emphasis); the noise stays below 0.012
         self.assertGreater(rms(audio[-int(0.5 * rate) * 2:]), 0.03)
+
+
+class FakeOpenhuDabTest(ProcessTestCase):
+    """The simulated openhu-dab: the events and options of the real one (native/openhu-dab)."""
+
+    def events(self, process, until, seconds=15):
+        """Events on stderr (the default --events-fd) up to the first one of type until."""
+        import dablib
+        result = []
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            line = process.stderr.readline()
+            if not line:
+                break
+            event = dablib.parse_event(line)
+            if event:
+                result.append(event)
+                if event["event"] == until:
+                    return result
+        self.fail("no %s event: %s" % (until, result))
+
+    def test_version_and_arguments(self):
+        process = self.start("openhu-dab", "--version")
+        stdout, _ = process.communicate(timeout=10)
+        self.assertTrue(stdout.decode().startswith("openhu-dab "))
+        for args in ((), ("--channel", "7A", "--scan"), ("--channel", "99Z")):
+            process = self.start("openhu-dab", *args)
+            process.communicate(timeout=10)
+            self.assertEqual(process.returncode, 2, args)
+
+    def test_scan(self):
+        self.env["OPENHU_FAKE_SDR_DAB_SCAN_SECONDS"] = "0"
+        process = self.start("openhu-dab", "--scan", "--channels", "5a,12D")
+        events = self.events(process, "done")
+        self.assertEqual([event["channel"] for event in events if event["event"] == "scan"], ["5A", "12D"])
+        self.assertEqual([(event["channel"], event["services"]) for event in events if event["event"] == "channel"],
+                         [("5A", 0), ("12D", 1)])
+        service = next(event for event in events if event["event"] == "service")
+        self.assertEqual((service["sid"], service["label"], service["shortLabel"], service["audio"]),
+                         ("0xF001", "Testton DAB", "Testton", True))
+        self.assertEqual(events[-1], {"event": "done", "complete": True, "ensembles": 1, "services": 1})
+        self.assertEqual(process.wait(5), 0)
+
+    def test_no_stick(self):
+        for error, code in (("no-device", "no-device"), ("busy", "device-busy")):
+            self.write_stations(dict(STATIONS, error=error))
+            process = self.start("openhu-dab", "--channel", "12D", "--service", "0xF001")
+            events = self.events(process, "error")
+            self.assertEqual(events[-1]["code"], code)
+            self.assertEqual(process.wait(5), 3)
+
+    @unittest.skipUnless(shutil.which("ffmpeg"), "ffmpeg not installed")
+    def test_play_pcm_dls_slides(self):
+        self.env["OPENHU_FAKE_SDR_DAB_SYNC_SECONDS"] = "0.2"
+        slides = os.path.join(self.dir, "slides")
+        os.mkdir(slides)
+        process = self.start("openhu-dab", "--channel", "12D", "--service", "0xf001", "--slides", slides)
+        events = self.events(process, "audio")
+        kinds = [event["event"] for event in events]
+        self.assertLess(kinds.index("ensemble"), kinds.index("playing"))
+        self.assertEqual(events[-1], {"event": "audio", "rate": 48000, "channels": 2, "format": "s16le",
+                                      "sourceRate": 48000})
+        # stereo s16le at 48 kHz: the 440 Hz tone
+        audio = self.read_audio(process, 0.5, 48000 * 2)
+        self.assertEqual(len(audio), 48000 * 2 * 2 // 2)
+        self.assertGreater(rms(audio), 0.05)
+        dls = self.events(process, "dls")[-1]
+        self.assertEqual((dls["sid"], dls["text"]), ("0xF001", "Simuliert"))
+        first = self.events(process, "slide")[-1]
+        second = self.events(process, "slide")[-1]
+        self.assertNotEqual(first["path"], second["path"])
+        with open(second["path"], "rb") as file:
+            self.assertEqual(radiolib.image_type(file.read()), "image/png")
+        process.terminate()
+        self.assertEqual(process.wait(5), 0)
+        # its slide files go with it
+        self.assertEqual(os.listdir(slides), [])
 
 
 class IcyHandler(BaseHTTPRequestHandler):

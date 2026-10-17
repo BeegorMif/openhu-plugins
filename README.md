@@ -13,7 +13,7 @@ github average-web-dev/openhu-plugins main
 | `org.openhu.swc` | Lenkradtasten über Eingabegeräte (USB-Lenkradadapter, IR-Fernbedienungen, Multimedia-Tasten) mit Anlern-Modus |
 | `org.openhu.camera` | Rückfahrkamera mit Hilfslinien, im Inhaltsbereich oder als Vollbild, automatisch beim Rückwärtsgang |
 | `org.openhu.logger` | Fahrzeugdaten-Logger: zeichnet `vehicle.*`, Android-Auto-Zustand und Werte der Head-Unit auf dem Gerät auf (SQLite, komprimiert, Größenlimit), erkennt Fahrten, hochfrequente Aufnahmen; Schnittstelle für andere Plugins (Fahrten, Messwerte, Live-Werte) |
-| `org.openhu.radio` | FM/AM/DAB+-Radio mit RTL-SDR-Stick, Sendersuche, Favoriten, RDS (mit `redsea`), DAB+ (mit `welle-cli`) |
+| `org.openhu.radio` | FM/AM/DAB+-Radio mit RTL-SDR-Stick, Sendersuche, Favoriten, RDS (`redsea`), DAB+ mit DLS und Slideshow (eigener Decoder `openhu-dab`); ein Archiv pro Architektur (amd64, arm64) |
 
 ## Aufbau
 

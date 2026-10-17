@@ -1,0 +1,26 @@
+openhu-dab changes to dab-cmdline (applied by native/build.sh with patch -p1):
+- dabProcessor::get_ecc(): the ensemble's extended country code (FIG 0/9) for the ensemble event
+- faad-decoder.h: the stereo buffer for mono AAC frames was allocated with half the needed size
+
+--- a/library/includes/backend/audio/faad-decoder.h
++++ b/library/includes/backend/audio/faad-decoder.h
+@@ -170,7 +170,7 @@
+ 	}
+ 	else
+ 	if (channels == 1) {
+-	   int16_t *buffer = (int16_t *)alloca (2 * samples);
++	   int16_t *buffer = (int16_t *)alloca (2 * samples * sizeof (int16_t));
+ 	   int16_t i;
+ 	   for (i = 0; i < samples; i ++) {
+ 	      buffer [2 * i]	= ((int16_t *)outBuffer) [i];
+--- a/library/includes/dab-processor.h
++++ b/library/includes/dab-processor.h
+@@ -73,6 +73,8 @@
+ 	void		reset_msc		();
+ 	std::string	get_ensembleName	();
+ 	void		clearEnsemble		();
++//	openhu-dab: extended country code of the ensemble (FIG 0/9), 0 if unknown
++	uint8_t		get_ecc			() { return my_ficHandler. get_ecc (); }
+ private:
+ 	deviceHandler	*inputDevice;
+ 	dabParams	params;

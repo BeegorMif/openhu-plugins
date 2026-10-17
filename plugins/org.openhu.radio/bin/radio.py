@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """FM/AM/DAB+ radio with an RTL-SDR stick: rtl_fm -> pacat, optional RDS via redsea, station scan via rtl_power;
-DAB+ with welle-cli (dab.py: MP3 from welle-cli -> mpg123 -> pacat, DLS, slideshow, scan over Band III).
+DAB+ with openhu-dab (dab.py: PCM from openhu-dab -> pacat, DLS, slideshow, scan over Band III). openhu-dab and
+redsea come with the plugin archive (bin/<arch>/, native/build.sh); the simulated stick has stand-ins for both.
 
 State: "radio.state" {band, frequency, unit, playing, scanning, scan, rds: {pi, ps, rt}, presets, stations, error,
-          rdsAvailable, dabAvailable, dab, simulated, bands: {fm|am: {min, max, step, unit, stations, presets,
-          names: {"96.2": "NDR 2"}, pis: {"96.2": "0xD382"}}, dab: {unit, stations, presets, names, channels,
-          services: {"0xD882": {label, shortLabel, channel, ensemble, ensembleLabel, ecc}}}}}
+          rdsAvailable, dabAvailable, rdsMissing, dabMissing, dab, simulated, bands: {fm|am: {min, max, step, unit,
+          stations, presets, names: {"96.2": "NDR 2"}, pis: {"96.2": "0xD382"}}, dab: {unit, stations, presets, names,
+          channels, services: {"0xD882": {label, shortLabel, channel, ensemble, ensembleLabel, ecc}}}}}
           (presets/stations: current band; bands: all, with the RDS names and PI codes remembered per frequency;
           rds.pi: PI code of the station that plays, "0xD382")
           DAB: band "dab", a station is a service, its key ("frequency", stations, presets) the service id "0xD882";
           rds.ps is the service label, rds.rt the DLS; dab: {id, label, ecc} of the ensemble that plays;
           scan: {channel, done, total, found} while a DAB scan runs (minutes: every channel 5A-13F)
+          rdsMissing/dabMissing: what RDS or DAB needs and is missing ("" if nothing), e.g. a library of openhu-dab
+          ("librtlsdr.so.0 (librtlsdr0)") or a program ("pacat (pulseaudio-utils)")
 Commands: bus.emit "radio.command" {cmd: "play"|"stop"|"toggle"|"tune"|"step"|"band"|"preset"|"savePreset"|
           "removePreset"|"scan"|"fakeSdr"|"tunePi", value}
           tunePi: value is a PI code ("0xD382"): tunes FM to the strongest remembered frequency with it (level of the
@@ -27,9 +30,10 @@ Slide: "radio.slide" {band, station, image: data URL} – DAB slideshow picture 
 Media: while playing also media.metadata / media.status with source "radio" (home page, Bluetooth car radio), as
           cover the slideshow picture, else the station logo; "stopped" only if the radio was the last media source
           (not when Android Auto music took over)
-Config (plugin data dir): gain ("auto" or dB), ppm, amOptions (rtl_fm arguments for AM, default direct sampling),
-          rds, pauseForAndroidAuto, fakeSdr (simulated stick, tools/fake-sdr; also OPENHU_FAKE_SDR=1),
-          dabPort (welle-cli web server, default 7979), dabScanSeconds (per channel, default 5), dabChannels
+Config (plugin data dir): gain ("auto" or dB), ppm, biasTee (antenna power from the stick, DAB), amOptions (rtl_fm
+          arguments for AM, default direct sampling), rds, pauseForAndroidAuto, fakeSdr (simulated stick,
+          tools/fake-sdr; also OPENHU_FAKE_SDR=1), dabSyncSeconds (time to find a DAB signal on a channel during
+          the scan, default 3), dabScanSeconds (at most per channel with a signal, default 10), dabChannels
           (channels the DAB scan tunes, default all of 5A-13F)
 """
 
@@ -37,6 +41,7 @@ import asyncio
 import logging
 import os
 import shutil
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -44,13 +49,15 @@ sys.path.insert(0, os.path.join(HERE, "..", "lib"))
 sys.path.insert(0, HERE)
 
 import dab  # noqa: E402
+import dablib  # noqa: E402
 import radiolib  # noqa: E402
 from openhu import DATA_DIR, OpenHU, Texts, load_config, save_config, setup_logging  # noqa: E402
 
 log = logging.getLogger("radio")
 
 # Simulated stick for tests without hardware: rtl_fm/rtl_power/redsea stand-ins, first in PATH when switched on
-FAKE_SDR_DIR = os.path.normpath(os.path.join(HERE, "..", "tools", "fake-sdr"))
+PLUGIN_DIR = os.path.normpath(os.path.join(HERE, ".."))
+FAKE_SDR_DIR = os.path.join(PLUGIN_DIR, "tools", "fake-sdr")
 LOGO_POLL_SECONDS = 10
 
 DEFAULTS = {
@@ -60,12 +67,13 @@ DEFAULTS = {
     "stations": {"fm": [], "am": [], "dab": []},
     "names": {"fm": {}, "am": {}, "dab": {}},
     "dabServices": {},
-    "dabPort": 7979,
-    "dabScanSeconds": 5,
+    "dabSyncSeconds": 3,
+    "dabScanSeconds": 10,
     "pis": {"fm": {}},
     "levels": {"fm": {}},
     "gain": "auto",
     "ppm": 0,
+    "biasTee": False,
     "amOptions": ["-E", "direct2"],
     "rds": True,
     "pauseForAndroidAuto": True,
@@ -104,6 +112,7 @@ class RadioPlugin(dab.DabMixin):
         self.slide = ""  # DAB slideshow picture (data URL) of the station that plays
         self.slide_sent = None
         self.dab_ensemble = {}
+        self.tool_checks = {}  # (path, mtime) -> problem ("" if the tool runs)
         self.scan_progress = None
         self.scan_abort = False
         # Every event runs as its own task: commands that come quickly one after the other (Android Auto sends
@@ -137,8 +146,49 @@ class RadioPlugin(dab.DabMixin):
     def which(self, name):
         return shutil.which(name, path=self.environment()["PATH"])
 
+    def tool(self, name):
+        """openhu-dab / redsea: the simulated stick's stand-in when it is on, else the plugin's own build
+        (bin/<arch>/), else one from PATH (development); None if there is none."""
+        if self.simulated():
+            return self.which(name)
+        return dablib.native_tool(PLUGIN_DIR, name) or self.which(name)
+
+    def tool_problem(self, name):
+        """"" if the tool runs (--version), else what is missing: the tool itself or a shared library of it.
+        Checked once per file (a library installed later counts after a plugin restart)."""
+        path = self.tool(name)
+        if not path:
+            return name
+        try:
+            key = (path, os.stat(path).st_mtime)
+        except OSError:
+            return name
+        if key not in self.tool_checks:
+            try:
+                result = subprocess.run([path, "--version"], stdin=subprocess.DEVNULL, capture_output=True,
+                                        timeout=10, env=self.environment())
+                stderr = result.stderr.decode(errors="replace")
+                library = dablib.missing_library(stderr)
+                if library:
+                    package = dablib.library_package(library)
+                    problem = "%s (%s)" % (library, package) if package else library
+                elif result.returncode != 0:
+                    problem = "%s: %s" % (name, (stderr.strip().splitlines() or ["exit %d" % result.returncode])[-1])
+                else:
+                    problem = ""
+            except (OSError, subprocess.SubprocessError) as error:
+                problem = "%s: %s" % (name, error)
+            if problem:
+                log.warning("%s: %s", path, problem)
+            self.tool_checks[key] = problem
+        return self.tool_checks[key]
+
+    def rds_problem(self):
+        """"" if RDS works, else what is missing (redsea, a library of it, sox)."""
+        return self.tool_problem("redsea") or ("" if self.which("sox") else "sox")
+
     def rds_available(self):
-        return self.band == "fm" and self.config["rds"] and self.which("redsea") and self.which("sox")
+        return self.band == "fm" and self.config["rds"] and not self.rds_problem()
 
     # --- playback ---------------------------------------------------------------
 
@@ -170,7 +220,7 @@ class RadioPlugin(dab.DabMixin):
             # rtl_fm (multiplex) -> this process -> redsea (RDS) and sox (audio) -> pacat
             rtl = await radiolib.spawn(*args, stdout=asyncio.subprocess.PIPE,
                                                        stderr=asyncio.subprocess.PIPE, env=env)
-            redsea = await radiolib.spawn("redsea", "-r", "171k", stdin=asyncio.subprocess.PIPE,
+            redsea = await radiolib.spawn(self.tool("redsea"), "-r", "171k", stdin=asyncio.subprocess.PIPE,
                                                           stdout=asyncio.subprocess.PIPE,
                                                           stderr=asyncio.subprocess.DEVNULL, env=env)
             read_fd, write_fd = os.pipe()
@@ -591,6 +641,8 @@ class RadioPlugin(dab.DabMixin):
             dabAvailable=self.dab_available(),
             rds=self.rds,
             rdsAvailable=bool(self.rds_available()),
+            rdsMissing=self.rds_problem(),
+            dabMissing=self.dab_problem(),
             presets=self.config["presets"].get(self.band, []),
             stations=self.config["stations"].get(self.band, []),
             error=str(self.error),

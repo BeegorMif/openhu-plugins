@@ -1,15 +1,17 @@
-"""DAB/DAB+ for the radio plugin: playback, DLS, slideshow and the scan with welle-cli (see dablib.py).
+"""DAB/DAB+ for the radio plugin: playback, DLS, slideshow and the scan with openhu-dab (see dablib.py).
 
-welle-cli runs in its web server mode for the channel (ensemble) of the station; this module talks to it on
-127.0.0.1 only: /mux.json for the services, DLS and slideshow changes, /mp3/<sid> for the sound (decoded by mpg123
-or ffmpeg into pacat), /slide/<sid> for the picture, POST /channel to retune during the scan. One stick: the band
-switch stops the FM/AM processes and vice versa (radio.py starts one or the other).
+openhu-dab (shipped in the plugin archive as bin/<arch>/openhu-dab) tunes the channel (ensemble) of the station and
+writes the service's audio as PCM straight into pacat; its events (ensemble, services, DLS, slideshow pictures as
+files, errors) arrive as JSON lines on a pipe (--events-fd). No network port. One stick: the band switch stops the
+FM/AM processes and vice versa (radio.py starts one or the other).
 """
 
 import asyncio
+import base64
 import collections
 import logging
 import os
+import tempfile
 import time
 
 import dablib
@@ -18,75 +20,18 @@ from openhu import save_config
 
 log = logging.getLogger("radio")
 
-CHUNK = 16384
-METADATA_SECONDS = 2
-# no ensemble with the station after this long: "no reception" (welle-cli keeps trying, the error goes away)
+# no "playing" event (the ensemble with the station) after this long: "no reception" (openhu-dab keeps trying, the
+# error goes away when it finds the station)
 SYNC_SECONDS = 20
-MAX_RESPONSE = 4 * 1024 * 1024
 MAX_SLIDE_BYTES = 512 * 1024
-
-
-class HttpError(Exception):
-    pass
-
-
-def parse_response(data):
-    """Raw HTTP response -> (status, body)."""
-    head, separator, body = data.partition(b"\r\n\r\n")
-    if not separator:
-        raise HttpError("incomplete response")
-    try:
-        status = int(head.split(b"\r\n", 1)[0].split()[1])
-    except (IndexError, ValueError):
-        raise HttpError("bad status line") from None
-    return status, body
-
-
-async def http_request(port, path, method="GET", body=b"", timeout=5.0):
-    """Small HTTP/1.0 client for welle-cli on localhost -> (status, body); the server closes after the response."""
-    reader, writer = await asyncio.wait_for(asyncio.open_connection("127.0.0.1", port), timeout)
-    try:
-        request = "%s %s HTTP/1.0\r\nHost: 127.0.0.1\r\nContent-Length: %d\r\nConnection: close\r\n\r\n" % (
-            method, path, len(body))
-        writer.write(request.encode() + body)
-        await writer.drain()
-        data = b""
-        deadline = time.monotonic() + timeout
-        while len(data) <= MAX_RESPONSE:
-            chunk = await asyncio.wait_for(reader.read(65536), max(0.1, deadline - time.monotonic()))
-            if not chunk:
-                break
-            data += chunk
-    finally:
-        writer.close()
-    return parse_response(data)
-
-
-async def open_stream(port, path, timeout=10.0):
-    """GET with a streamed body -> (reader, writer) after the headers; HttpError unless 200."""
-    reader, writer = await asyncio.wait_for(asyncio.open_connection("127.0.0.1", port), timeout)
-    try:
-        writer.write(("GET %s HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n" % path).encode())
-        await writer.drain()
-        head = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), timeout)
-        status, _ = parse_response(head)
-        if status != 200:
-            raise HttpError("%s: HTTP %d" % (path, status))
-    except BaseException:
-        writer.close()
-        raise
-    return reader, writer
-
-
-async def read_mux(port):
-    status, body = await http_request(port, "/mux.json")
-    if status != 200:
-        raise HttpError("/mux.json: HTTP %d" % status)
-    return dablib.parse_mux(body.decode("utf-8", "replace"))
+# event lines carry slides as files (--slides), so they are short; base64 slides would be < 1 MB
+EVENT_LINE_LIMIT = 2 * 1024 * 1024
+# error codes of openhu-dab that mean: no usable stick
+STICK_ERRORS = ("no-device", "device-busy", "device-lost")
 
 
 async def drain(stream, lines):
-    """Reads a chatty stderr (welle-cli logs a lot; a full pipe would block it), keeps the last lines."""
+    """Reads stderr (library debug output, loader errors; a full pipe would block the tool), keeps the last lines."""
     while True:
         line = await stream.readline()
         if not line:
@@ -94,51 +39,99 @@ async def drain(stream, lines):
         lines.append(line.decode(errors="replace").strip())
 
 
-async def wait_for_server(port, process, seconds=15):
-    """True once welle-cli's web server answers."""
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline and process.returncode is None:
+async def open_events(read_fd):
+    """StreamReader for the read end of the events pipe."""
+    loop = asyncio.get_running_loop()
+    reader = asyncio.StreamReader(limit=EVENT_LINE_LIMIT)
+    await loop.connect_read_pipe(lambda: asyncio.StreamReaderProtocol(reader), os.fdopen(read_fd, "rb", 0))
+    return reader
+
+
+async def next_event(reader, timeout=None):
+    """Next openhu-dab event; None at the end of the pipe, {} on a timeout."""
+    while True:
         try:
-            await read_mux(port)
-            return True
-        except (OSError, asyncio.TimeoutError, HttpError):
-            await asyncio.sleep(0.3)
-    return False
+            line = await asyncio.wait_for(reader.readline(), timeout) if timeout else await reader.readline()
+        except asyncio.TimeoutError:
+            return {}
+        except ValueError:  # line longer than the limit
+            continue
+        if not line:
+            return None
+        event = dablib.parse_event(line)
+        if event:
+            return event
+
+
+def slides_dir():
+    """Directory for openhu-dab's slideshow pictures (it keeps the last two, removes them when it ends)."""
+    base = os.environ.get("XDG_RUNTIME_DIR") or tempfile.gettempdir()
+    path = os.path.join(base, "openhu-radio-slides-%d" % os.getuid())
+    try:
+        os.makedirs(path, mode=0o700, exist_ok=True)
+    except OSError:
+        return None
+    return path
 
 
 class DabMixin:
-    """DAB part of RadioPlugin (radio.py): uses its config, processes, tasks, rds, error and publish_* methods."""
+    """DAB part of RadioPlugin (radio.py): uses its config, processes, tasks, rds, error and publish_* methods,
+    tool() and tool_problem()."""
 
-    def dab_decoder(self):
-        """MP3 decoder: mpg123 (small, for the OS image), else ffmpeg (dev image); None if neither is there."""
-        return next((name for name in ("mpg123", "ffmpeg") if self.which(name)), None)
+    def dab_problem(self):
+        """"" if DAB can play, else what is missing (openhu-dab, a library of it, pacat)."""
+        return self.tool_problem("openhu-dab") or ("" if self.which("pacat") else "pacat (pulseaudio-utils)")
 
     def dab_available(self):
-        return bool(self.which("welle-cli") and self.which("pacat") and self.dab_decoder())
+        return not self.dab_problem()
 
     def dab_service(self, key=None):
         return self.config.get("dabServices", {}).get(key or self.config["frequency"].get(radiolib.DAB))
 
-    def dab_port(self):
-        return int(self.config.get("dabPort") or dablib.DEFAULT_PORT)
+    def dab_error(self, event, stderr=()):
+        """Text for an error event of openhu-dab, or for its end without one (stderr: its last lines)."""
+        if event and event.get("code") in STICK_ERRORS:
+            if event.get("code") == "device-busy":
+                return self.texts.text("org.openhu.radio.error.stick_busy")
+            return self.texts.text("org.openhu.radio.error.no_stick")
+        if event and event.get("message"):
+            return str(event["message"])
+        library = dablib.missing_library("\n".join(stderr))
+        if library:
+            return self.texts.text("org.openhu.radio.error.library_missing", "openhu-dab", library,
+                                   dablib.library_package(library) or "?")
+        return next((line for line in reversed(list(stderr)) if line),
+                    self.texts.text("org.openhu.radio.error.dab_ended"))
 
-    async def start_welle(self, channel):
-        args = dablib.welle_cli_command(channel, self.dab_port(), self.config)
+    async def start_openhu_dab(self, args, stdout):
+        """openhu-dab with its events on a pipe -> (process, events reader, stderr lines, stderr task)."""
+        read_fd, write_fd = os.pipe()
+        os.set_inheritable(write_fd, True)
+        args = [str(write_fd) if arg == "{events}" else arg for arg in args]
         log.info("%s%s", " ".join(args), " (simulated stick)" if self.simulated() else "")
-        return await radiolib.spawn(*args, stdin=asyncio.subprocess.DEVNULL,
-                                                    stdout=asyncio.subprocess.DEVNULL,
-                                                    stderr=asyncio.subprocess.PIPE, env=self.environment())
+        try:
+            process = await radiolib.spawn(*args, stdin=asyncio.subprocess.DEVNULL, stdout=stdout,
+                                           stderr=asyncio.subprocess.PIPE, pass_fds=(write_fd,),
+                                           env=self.environment())
+        except BaseException:
+            os.close(read_fd)
+            raise
+        finally:
+            os.close(write_fd)
+        reader = await open_events(read_fd)
+        lines = collections.deque(maxlen=20)
+        return process, reader, lines, asyncio.create_task(drain(process.stderr, lines))
 
     # --- playback -------------------------------------------------------------------------
 
     async def start_dab(self):
         key = self.config["frequency"].get(radiolib.DAB)
         service = self.dab_service(key)
-        decoder = self.dab_decoder()
+        problem = self.dab_problem()
         if not service:
             self.error = self.texts.text("org.openhu.radio.error.no_dab_station")
-        elif not (self.which("welle-cli") and self.which("pacat") and decoder):
-            self.error = self.texts.text("org.openhu.radio.error.no_welle_cli")
+        elif problem:
+            self.error = self.texts.text("org.openhu.radio.error.dab_missing", problem)
         if self.error:
             self.playing = False
             await self.publish_state()
@@ -147,67 +140,20 @@ class DabMixin:
         self.rds = {"ps": service.get("label", "")}
         self.dab_ensemble = {}
         await self.set_slide("")
-        welle = await self.start_welle(service["channel"])
         read_fd, write_fd = os.pipe()
-        mp3 = await radiolib.spawn(*dablib.mp3_decoder_command(decoder),
-                                                   stdin=asyncio.subprocess.PIPE, stdout=write_fd,
-                                                   stderr=asyncio.subprocess.DEVNULL)
-        pacat = await radiolib.spawn(*radiolib.pacat_command(48000, 2), stdin=read_fd)
-        os.close(read_fd)
-        os.close(write_fd)
-        self.processes = [welle, mp3, pacat]
-        self.tasks = [asyncio.create_task(self.dab_audio(key, service, mp3)),
-                      asyncio.create_task(self.dab_metadata(key)),
-                      asyncio.create_task(self.watch_welle(welle))]
+        try:
+            args = dablib.play_command(self.tool("openhu-dab"), service["channel"], key, self.config, "{events}",
+                                       slides_dir())
+            dab, events, lines, stderr_task = await self.start_openhu_dab(args, write_fd)
+            pacat = await radiolib.spawn(*radiolib.pacat_command(dablib.PCM_RATE, 2), stdin=read_fd)
+        finally:
+            os.close(read_fd)
+            os.close(write_fd)
+        self.processes = [dab, pacat]
+        self.tasks = [stderr_task,
+                      asyncio.create_task(self.dab_events(key, service, dab, events, lines, stderr_task))]
         self.playing = True
         await self.publish_state()
-
-    async def wait_for_service(self, key, service):
-        """Polls /mux.json until the ensemble carries the station; an error while it takes long, cleared after."""
-        started = time.monotonic()
-        reported = False
-        while True:
-            try:
-                mux = await read_mux(self.dab_port())
-                if mux["noDevice"]:
-                    await self.dab_failed(self.texts.text("org.openhu.radio.error.no_stick"))
-                    return False
-                if key in mux["services"]:
-                    if reported:
-                        self.error = ""
-                        await self.publish_state()
-                    return True
-            except (OSError, asyncio.TimeoutError, HttpError):
-                pass  # welle-cli still starting
-            if not reported and time.monotonic() - started > SYNC_SECONDS:
-                reported = True
-                self.error = self.texts.text("org.openhu.radio.error.dab_no_reception",
-                                             dablib.station_label(service, key), service.get("channel"))
-                log.warning("%s", self.error)
-                await self.publish_state()
-            await asyncio.sleep(1)
-
-    async def dab_audio(self, key, service, mp3):
-        """welle-cli's MP3 stream of the station -> decoder, again after interruptions."""
-        while True:
-            if not await self.wait_for_service(key, service):
-                return
-            try:
-                reader, writer = await open_stream(self.dab_port(), "/mp3/" + dablib.welle_sid(key))
-                try:
-                    while True:
-                        data = await reader.read(CHUNK)
-                        if not data:
-                            break
-                        mp3.stdin.write(data)
-                        await mp3.stdin.drain()
-                finally:
-                    writer.close()
-            except (OSError, asyncio.TimeoutError, asyncio.IncompleteReadError, HttpError) as error:
-                log.info("DAB stream %s: %s", key, error)
-            if mp3.returncode is not None:
-                return
-            await asyncio.sleep(1)
 
     async def dab_failed(self, error):
         """Stops the DAB processes with an error (from one of their tasks: the rest runs in a new task, the stop
@@ -220,91 +166,80 @@ class DabMixin:
             await self.publish_state()
         asyncio.create_task(stop())
 
-    async def dab_metadata(self, key):
-        """Station name and DLS (as radiotext), ensemble, and the slideshow picture when it changed."""
-        mot = None
+    async def dab_events(self, key, service, dab, events, lines, stderr_task):
+        """Ensemble, station name, DLS (as radiotext) and slideshow of openhu-dab; "no reception" while the station
+        does not play; an error when openhu-dab ends."""
+        started = time.monotonic()
+        playing = reported = False
+        error = None
         while True:
-            await asyncio.sleep(METADATA_SECONDS)
-            try:
-                mux = await read_mux(self.dab_port())
-            except (OSError, asyncio.TimeoutError, HttpError):
-                continue
-            service = mux["services"].get(key)
-            if not service:
-                continue
-            rds = {"ps": service["label"] or self.rds.get("ps", "")}
-            if service["dls"]:
-                rds["rt"] = service["dls"]
-            ensemble = mux["ensemble"] or {}
-            if rds != self.rds or ensemble != self.dab_ensemble:
-                self.rds, self.dab_ensemble = rds, ensemble
+            event = await next_event(events, timeout=1)
+            if event is None:
+                break
+            kind = event.get("event")
+            if kind == "error":
+                error = event
+                log.warning("openhu-dab: %s", event)
+            elif kind == "ensemble":
+                ensemble = dablib.ensemble_info(event)
+                if ensemble != self.dab_ensemble:
+                    self.dab_ensemble = ensemble
+                    await self.publish_state()
+            elif kind == "playing" and event.get("sid") == key:
+                playing = True
+                if reported:
+                    self.error = ""
+                    await self.publish_state()
+            elif kind == "dls" and event.get("sid") == key:
+                text = str(event.get("text") or "").strip()
+                if text and text != self.rds.get("rt"):
+                    self.rds = dict(self.rds, rt=text)
+                    await self.publish_state()
+            elif kind == "service" and event.get("sid") == key and event.get("label"):
+                if event["label"] != self.rds.get("ps"):
+                    self.rds = dict(self.rds, ps=event["label"])
+                    await self.publish_state()
+            elif kind == "slide" and event.get("sid") == key:
+                await self.show_slide(event)
+            if not playing and not reported and time.monotonic() - started > SYNC_SECONDS:
+                reported = True
+                self.error = self.texts.text("org.openhu.radio.error.dab_no_reception",
+                                             dablib.station_label(service, key), service.get("channel"))
+                log.warning("%s", self.error)
                 await self.publish_state()
-            if service["mot"] and service["mot"] != mot:
-                mot = service["mot"]
-                await self.fetch_slide(key)
+        await dab.wait()
+        await asyncio.wait([stderr_task], timeout=1)  # the rest of stderr (a loader error)
+        if self.playing and dab in self.processes:
+            await self.dab_failed(self.dab_error(error, lines))
 
-    async def fetch_slide(self, key):
-        try:
-            status, body = await http_request(self.dab_port(), "/slide/" + dablib.welle_sid(key))
-        except (OSError, asyncio.TimeoutError, HttpError) as error:
-            log.info("DAB slide %s: %s", key, error)
-            return
-        if status != 200 or len(body) > MAX_SLIDE_BYTES:
-            return
-        image = radiolib.data_url(body)
+    async def show_slide(self, event):
+        """A slideshow picture of the station: a file (--slides) or base64 in the event."""
+        data = None
+        if event.get("path"):
+            try:
+                if os.path.getsize(event["path"]) <= MAX_SLIDE_BYTES:
+                    with open(event["path"], "rb") as file:
+                        data = file.read()
+            except OSError as error:
+                log.info("DAB slide: %s", error)
+        elif event.get("data") and len(event["data"]) <= MAX_SLIDE_BYTES * 4 // 3 + 4:
+            try:
+                data = base64.b64decode(event["data"])
+            except ValueError:
+                data = None
+        image = radiolib.data_url(data) if data else None
         if image:
             await self.set_slide(image)
-
-    async def watch_welle(self, welle):
-        """welle-cli ends on its own only on errors (no stick, port in use); it writes a lot, only the end is kept."""
-        lines = collections.deque(maxlen=20)
-        await drain(welle.stderr, lines)
-        await welle.wait()
-        if self.playing and welle in self.processes:
-            text = "\n".join(lines)
-            self.error = next((line for line in reversed(lines) if line),
-                              self.texts.text("org.openhu.radio.error.welle_cli_ended"))
-            if "Could not start device" in text or "No supported devices" in text:
-                self.error = self.texts.text("org.openhu.radio.error.no_stick")
-            log.error("welle-cli: %s", self.error)
-            await self.stop_processes()
-            self.playing = False
-            await self.publish_state()
+        elif data:
+            log.info("DAB slide %s: neither PNG nor JPEG", event.get("mime"))
 
     # --- scan -----------------------------------------------------------------------------
 
-    def dab_scan_seconds(self):
-        """How long a channel may take to show an ensemble (welle-cli syncs in about 1-3 s)."""
-        return float(self.config.get("dabScanSeconds") or 5)
-
-    async def scan_channel(self, channel):
-        """Services of one channel: waits for the ensemble, then until its service list stops changing."""
-        port = self.dab_port()
-        deadline = time.monotonic() + self.dab_scan_seconds()
-        services, stable = {}, 0
-        while time.monotonic() < deadline:
-            await asyncio.sleep(0.5)
-            try:
-                mux = await read_mux(port)
-            except (OSError, asyncio.TimeoutError, HttpError):
-                continue
-            current = dablib.scan_services(channel, mux)
-            if mux["noDevice"]:
-                self.scan_no_device = True
-                return {}
-            if mux["ensemble"] and current:
-                # labels arrive one after the other: done once the list stayed the same twice
-                stable = stable + 1 if current == services else 0
-                services = current
-                if stable >= 2:
-                    break
-                deadline = max(deadline, time.monotonic() + 1)
-        return services
-
     async def scan_dab(self):
-        """All Band III channels one after the other (POST /channel), takes minutes; progress in radio.state.scan."""
-        if not self.which("welle-cli"):
-            self.error = self.texts.text("org.openhu.radio.error.dab_scan_no_welle_cli")
+        """All Band III channels one after the other, takes minutes; progress in radio.state.scan."""
+        problem = self.tool_problem("openhu-dab")
+        if problem:
+            self.error = self.texts.text("org.openhu.radio.error.dab_missing", problem)
             self.scanning = False
             await self.publish_state()
             return
@@ -314,55 +249,53 @@ class DabMixin:
         # all of Band III, or the channels in the config (dabChannels, e.g. only the ones used nearby)
         channels = [channel for channel in (dablib.normalize_channel(value) for value in
                                             self.config.get("dabChannels") or dablib.DAB_CHANNELS) if channel]
-        found = {}
-        welle = await self.start_welle(channels[0])
-        lines = collections.deque(maxlen=20)
-        reader = asyncio.create_task(drain(welle.stderr, lines))
-        exited = None
-        self.scan_no_device = False
+        result = dablib.ScanResult()
+        args = dablib.scan_command(self.tool("openhu-dab"), channels, self.config, "{events}")
+        process, events, lines, stderr_task = await self.start_openhu_dab(args, asyncio.subprocess.DEVNULL)
+        error = None
+        complete = False
         try:
-            await wait_for_server(self.dab_port(), welle)
-            for index, channel in enumerate(channels):
-                if welle.returncode is not None:
-                    exited = welle.returncode
+            while True:
+                if self.scan_abort:
                     break
-                if self.scan_abort or self.scan_no_device:
+                event = await next_event(events, timeout=0.5)
+                if event is None:
                     break
-                self.scan_progress = {"channel": channel, "done": index, "total": len(channels),
-                                      "found": sum(len(services) for services in found.values())}
-                await self.publish_state()
-                if index > 0:
-                    try:
-                        await http_request(self.dab_port(), "/channel", method="POST", body=channel.encode())
-                    except (OSError, asyncio.TimeoutError, HttpError) as error:
-                        log.warning("DAB scan %s: %s", channel, error)
-                        continue
-                services = await self.scan_channel(channel)
-                if services:
-                    log.info("DAB scan %s: %s", channel, ", ".join(service["label"] for service in services.values()))
-                    found[channel] = services
+                kind = event.get("event")
+                if kind == "scan":
+                    self.scan_progress = {"channel": event.get("channel"), "done": int(event.get("index") or 0),
+                                          "total": int(event.get("total") or len(channels)), "found": result.count()}
+                    await self.publish_state()
+                elif kind in ("ensemble", "service"):
+                    result.add(event)
+                elif kind == "channel" and event.get("services"):
+                    found = result.found().get(dablib.normalize_channel(event.get("channel")), {})
+                    log.info("DAB scan %s: %s", event.get("channel"),
+                             ", ".join(service["label"] for service in found.values()))
+                elif kind == "error":
+                    error = event
+                elif kind == "done":
+                    complete = bool(event.get("complete", True))
         finally:
-            if welle.returncode is None:
-                welle.terminate()
+            if process.returncode is None:
+                process.terminate()
             try:
-                await asyncio.wait_for(welle.wait(), 3)
+                await asyncio.wait_for(process.wait(), 3)
             except asyncio.TimeoutError:
-                welle.kill()
-            await reader
-            stderr = [line for line in lines if line]
+                process.kill()
+                await process.wait()
+            await stderr_task
 
-        if self.scan_no_device:
-            self.error = self.texts.text("org.openhu.radio.error.no_stick")
+        if self.scan_abort:
+            pass  # cancelled: the old station list stays
+        elif error or not complete:
+            # openhu-dab ended during the scan: keep the old station list
+            message = self.dab_error(error, lines)
+            self.error = message if error and error.get("code") in STICK_ERRORS else \
+                self.texts.text("org.openhu.radio.error.dab_scan_failed", message)
             log.error("DAB scan: %s", self.error)
-        elif exited is not None:
-            # welle-cli ended during the scan: keep the old station list
-            self.error = self.texts.text("org.openhu.radio.error.dab_scan_failed",
-                                         (stderr or [self.texts.tr("org.openhu.radio.error.welle_cli_ended")])[-1])
-            if any("Could not start device" in line or "No supported devices" in line for line in stderr):
-                self.error = self.texts.text("org.openhu.radio.error.no_stick")
-            log.error("%s", self.error)
-        elif not self.scan_abort:
-            services = dablib.merge_scan(found)
+        else:
+            services = dablib.merge_scan(result.found())
             self.config["dabServices"] = services
             self.config["stations"][radiolib.DAB] = dablib.station_order(services)
             self.config.setdefault("names", {})[radiolib.DAB] = {

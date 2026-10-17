@@ -3,10 +3,12 @@
   "name": "Radio",
   "version": "1.0.0",
   "api": 2,
-  "description": "FM/AM/DAB+ radio with an RTL-SDR USB stick: station scan, favorites and RDS (station name, radio text, PI; RDS needs redsea), station logos from your own image files; DAB+ with welle-cli (DLS, slideshow). For testing without a stick: a simulated stick with internet radio streams.",
-  "arch": ["all"],
+  "description": "FM/AM/DAB+ radio with an RTL-SDR USB stick: station scan, favorites, RDS (station name, radio text, PI) and DAB+ with DLS and slideshow (decoders included), station logos from your own image files. For testing without a stick: a simulated stick with internet radio streams.",
+  "arch": ["amd64", "arm64"],
   "ui": {"page": "qml/Main.qml", "icon": "icon.svg", "dock": true},
   "process": {"exec": "bin/radio.py", "restart": "on-failure"},
   "permissions": ["audio", "usb"],
-  "shared": ["openhu.py"]
+  "shared": ["openhu.py"],
+  "packages": ["rtl-sdr", "pulseaudio-utils", "sox", "librtlsdr0", "libfaad2", "libfftw3-single3", "libsamplerate0",
+               "libliquid1", "libsndfile1"]
 }

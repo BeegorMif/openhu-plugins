@@ -80,7 +80,7 @@ def start_needed(playing, running):
 
 def die_with_parent():
     """preexec_fn for the tools: they get SIGTERM when the plugin dies. OpenHU stops the plugin, not its children;
-    welle-cli (an HTTP server) kept running after an OpenHU restart and blocked its port for the next start."""
+    a DAB receiver that kept running after an OpenHU restart held the stick for the next start."""
     try:
         ctypes.CDLL(None, use_errno=True).prctl(1, signal.SIGTERM)  # PR_SET_PDEATHSIG
     except (OSError, AttributeError):

@@ -1,4 +1,3 @@
-import json
 import os
 import sys
 import tempfile
@@ -11,21 +10,18 @@ import dablib  # noqa: E402
 import fakesdr  # noqa: E402
 import radiolib  # noqa: E402
 
-# Shortened /mux.json of welle-cli 2.4 (format of its jsonconvert.cpp): labels are objects, ids lower case hex
-MUX = {
-    "ensemble": {"id": "0x1188", "ecc": "0xe0", "label": {"label": "NDR NDS", "shortlabel": "NDR NDS"}},
-    "services": [
-        {"sid": "0xd882", "label": {"label": "NDR 2 NDS       ", "shortlabel": "NDR 2"}, "url_mp3": "/mp3/0xd882",
-         "components": [{"transportmode": "audio", "ascty": "DAB+"}],
-         "dls": {"label": "Dreamer - Ozzy Osbourne", "time": 1, "lastchange": 1},
-         "mot": {"time": 5, "lastchange": 5}},
-        {"sid": "0xd383", "label": {"label": "NDR Kultur", "shortlabel": "NDR Kult"}, "url_mp3": None,
-         "components": [{"transportmode": "audio", "ascty": "DAB+"}], "dls": {"label": ""}, "mot": {"time": 0}},
-        {"sid": "0xe0d03188", "label": {"label": "NDR EPG", "shortlabel": "NDR EPG"}, "url_mp3": None,
-         "components": [{"transportmode": "packetdata"}]},
-        {"sid": "0xd385", "label": {"label": "", "shortlabel": ""}, "url_mp3": "/mp3/0xd385"},
-    ],
-}
+# Events of one channel as openhu-dab writes them (native/openhu-dab/openhu-dab.cpp)
+EVENTS_7A = [
+    '{"event":"tuned","channel":"7A","frequency":188928}',
+    '{"event":"sync","channel":"7A","synced":true}',
+    '{"event":"service","channel":"7A","sid":"0xD882","label":"NDR 2 NDS","shortLabel":"NDR 2","audio":true,'
+    '"dabPlus":true,"bitrate":96}',
+    '{"event":"ensemble","channel":"7A","id":"0x1188","label":"NDR NDS","ecc":"0xE0"}',
+    '{"event":"service","channel":"7A","sid":"0xd383","label":"NDR Kultur","shortLabel":"NDR Kult","audio":true}',
+    '{"event":"service","channel":"7A","sid":"0xE0D03188","label":"NDR EPG","audio":false}',
+    'some debug output of the DAB library',
+    '{"event":"channel","channel":"7A","ensemble":true,"services":3}',
+]
 
 
 class DabLibTest(unittest.TestCase):
@@ -36,7 +32,6 @@ class DabLibTest(unittest.TestCase):
         self.assertEqual(dablib.normalize_sid("0xe0d03188"), "0xE0D03188")
         for bad in (None, "", "xyz", 0, True, -1, 0x100000000):
             self.assertIsNone(dablib.normalize_sid(bad), bad)
-        self.assertEqual(dablib.welle_sid("0xD882"), "0xd882")
         self.assertEqual(dablib.normalize_channel("7a"), "7A")
         self.assertIsNone(dablib.normalize_channel("14A"))
 
@@ -49,42 +44,64 @@ class DabLibTest(unittest.TestCase):
                          (178352, 188928, 199360))
 
     def test_commands(self):
-        self.assertEqual(dablib.welle_cli_command("7A", 7979, {"gain": "auto"}),
-                         ["welle-cli", "-c", "7A", "-w", "7979", "-T"])
-        self.assertEqual(dablib.welle_cli_command("5C", 8000, {"gain": 30})[-2:], ["-g", "30"])
-        self.assertEqual(dablib.mp3_decoder_command("mpg123")[:3], ["mpg123", "-q", "-s"])
-        ffmpeg = dablib.mp3_decoder_command("ffmpeg")
-        self.assertEqual(ffmpeg[0], "ffmpeg")
-        self.assertIn("s16le", ffmpeg)
+        tool = "/plugin/bin/amd64/openhu-dab"
+        self.assertEqual(dablib.play_command(tool, "7A", "0xD882", {"gain": "auto"}, 5, "/run/slides"),
+                         [tool, "--channel", "7A", "--service", "0xD882", "--rate", "48000", "--events-fd", "5",
+                          "--slides", "/run/slides"])
+        args = dablib.play_command(tool, "5C", "0xD210", {"gain": 30, "ppm": 12, "biasTee": True}, 3)
+        self.assertEqual(args[-5:], ["--gain", "30", "--ppm", "12", "--bias-tee"])
+        self.assertNotIn("--slides", args)
+        self.assertEqual(dablib.scan_command(tool, ["5C", "7A"], {"dabSyncSeconds": 2, "dabScanSeconds": 8}, 4),
+                         [tool, "--scan", "--channels", "5C,7A", "--events-fd", "4", "--sync-seconds", "2",
+                          "--scan-seconds", "8"])
         self.assertEqual(radiolib.pacat_command(48000, 2)[3:5], ["--rate=48000", "--channels=2"])
 
-    def test_parse_mux(self):
-        mux = dablib.parse_mux(json.dumps(MUX))
-        self.assertEqual(mux["ensemble"], {"id": "0x1188", "label": "NDR NDS", "ecc": "0xE0"})
-        ndr2 = mux["services"]["0xD882"]
-        self.assertEqual((ndr2["label"], ndr2["shortLabel"], ndr2["audio"], ndr2["dls"], ndr2["mot"]),
-                         ("NDR 2 NDS", "NDR 2", True, "Dreamer - Ozzy Osbourne", 5))
-        # audio by its component also without url_mp3; data services are no audio
-        self.assertTrue(mux["services"]["0xD383"]["audio"])
-        self.assertFalse(mux["services"]["0xE0D03188"]["audio"])
-        # before the sync: no ensemble
-        empty = dablib.parse_mux(json.dumps({"ensemble": {"id": "0x0000", "label": {"label": ""}}, "services": []}))
-        self.assertEqual(empty, {"ensemble": None, "services": {}, "noDevice": False})
-        self.assertEqual(dablib.parse_mux("garbage"), {"ensemble": None, "services": {}, "noDevice": False})
-        self.assertEqual(dablib.parse_mux("[]"), {"ensemble": None, "services": {}, "noDevice": False})
-        # real welle-cli 2.4 without a stick (Debian trixie): it keeps running with a "Null device"
-        nostick = ('{"ensemble":{"ecc":"0x00","id":"0x0000","label":{"fig2charset":"Undefined","fig2label":"",'
-                   '"fig2rfu":false,"label":"","shortlabel":""}},"messages":[],"receiver":{"hardware":{"gain":0.0,'
-                   '"name":"Null device"},"software":{"name":"welle.io","version":"2.4+ds"}},"services":[]}')
-        self.assertEqual(dablib.parse_mux(nostick), {"ensemble": None, "services": {}, "noDevice": True})
+    def test_events(self):
+        self.assertEqual(dablib.parse_event(b'{"event":"dls","sid":"0xd882","text":"Song"}'),
+                         {"event": "dls", "sid": "0xD882", "text": "Song"})
+        for line in ("", "debug output", "[1, 2]", '{"no":"event"}', '{"event": 3}'):
+            self.assertIsNone(dablib.parse_event(line), line)
+        self.assertEqual(dablib.ensemble_info({"id": "0x1188", "label": " NDR NDS ", "ecc": "0xe0"}),
+                         {"id": "0x1188", "label": "NDR NDS", "ecc": "0xE0"})
+        self.assertEqual(dablib.ensemble_info({"id": "0x1188", "label": "X", "ecc": ""})["ecc"], "")
+
+    def test_tools(self):
+        self.assertEqual(dablib.machine_arch("x86_64"), "amd64")
+        self.assertEqual(dablib.machine_arch("aarch64"), "arm64")
+        self.assertEqual(dablib.machine_arch("riscv64"), "riscv64")
+        stderr = ("/home/openhu/.openhu/plugins/org.openhu.radio/bin/arm64/openhu-dab: error while loading shared "
+                  "libraries: librtlsdr.so.0: cannot open shared object file: No such file or directory")
+        self.assertEqual(dablib.missing_library(stderr), "librtlsdr.so.0")
+        self.assertIsNone(dablib.missing_library("No supported devices found."))
+        self.assertEqual(dablib.library_package("libfaad.so.2"), "libfaad2")
+        self.assertEqual(dablib.library_package("libliquid.so.1"), "libliquid1")
+        self.assertEqual(dablib.library_package("libunknown.so.1"), "")
+        with tempfile.TemporaryDirectory() as plugin:
+            self.assertIsNone(dablib.native_tool(plugin, "openhu-dab", "arm64"))
+            os.makedirs(os.path.join(plugin, "bin", "arm64"))
+            path = os.path.join(plugin, "bin", "arm64", "openhu-dab")
+            with open(path, "w") as file:
+                file.write("#!/bin/sh\n")
+            self.assertIsNone(dablib.native_tool(plugin, "openhu-dab", "arm64"))  # not executable
+            os.chmod(path, 0o755)
+            self.assertEqual(dablib.native_tool(plugin, "openhu-dab", "arm64"), path)
+            self.assertIsNone(dablib.native_tool(plugin, "openhu-dab", "amd64"))
 
     def test_scan(self):
-        found_7a = dablib.scan_services("7A", dablib.parse_mux(json.dumps(MUX)))
-        # audio services with a label
+        result = dablib.ScanResult()
+        for line in EVENTS_7A:
+            event = dablib.parse_event(line)
+            if event:
+                result.add(event)
+        found_7a = result.found()["7A"]
+        # audio services with a label; the label may come before the ensemble
         self.assertEqual(set(found_7a), {"0xD882", "0xD383"})
         self.assertEqual(found_7a["0xD882"], {"label": "NDR 2 NDS", "shortLabel": "NDR 2", "channel": "7A",
                                               "ensemble": "0x1188", "ensembleLabel": "NDR NDS", "ecc": "0xE0"})
-        self.assertEqual(dablib.scan_services("5A", {"ensemble": None, "services": {}}), {})
+        self.assertEqual(result.count(), 2)
+        # services without an ensemble (lost during the scan) do not count
+        result.add({"event": "service", "channel": "9A", "sid": "0xD001", "label": "Lost", "audio": True})
+        self.assertNotIn("9A", result.found())
         found_5c = {"0xD210": dict(found_7a["0xD882"], label="Dlf", channel="5C"),
                     "0xD882": dict(found_7a["0xD882"], channel="5C", label="NDR 2 elsewhere")}
         services = dablib.merge_scan({"7A": found_7a, "5C": found_5c})
@@ -117,21 +134,7 @@ class DabLibTest(unittest.TestCase):
         self.assertEqual(radiolib.logo_keys(config, "dab", "0xD383"), ["0xD383", "0xD882"])
 
 
-class FakeWelleTest(unittest.TestCase):
-    def test_fake_mux_is_read_like_welle_cli(self):
-        stations = {"dab": [{"channel": "7A", "ensemble": "0x1188", "label": "NDR NDS", "services": [
-            {"sid": "0xD882", "label": "NDR 2 NDS", "shortLabel": "NDR 2"}]}]}
-        with tempfile.TemporaryDirectory() as directory:
-            path = os.path.join(directory, "stations.json")
-            with open(path, "w") as file:
-                json.dump(stations, file)
-            loaded = fakesdr.load_stations(path)
-        ensemble = fakesdr.find_ensemble(loaded, "7a")
-        mux = dablib.parse_mux(json.dumps(fakesdr.welle_mux(ensemble, {"0xD882": {"dls": "Song", "mot": 7}}, 1)))
-        self.assertEqual(mux["ensemble"]["id"], "0x1188")
-        self.assertEqual((mux["services"]["0xD882"]["dls"], mux["services"]["0xD882"]["mot"]), ("Song", 7))
-        self.assertIsNone(dablib.parse_mux(json.dumps(fakesdr.welle_mux(None, {}, 1)))["ensemble"])
-
+class FakeStationsTest(unittest.TestCase):
     def test_bundled_ensembles(self):
         path = os.path.join(TESTS, "..", "tools", "fake-sdr", "stations.json")
         stations = fakesdr.load_stations(path)
