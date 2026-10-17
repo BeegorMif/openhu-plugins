@@ -1,4 +1,5 @@
-# Plugin unit tests, translations, Python syntax and qmllint (Qt 6) on Debian trixie (the OpenHU target system).
+# Plugin unit tests, translations, Python syntax and qmllint (Qt 6) on Debian trixie (the OpenHU target system);
+# the plugins' native programs are built for amd64 and arm64 and started once (native.yml).
 name: Tests
 
 on:
@@ -8,6 +9,9 @@ on:
   workflow_dispatch:
 
 jobs:
+  native:
+    uses: ./.github/workflows/native.yml
+
   tests:
     runs-on: ubuntu-latest
     container: debian:trixie-slim
@@ -42,7 +46,7 @@ jobs:
           python3 -m py_compile common/*.py plugins/*/bin/*.py tools/openhu-repo-index tools/openhu-translations \
               plugins/org.openhu.radio/tools/fake-sdr/fakesdr.py plugins/org.openhu.radio/tools/fake-sdr/rtl_fm \
               plugins/org.openhu.radio/tools/fake-sdr/rtl_power plugins/org.openhu.radio/tools/fake-sdr/redsea \
-              plugins/org.openhu.radio/tools/fake-sdr/welle-cli
+              plugins/org.openhu.radio/tools/fake-sdr/openhu-dab
 
       # qmllint of OpenHU (Qt 6) with its OpenHU QML module; OpenHU branch of the same name, else main
       - name: QML

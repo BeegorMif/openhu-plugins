@@ -1,22 +1,49 @@
-# Rebuilds dist/ and index.json after changes to plugins/ or common/ and commits them.
+# Rebuilds dist/ and index.json after changes to plugins/ or common/ and commits them. Plugins with native programs
+# (manifest "arch": ["amd64", "arm64"]) get one archive per architecture; their programs are built by native.yml
+# (or taken from the published archive when their sources did not change) and their source archives are published
+# in dist/sources/.
 name: Repository index
 
 on:
   push:
     branches: [main]
-    paths: ["plugins/**", "common/**", "repo.json", "tools/**"]
+    paths: ["plugins/**", "common/**", "repo.json", "tools/**", ".github/workflows/index.yml",
+            ".github/workflows/native.yml"]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  native:
+    uses: ./.github/workflows/native.yml
+    with:
+      reuse: true
+
   index:
+    needs: native
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: /tmp/native
+          merge-multiple: true
+
+      - name: Native programs and their sources
+        run: |
+          for archive in /tmp/native/native-*.tar; do
+            tar -xf "$archive"
+          done
+          mkdir -p dist/sources
+          cp -n sources/* dist/sources/ 2>/dev/null || true
+          rm -rf sources
+
       - name: Build archives and index.json
         run: python3 tools/openhu-repo-index
+
       - name: Commit
         run: |
           git config user.name "github-actions[bot]"

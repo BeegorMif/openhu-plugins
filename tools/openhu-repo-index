@@ -2,6 +2,7 @@
 """Builds an OpenHU plugin repository: dist/<id>-<version>.tar.gz and index.json.
 
     tools/openhu-repo-index [repository]      (default: current directory)
+    tools/openhu-repo-index --native-arches   plugins and architectures with native tools ("<id> <arch>" lines)
 
 Layout:
     repo.json                   {"name": ..., "description": ..., "maintainer": ...}
@@ -9,6 +10,12 @@ Layout:
     common/                     shared files, copied into a plugin's lib/ when listed in its
                                 manifest ("shared": ["openhu.py"])
     plugins/<id>/i18n/          translations, <language>.ts and the compiled .qm (tools/openhu-translations)
+    plugins/<id>/bin/<arch>/    native programs of a plugin whose manifest names architectures ("arch": ["amd64",
+                                "arm64"]): one archive per architecture, dist/<id>-<version>-<arch>.tar.gz, with only
+                                its own bin/<arch>/ (built by plugins/<id>/native/build.sh, not committed). The
+                                index entry lists them under "archives" ({arch: {archive, sha256, size}}).
+    dist/sources/               source archives of the native programs (GPL: published next to the binaries), as
+                                listed in bin/<arch>/build-info.json ("sources")
 
 Archives are reproducible (sorted entries, fixed timestamps and owners), so unchanged plugins keep
 their checksum. Run it after every change and commit dist/ and index.json; OpenHU installs the
@@ -25,6 +32,7 @@ import re
 import sys
 import tarfile
 
+ARCHES = ("amd64", "arm64", "armhf", "i386")
 ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 VERSION_PATTERN = re.compile(r"^\d+(\.\d+)*$")
 REQUIRED = ("id", "name", "version")
@@ -47,11 +55,25 @@ def add_file(tar, path, arcname):
         tar.addfile(info, file)
 
 
-def build_archive(repo, plugin_dir, manifest):
+def native_arches(manifest):
+    """Architectures with an archive of their own; [] for "all" (one archive for every machine)."""
+    arches = manifest.get("arch", ["all"])
+    if not isinstance(arches, list) or not arches or "all" in arches:
+        return []
+    unknown = [arch for arch in arches if arch not in ARCHES]
+    if unknown:
+        fail("%s: unknown arch %s (%s)" % (manifest["id"], ", ".join(unknown), ", ".join(ARCHES)))
+    return arches
+
+
+def build_archive(repo, plugin_dir, manifest, arch=None):
+    """Reproducible tar.gz of a plugin; with arch only that architecture's bin/<arch>/ (no other one)."""
     plugin_id = manifest["id"]
+    bin_dir = os.path.join(plugin_dir, "bin")
     files = []
     for root, dirs, names in os.walk(plugin_dir):
-        dirs[:] = sorted(d for d in dirs if d not in ("__pycache__", ".git", "tests"))
+        dirs[:] = sorted(d for d in dirs if d not in ("__pycache__", ".git", "tests")
+                         and not (root == bin_dir and d in ARCHES and d != arch))
         for name in sorted(names):
             if name.endswith(".pyc"):
                 continue
@@ -74,8 +96,44 @@ def build_archive(repo, plugin_dir, manifest):
     return compressed.getvalue()
 
 
+def native_sources(plugin_dir, manifest, arch):
+    """Source archives the native programs of an architecture were built from (build-info.json "sources")."""
+    path = os.path.join(plugin_dir, "bin", arch, "build-info.json")
+    try:
+        with open(path) as file:
+            sources = json.load(file).get("sources", [])
+    except (OSError, ValueError):
+        sources = []
+    if not sources:
+        fail("%s: %s missing or without \"sources\": build the native programs with "
+             "plugins/%s/native/build.sh" % (manifest["id"], os.path.relpath(path), manifest["id"]))
+    return sources
+
+
+def write_archive(repo, name, data):
+    with open(os.path.join(repo, name), "wb") as file:
+        file.write(data)
+    return {"archive": name, "sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
+
+
+def load_manifests(repo):
+    plugins_dir = os.path.join(repo, "plugins")
+    for folder in sorted(os.listdir(plugins_dir)):
+        manifest_path = os.path.join(plugins_dir, folder, "manifest.json")
+        if os.path.isfile(manifest_path):
+            with open(manifest_path) as file:
+                yield folder, manifest_path, json.load(file)
+
+
 def main():
-    repo = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else ".")
+    args = sys.argv[1:]
+    if args and args[0] == "--native-arches":
+        repo = os.path.abspath(args[1] if len(args) > 1 else ".")
+        for folder, _, manifest in load_manifests(repo):
+            for arch in native_arches(manifest):
+                print(folder, arch)
+        return
+    repo = os.path.abspath(args[0] if args else ".")
     try:
         with open(os.path.join(repo, "repo.json")) as file:
             info = json.load(file)
@@ -88,14 +146,9 @@ def main():
 
     entries = []
     archives = set()
-    for folder in sorted(os.listdir(plugins_dir)):
+    sources = set()
+    for folder, manifest_path, manifest in load_manifests(repo):
         plugin_dir = os.path.join(plugins_dir, folder)
-        manifest_path = os.path.join(plugin_dir, "manifest.json")
-        if not os.path.isfile(manifest_path):
-            continue
-        with open(manifest_path) as file:
-            manifest = json.load(file)
-
         missing = [key for key in REQUIRED if not manifest.get(key)]
         if missing:
             fail("%s: missing %s" % (manifest_path, ", ".join(missing)))
@@ -109,11 +162,29 @@ def main():
             if not os.path.isfile(ts[:-3] + ".qm"):
                 fail("%s: %s.qm missing, run tools/openhu-translations" % (manifest["id"], os.path.relpath(ts, repo)[:-3]))
 
-        data = build_archive(repo, plugin_dir, manifest)
-        archive = "dist/%s-%s.tar.gz" % (manifest["id"], manifest["version"])
-        archives.add(os.path.basename(archive))
-        with open(os.path.join(repo, archive), "wb") as file:
-            file.write(data)
+        entry = {}
+        arches = native_arches(manifest)
+        if arches:
+            entry["archives"] = {}
+            for arch in arches:
+                native = os.path.join(plugin_dir, "bin", arch)
+                if not os.path.isdir(native) or not os.listdir(native):
+                    fail("%s: bin/%s/ is empty: build the native programs with plugins/%s/native/build.sh (the "
+                         "index workflow does that for every architecture)" % (manifest["id"], arch, folder))
+                for source in native_sources(plugin_dir, manifest, arch):
+                    if not os.path.isfile(os.path.join(dist_dir, "sources", source)):
+                        fail("%s: source archive dist/sources/%s missing (native/build.sh --sources dist/sources)"
+                             % (manifest["id"], source))
+                    sources.add(source)
+                archive = "dist/%s-%s-%s.tar.gz" % (manifest["id"], manifest["version"], arch)
+                archives.add(os.path.basename(archive))
+                entry["archives"][arch] = write_archive(repo, archive, build_archive(repo, plugin_dir, manifest, arch))
+                print("%-28s %-8s %s" % (manifest["id"], manifest["version"], archive))
+        else:
+            archive = "dist/%s-%s.tar.gz" % (manifest["id"], manifest["version"])
+            archives.add(os.path.basename(archive))
+            entry = write_archive(repo, archive, build_archive(repo, plugin_dir, manifest))
+            print("%-28s %-8s %s" % (manifest["id"], manifest["version"], archive))
 
         entries.append({
             "id": manifest["id"],
@@ -124,16 +195,21 @@ def main():
             # plugin API (OpenHU only installs plugins made for its version), 1 = Qt 5 era
             "api": manifest.get("api", 1),
             "permissions": manifest.get("permissions", []),
-            "archive": archive,
-            "sha256": hashlib.sha256(data).hexdigest(),
-            "size": len(data),
+            # Debian packages the plugin needs on the head unit (informational)
+            **({"packages": manifest["packages"]} if manifest.get("packages") else {}),
+            **entry,
         })
-        print("%-28s %-8s %s" % (manifest["id"], manifest["version"], archive))
 
     for name in os.listdir(dist_dir):
         if name.endswith(".tar.gz") and name not in archives:
             os.remove(os.path.join(dist_dir, name))
             print("removed dist/" + name)
+    # source archives no published binary was built from any more
+    sources_dir = os.path.join(dist_dir, "sources")
+    for name in sorted(os.listdir(sources_dir)) if os.path.isdir(sources_dir) else []:
+        if name not in sources:
+            os.remove(os.path.join(sources_dir, name))
+            print("removed dist/sources/" + name)
 
     index = {
         "name": info.get("name", os.path.basename(repo)),

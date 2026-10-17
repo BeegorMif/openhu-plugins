@@ -70,10 +70,18 @@ Item {
                 color: "#ffb74d"
                 font.pixelSize: Theme.fontSmall
             }
+            // what RDS / DAB needs and is missing: redsea or openhu-dab (both come with the plugin archive), one of
+            // their libraries ("librtlsdr.so.0 (librtlsdr0)"), sox, pacat
             Text {
-                visible: !radio.data.rdsAvailable && page.fm
-                text: qsTrId("org.openhu.radio.main.no_redsea")
+                visible: page.fm && !!radio.data.rdsMissing
+                text: qsTrId("org.openhu.radio.main.rds_missing").arg(radio.data.rdsMissing || "")
                 color: Theme.textDim
+                font.pixelSize: Theme.fontSmall
+            }
+            Text {
+                visible: page.dab && !!radio.data.dabMissing
+                text: qsTrId("org.openhu.radio.main.dab_missing").arg(radio.data.dabMissing || "")
+                color: "#ff8a80"
                 font.pixelSize: Theme.fontSmall
             }
         }
