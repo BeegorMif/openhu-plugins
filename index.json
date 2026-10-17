@@ -57,18 +57,39 @@
       "id": "org.openhu.radio",
       "name": "Radio",
       "version": "1.0.0",
-      "description": "FM/AM/DAB+ radio with an RTL-SDR USB stick: station scan, favorites and RDS (station name, radio text, PI; RDS needs redsea), station logos from your own image files; DAB+ with welle-cli (DLS, slideshow). For testing without a stick: a simulated stick with internet radio streams.",
+      "description": "FM/AM/DAB+ radio with an RTL-SDR USB stick: station scan, favorites, RDS (station name, radio text, PI) and DAB+ with DLS and slideshow (decoders included), station logos from your own image files. For testing without a stick: a simulated stick with internet radio streams.",
       "arch": [
-        "all"
+        "amd64",
+        "arm64"
       ],
       "api": 2,
       "permissions": [
         "audio",
         "usb"
       ],
-      "archive": "dist/org.openhu.radio-1.0.0.tar.gz",
-      "sha256": "7e47e9b44299d0365293e6b0416aa14887c8fdf883d62efa7d843a63b75c2b79",
-      "size": 47126
+      "packages": [
+        "rtl-sdr",
+        "pulseaudio-utils",
+        "sox",
+        "librtlsdr0",
+        "libfaad2",
+        "libfftw3-single3",
+        "libsamplerate0",
+        "libliquid1",
+        "libsndfile1"
+      ],
+      "archives": {
+        "amd64": {
+          "archive": "dist/org.openhu.radio-1.0.0-amd64.tar.gz",
+          "sha256": "d34ae6ad22590e10d0f3b80da1ace70478b339c3c20b4be37207389b7301d09c",
+          "size": 514068
+        },
+        "arm64": {
+          "archive": "dist/org.openhu.radio-1.0.0-arm64.tar.gz",
+          "sha256": "9c51998d3786b40dbb0da0fe61f2bb5a8f0bb5b3aadff47a78b462938e63b8ae",
+          "size": 476150
+        }
+      }
     },
     {
       "id": "org.openhu.swc",
