@@ -9,5 +9,6 @@
   "process": {"exec": "bin/vehicle.py", "restart": "on-failure"},
   "shared": ["openhu.py"],
   "androidAuto": {"sensors": ["speed", "parkingBrake", "gear", "fuel", "odometer", "engine", "climate", "compass",
-                              "drivingStatus", "info"]}
+                              "drivingStatus", "info"],
+                  "services": ["carControl"]}
 }

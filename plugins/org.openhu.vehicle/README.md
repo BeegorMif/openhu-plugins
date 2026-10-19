@@ -21,4 +21,18 @@ The values become `{"available": false}` when the CAN plugin reports its bus as 
 While Android Auto is connected, this plugin cannot be enabled, disabled, updated or removed: what OpenHU announces
 to the phone is fixed for a connection.
 
-Later: car controls for Android Auto (openhu#121) come from this plugin too.
+## Car controls
+
+The plugin provides the car controls of Android Auto's climate rail (openhu#121, OpenHU docs/api.md "Car controls"):
+`can.controls` of the CAN plugin becomes `vehicle.controls`, changes on the phone (`vehicle.control.set`) go to the CAN
+plugin as `can.control.set`, its `can.control.result` comes back as `vehicle.control.result`. The rail needs a video
+resolution above 720p.
+
+Without a car, a demo climate (temperatures, seat and steering wheel heating, A/C, fan, recirculation, defrost) takes
+every change:
+
+```sh
+openhu-cli api bus.emit '{"topic": "vehicle.command", "data": {"cmd": "demoControls", "value": true}}'
+```
+
+It is kept in the plugin's config and shows in Android Auto from the next connection (`false` switches it off).
