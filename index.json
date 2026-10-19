@@ -1,7 +1,7 @@
 {
   "name": "OpenHU Plugins",
-  "description": "Offizielle Plugins für OpenHU: CAN-Bus, Lenkradtasten, Rückfahrkamera, FM/AM-Radio",
-  "maintainer": "average-web-dev",
+  "description": "Official plugins for OpenHU: CAN bus, steering wheel keys, reverse camera, vehicle data logger, FM/AM/DAB+ radio",
+  "maintainer": "Leon Strauß <openhu.dev@alias.strauss-hub.de>",
   "api": 2,
   "plugins": [
     {
@@ -37,8 +37,8 @@
         "input"
       ],
       "archive": "dist/org.openhu.can-1.0.0.tar.gz",
-      "sha256": "343c8c2d99da9d22d1e16c85cde5a5f6c559d0450d55bafddfb8378ae5556ef2",
-      "size": 14878
+      "sha256": "85f5b01afb2928a1cb7a1ad47c0a0226d6e16c259beb91c5e828647d0727c51c",
+      "size": 14608
     },
     {
       "id": "org.openhu.logger",
@@ -92,13 +92,13 @@
       "archives": {
         "amd64": {
           "archive": "dist/org.openhu.radio-1.0.0-amd64.tar.gz",
-          "sha256": "fbff73126b617f10d49a774d65e8dfa7d9f46f53b075b2f3bb838fc7e615876b",
-          "size": 514167
+          "sha256": "6577781d68b4dcb75a0e1d85055d547390bb55dda0caa23a367d03c19fc581fc",
+          "size": 513553
         },
         "arm64": {
           "archive": "dist/org.openhu.radio-1.0.0-arm64.tar.gz",
-          "sha256": "5b11c19b6e14b18b6a54b3c27c34bdc22876ae81df288265c422a04f2b722293",
-          "size": 476247
+          "sha256": "f29f154e778ca539a2fe8f73d28941f27af91eac8499b69bbc69a586da7d5d87",
+          "size": 475795
         }
       }
     },
