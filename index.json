@@ -134,11 +134,14 @@
           "compass",
           "drivingStatus",
           "info"
+        ],
+        "services": [
+          "carControl"
         ]
       },
       "archive": "dist/org.openhu.vehicle-1.0.0.tar.gz",
-      "sha256": "023235fdb71b0dee51ad8ec6295c206776428472402670a8eccc73e37de654db",
-      "size": 6265
+      "sha256": "7ebdb489f73566f3b314de0ec0d280197b46e95d8525b158bd666930dacfce72",
+      "size": 7485
     }
   ]
 }
