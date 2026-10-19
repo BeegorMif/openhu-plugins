@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Simulated drive for testing the logger without a car: publishes vehicle.* like the CAN plugin would (speed,
+"""Simulated drive for testing the logger without a car: publishes vehicle.* like the vehicle plugin would (speed,
 engine, gear, temperatures), for development only.
 
     python3 tools/fake-drive.py [--hz 10] [--minutes 3] [--stop 0]

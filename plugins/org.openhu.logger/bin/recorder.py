@@ -10,7 +10,8 @@ Values are written only when they change:
   sample per period with the time the value arrived, or "update": every change as it arrives; signals without a rate
   on every change
 - booleans and texts (gear "drive", call state) right away
-Groups (switches in the config): vehicle (vehicle.* without vehicle.position), position (vehicle.position), openhu
+Groups (switches in the config): vehicle (vehicle.* without vehicle.position), position (vehicle.position), can (the
+CAN plugin's decoded values can.*, off by default: the vehicle plugin passes most of them on as vehicle.*), openhu
 (Android Auto, call state, media source; no numbers, names or titles) and health (headunit.*, read by the process).
 
 High-rate recordings (config "recording") are time windows in which their signals are written on every change,
@@ -47,7 +48,17 @@ MAX_BUFFER = 500_000
 UPDATE = "update"
 
 
+# the CAN plugin's own topics, not values
+CAN_PLUGIN_TOPICS = ("can.state", "can.monitor", "can.command", "can.signals")
+
+
+def is_vehicle_data(topic):
+    return topic.startswith("vehicle.") or (topic.startswith("can.") and topic not in CAN_PLUGIN_TOPICS)
+
+
 def group_of(name):
+    if name.startswith("can."):
+        return "can"
     if name.startswith("vehicle.position."):
         return "position"
     if name.startswith("vehicle."):
@@ -68,7 +79,7 @@ def flatten(topic, data):
     objects for vehicle data, the fixed fields for OpenHU topics."""
     fields = []
     for field, value in (data or {}).items():
-        if not topic.startswith("vehicle."):
+        if not is_vehicle_data(topic):
             known = OPENHU_SIGNALS.get((topic, field))
             if known is not None and loggable(value):
                 fields.append((known[0], value))
@@ -187,7 +198,7 @@ class Recorder:
     def on_value(self, name, value, t):
         if not self.enabled(group_of(name)):
             return
-        if name.startswith("vehicle.") and name not in self.store.signal_info:
+        if name.startswith(("vehicle.", "can.")) and name not in self.store.signal_info:
             self.store.describe(name, source=name.rsplit(".", 1)[0])
         known = name in self.values
         old = self.values.get(name)

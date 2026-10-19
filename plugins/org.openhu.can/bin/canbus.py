@@ -2,9 +2,12 @@
 
 A profile describes a car, see profiles/example.json:
 
-    signals   value in a frame -> EventBus topic field   (vehicle.speed.kmh, vehicle.gear.reverse, ...)
+    signals   value in a frame -> EventBus topic field   ("speed" -> can.speed.kmh, can.gear.reverse, ...)
     buttons   bits in a frame  -> action while pressed     (steering wheel buttons)
     triggers  signal value     -> action or API method     (reverse gear -> camera, lights -> night mode)
+
+The plugin only decodes: its values go to can.<topic>. The vehicle plugin (org.openhu.vehicle) maps them to the
+vehicle.* topics that OpenHU passes to Android Auto (openhu#123, openhu-plugins#29).
 """
 
 import struct
@@ -25,6 +28,23 @@ def parse_frame(raw):
         return None
     can_id &= CAN_EFF_MASK if can_id & CAN_EFF_FLAG else CAN_SFF_MASK
     return can_id, data[:min(length, 8)]
+
+
+# topics of the plugin itself, not available to profiles
+RESERVED = {"state", "monitor", "command", "signals"}
+
+
+def data_topic(topic):
+    """Profile topic -> EventBus topic: "speed" -> "can.speed". Profiles from before openhu-plugins#29 name
+    "vehicle.speed": read as "can.speed" too. None for an empty or reserved name."""
+    name = str(topic or "")
+    for prefix in ("vehicle.", "can."):
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+            break
+    if not name or name.split(".")[0] in RESERVED:
+        return None
+    return "can." + name
 
 
 def parse_number(value):
@@ -70,16 +90,27 @@ class Profile:
         self.name = spec.get("name", "")
         self.signals = {}
         self.buttons = {}
+        self.warnings = []
         for signal in spec.get("signals", []):
-            self.signals.setdefault(parse_number(signal["id"]), []).append(signal)
+            topic = self._topic(signal.get("topic"))
+            if topic is not None:
+                self.signals.setdefault(parse_number(signal["id"]), []).append(dict(signal, topic=topic))
         for button in spec.get("buttons", []):
             button = dict(button)
             button["mask"] = parse_number(button.get("mask", 0xFF))
             button["value"] = parse_number(button.get("value", button["mask"]))
             self.buttons.setdefault(parse_number(button["id"]), []).append(button)
-        self.triggers = spec.get("triggers", [])
+        self.triggers = [dict(trigger, topic=self._topic(trigger.get("topic"))) for trigger in spec.get("triggers", [])]
         self.values = {}      # topic -> {field: value}
         self._pressed = set()  # ids of pressed buttons
+
+    def _topic(self, topic):
+        result = data_topic(topic)
+        if result is None:
+            self.warnings.append("topic %r not allowed (empty or one of %s), ignored" % (topic, ", ".join(sorted(RESERVED))))
+        elif str(topic).startswith("vehicle."):
+            self.warnings.append("topic %s is read as %s, write %r in the profile" % (topic, result, result[4:]))
+        return result
 
     @property
     def ids(self):

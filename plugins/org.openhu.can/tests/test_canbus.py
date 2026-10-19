@@ -32,6 +32,26 @@ class ExtractTest(unittest.TestCase):
         self.assertIsNone(canbus.extract(data, {"byte": 3, "length": 16}))
 
 
+class TopicTest(unittest.TestCase):
+    def test_data_topic(self):
+        self.assertEqual(canbus.data_topic("speed"), "can.speed")
+        self.assertEqual(canbus.data_topic("can.speed"), "can.speed")
+        # profiles from before openhu-plugins#29
+        self.assertEqual(canbus.data_topic("vehicle.gear"), "can.gear")
+        for topic in ("", None, "state", "can.monitor", "vehicle.command", "signals.extra"):
+            self.assertIsNone(canbus.data_topic(topic), topic)
+
+    def test_old_profile(self):
+        profile = canbus.Profile({
+            "signals": [{"id": "0x100", "topic": "vehicle.speed", "field": "kmh", "byte": 0, "length": 8},
+                        {"id": "0x100", "topic": "state", "field": "x", "byte": 1, "length": 8}],
+            "triggers": [{"topic": "vehicle.speed", "field": "kmh", "equals": 0, "then": {"action": "a"}}]})
+        changed, _, commands = profile.feed(0x100, bytes([0, 7]))
+        self.assertEqual(changed, {"can.speed": {"kmh": 0}})
+        self.assertEqual(commands, [{"action": "a"}])
+        self.assertEqual(len(profile.warnings), 3)
+
+
 class ProfileTest(unittest.TestCase):
     def setUp(self):
         with open(PROFILE) as file:
@@ -39,8 +59,8 @@ class ProfileTest(unittest.TestCase):
 
     def test_signals_publish_only_changes(self):
         changed, _, _ = self.profile.feed(0x100, bytes([0x13, 0x88, 0x0B, 0xB8]))
-        self.assertEqual(changed["vehicle.speed"], {"kmh": 50.0})
-        self.assertEqual(changed["vehicle.engine"], {"rpm": 3000})
+        self.assertEqual(changed["can.speed"], {"kmh": 50.0})
+        self.assertEqual(changed["can.engine"], {"rpm": 3000})
         changed, _, _ = self.profile.feed(0x100, bytes([0x13, 0x88, 0x0B, 0xB8]))
         self.assertEqual(changed, {})
 

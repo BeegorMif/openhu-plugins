@@ -100,7 +100,8 @@ Item {
                             { key: "vehicle", label: qsTrId("org.openhu.logger.main.group_vehicle") },
                             { key: "openhu", label: qsTrId("org.openhu.logger.main.group_openhu") },
                             { key: "health", label: qsTrId("org.openhu.logger.main.group_health") },
-                            { key: "position", label: qsTrId("org.openhu.logger.main.group_position") }
+                            { key: "position", label: qsTrId("org.openhu.logger.main.group_position") },
+                            { key: "can", label: qsTrId("org.openhu.logger.main.group_can") }
                         ]
                         delegate: RowLayout {
                             Layout.fillWidth: true

@@ -3,7 +3,13 @@
 Liest einen CAN-Bus über SocketCAN (z. B. MCP2515-HAT am Raspberry Pi, USB-CAN-Adapter wie CANable)
 und übersetzt ihn mit einem Fahrzeugprofil:
 
-- `signals` → Topics wie `vehicle.speed` {kmh}, `vehicle.gear` {reverse}, `vehicle.lights` {headlights}
+- `signals` → Topics `can.<topic>`: `"topic": "speed"` → `can.speed` {kmh}, `can.gear` {reverse}, `can.lights`
+  {headlights}. Feldnamen wie bei den `vehicle.*`-Topics von OpenHU (docs/api.md), dann reicht das Plugin
+  „Fahrzeugdaten“ (`org.openhu.vehicle`) sie als `vehicle.*` an OpenHU und Android Auto weiter. Das CAN-Plugin selbst
+  liefert nichts an Android Auto (openhu#123). Alte Profile mit `vehicle.speed` werden als `can.speed` gelesen
+  (Warnung im Log); `state`, `monitor`, `command` und `signals` sind dem Plugin vorbehalten.
+- Kommen 3 s lang keine Frames (Bus still, Zündung aus), werden die Topics `{"available": false}`, bis wieder Frames
+  kommen.
 - `buttons` → Aktionen (`media.next`, `volume.up`, … siehe `input.actions`), mit Drücken/Loslassen
 - `triggers` → Aktion oder API-Methode bei einer Wertänderung (Rückwärtsgang → `camera.show`, Licht → `daynight.set`)
 
