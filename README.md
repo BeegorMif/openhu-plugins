@@ -1,7 +1,7 @@
 # OpenHU Plugins
 
-Plugin-Repository für [OpenHU](https://github.com/average-web-dev/openhu), im Store bereits als offizielle Quelle
-eingetragen:
+Plugin repository for [OpenHU](https://github.com/average-web-dev/openhu), already registered in the store as an
+official source:
 
 ```
 github average-web-dev/openhu-plugins main
@@ -9,84 +9,83 @@ github average-web-dev/openhu-plugins main
 
 | Plugin | |
 |---|---|
-| `org.openhu.can` | CAN-Bus über SocketCAN: Fahrzeugdaten (`vehicle.*`), Lenkradtasten, Rückwärtsgang → Kamera, Licht → Nachtmodus. Fahrzeugprofile in `profiles/`. |
-| `org.openhu.swc` | Lenkradtasten über Eingabegeräte (USB-Lenkradadapter, IR-Fernbedienungen, Multimedia-Tasten) mit Anlern-Modus |
-| `org.openhu.camera` | Rückfahrkamera mit Hilfslinien, im Inhaltsbereich oder als Vollbild, automatisch beim Rückwärtsgang |
-| `org.openhu.logger` | Fahrzeugdaten-Logger: zeichnet `vehicle.*`, Android-Auto-Zustand und Werte der Head-Unit auf dem Gerät auf (SQLite, komprimiert, Größenlimit), erkennt Fahrten, hochfrequente Aufnahmen; Schnittstelle für andere Plugins (Fahrten, Messwerte, Live-Werte) |
-| `org.openhu.radio` | FM/AM/DAB+-Radio mit RTL-SDR-Stick, Sendersuche, Favoriten, RDS (`redsea`), DAB+ mit DLS und Slideshow (eigener Decoder `openhu-dab`); ein Archiv pro Architektur (amd64, arm64) |
+| `org.openhu.can` | CAN bus via SocketCAN: vehicle data (`vehicle.*`), steering wheel keys, reverse gear → camera, lights → night mode. Vehicle profiles in `profiles/`. |
+| `org.openhu.swc` | Steering wheel keys via input devices (USB steering wheel adapters, IR remote controls, multimedia keys) with a learn mode |
+| `org.openhu.camera` | Reverse camera with guide lines, in the content area or full screen, automatically in reverse gear |
+| `org.openhu.logger` | Vehicle data logger: records `vehicle.*`, Android Auto state and head unit values on the device (SQLite, compressed, size limit), detects trips and high-rate recordings; interface for other plugins (trips, measurements, live values) |
+| `org.openhu.radio` | FM/AM/DAB+ radio with an RTL-SDR stick, station scan, favorites, RDS (`redsea`), DAB+ with DLS and slideshow (own decoder `openhu-dab`); one archive per architecture (amd64, arm64) |
 
-## Aufbau
-
-```
-repo.json                    Name/Beschreibung des Repositories
-plugins/<id>/manifest.json   ein Ordner pro Plugin (Format: openhu/docs/plugins.md)
-common/openhu.py             API-Client für Python-Plugins, wird über "shared" ins Archiv kopiert
-tools/openhu-repo-index      baut dist/*.tar.gz und index.json
-tools/openhu-translations    hält plugins/<id>/i18n/*.ts aktuell und kompiliert die .qm-Dateien
-index.json, dist/            generiert – nicht von Hand ändern
-```
-
-Nach jeder Änderung `tools/openhu-repo-index` ausführen und `dist/` + `index.json` mit committen
-(oder die GitHub-Action `.github/workflows/index.yml` erledigt das nach dem Push).
-Für ein neues Release die `version` im Manifest erhöhen, dann bietet der Store ein Update an.
-
-Versionen: alle Plugins starten mit dem ersten echten Release bei `1.0.0` (die 2.x-Versionen davor waren
-Entwicklungsstände). Der Store bietet nur höhere Versionen als Update an: Geräte mit einem 2.x-Stand die Plugins
-einmal entfernen und neu installieren.
-
-## Übersetzungen
-
-Die Plugins folgen der Sprache von OpenHU (Englisch, Deutsch; [openhu/docs/translations.md](https://github.com/average-web-dev/openhu/blob/main/docs/translations.md)).
-Im Code stehen nur Text-IDs mit der Plugin-ID davor, die Texte pro Sprache in `plugins/<id>/i18n/<sprache>.ts`,
-Englisch eingeschlossen:
-
-- QML: `qsTrId("org.openhu.radio.main.scan")`, Argumente mit `.arg()` (`%1`, `%2`)
-- Prozess (Meldungen, die er veröffentlicht): `texts = Texts()` aus `openhu.py`, `texts.tr("org.openhu.radio.error.no_stick")`
-  oder `texts.text(...)` für Meldungen, die gespeichert und nach einem Sprachwechsel (`ui.language`) neu
-  veröffentlicht werden (`texts.follow(api, publish_state)`). Er liest dieselben `.ts`-Dateien.
-- Name und Beschreibung in Dock und Store: `<id>.name`, `<id>.description`; im Manifest stehen die englischen.
-- Technische Meldungen des Systems (z. B. `can0: No such device`) bleiben, wie sie sind.
+## Layout
 
 ```
-tools/openhu-translations             # .ts-Dateien an den Code anpassen (neue IDs unübersetzt), .qm kompilieren
-linguist plugins/<id>/i18n/en.ts plugins/<id>/i18n/de.ts   # Texte schreiben (oder im Editor)
-tools/openhu-translations             # danach die .qm neu kompilieren und mit committen
-tools/openhu-translations --check     # wie in der CI: alles übersetzt, keine Texte ohne ID, .qm aktuell
+repo.json                    name/description of the repository
+plugins/<id>/manifest.json   one folder per plugin (format: openhu/docs/plugins.md)
+common/openhu.py             API client for Python plugins, copied into the archive via "shared"
+tools/openhu-repo-index      builds dist/*.tar.gz and index.json
+tools/openhu-translations    keeps plugins/<id>/i18n/*.ts up to date and compiles the .qm files
+index.json, dist/            generated – do not edit by hand
 ```
 
-Eine neue Sprache: `tools/openhu-translations --add fr`, übersetzen, `.ts` und `.qm` committen. Die `.qm`-Dateien
-werden mit committet, damit die Archive ohne Qt gebaut werden; zum Kompilieren braucht man `lrelease`
-(Debian: `qt6-l10n-tools`, oder im OpenHU-Container `docker/dev.sh shell`). Eine Zeile, deren Text absichtlich
-nicht übersetzt wird (Symbole, Beispiele), bekommt den Kommentar `// untranslated`.
+Run `tools/openhu-repo-index` after every change and commit `dist/` + `index.json` as well
+(or let the GitHub action `.github/workflows/index.yml` do it after the push).
+For a new release, raise the `version` in the manifest, then the store offers an update.
 
-## Eigenes Repository
+Versions: all plugins start with the first real release at `1.0.0` (the 2.x versions before were development
+states). The store only offers higher versions as an update: on devices with a 2.x state, remove the plugins and
+install them again once.
 
-Dieses Repository forken oder ein leeres mit gleichem Aufbau anlegen, Plugins unter `plugins/` ablegen,
-`tools/openhu-repo-index` ausführen, pushen und in OpenHU unter **Einstellungen → Apps & Store → Quellen**
-`github <benutzer>/<repo>` eintragen. Zum lokalen Entwickeln: Repo neben das OpenHU-Repository legen,
-`docker/run.sh` (im OpenHU-Repo) hängt es als `/opt/openhu-plugins` ein → Quelle `file /opt/openhu-plugins`.
+## Translations
 
-Ein Plugin-Prozess kann zum Entwickeln auch auf dem eigenen Rechner laufen und mit einer Head-Unit im Netzwerk
-sprechen: `PYTHONPATH=common OPENHU_API_URL=ws://<head-unit>:5520 OPENHU_API_TOKEN=<token> python3 plugins/<id>/bin/<name>.py` (Token unter
-**Einstellungen → Netzwerk → API-Token**, die API muss dort im Netzwerk freigegeben sein). Auf der Head-Unit selbst
-brauchen Plugins keinen Token.
+The plugins follow OpenHU's language (English, German; [openhu/docs/translations.md](https://github.com/average-web-dev/openhu/blob/main/docs/translations.md)).
+The code only contains text IDs prefixed with the plugin ID; the texts per language are in
+`plugins/<id>/i18n/<language>.ts`, English included:
 
-Plugin-Format, QML-Modul und ein vollständiges Beispiel: [openhu/docs/plugins.md](https://github.com/average-web-dev/openhu/blob/main/docs/plugins.md),
+- QML: `qsTrId("org.openhu.radio.main.scan")`, arguments with `.arg()` (`%1`, `%2`)
+- Process (messages it publishes): `texts = Texts()` from `openhu.py`, `texts.tr("org.openhu.radio.error.no_stick")`
+  or `texts.text(...)` for messages that are stored and published again after a language change (`ui.language`)
+  (`texts.follow(api, publish_state)`). It reads the same `.ts` files.
+- Name and description in the dock and the store: `<id>.name`, `<id>.description`; the manifest holds the English ones.
+- Technical system messages (e.g. `can0: No such device`) stay as they are.
+
+```
+tools/openhu-translations             # adapt the .ts files to the code (new IDs untranslated), compile the .qm files
+linguist plugins/<id>/i18n/en.ts plugins/<id>/i18n/de.ts   # write the texts (or in an editor)
+tools/openhu-translations             # then compile the .qm files again and commit them
+tools/openhu-translations --check     # as in CI: everything translated, no texts without an ID, .qm up to date
+```
+
+A new language: `tools/openhu-translations --add fr`, translate, commit the `.ts` and `.qm` files. The `.qm` files are
+committed so the archives can be built without Qt; compiling needs `lrelease` (Debian: `qt6-l10n-tools`, or in the
+OpenHU container with `docker/dev.sh shell`). A line whose text is intentionally not translated (symbols, examples)
+gets the comment `// untranslated`.
+
+## Your own repository
+
+Fork this repository or create an empty one with the same layout, put plugins under `plugins/`, run
+`tools/openhu-repo-index`, push, and add `github <user>/<repo>` in OpenHU under **Settings → Apps & Store → Sources**.
+For local development, put the repository next to the OpenHU repository; `docker/run.sh` (in the OpenHU repository)
+mounts it as `/opt/openhu-plugins` → source `file /opt/openhu-plugins`.
+
+For development, a plugin process can also run on your own machine and talk to a head unit on the network:
+`PYTHONPATH=common OPENHU_API_URL=ws://<head-unit>:5520 OPENHU_API_TOKEN=<token> python3 plugins/<id>/bin/<name>.py`
+(token under **Settings → Network → API token**; the API must be enabled for the network there). On the head unit
+itself, plugins need no token.
+
+Plugin format, QML module and a complete example: [openhu/docs/plugins.md](https://github.com/average-web-dev/openhu/blob/main/docs/plugins.md),
 API: [openhu/docs/api.md](https://github.com/average-web-dev/openhu/blob/main/docs/api.md).
 
 ## Tests
 
 ```
-python3 -m unittest discover -s tests          # openhu.py, Übersetzungen
+python3 -m unittest discover -s tests          # openhu.py, translations
 python3 -m unittest discover -s plugins/org.openhu.can/tests
 python3 -m unittest discover -s plugins/org.openhu.swc/tests
 python3 -m unittest discover -s plugins/org.openhu.radio/tests
 python3 -m unittest discover -s plugins/org.openhu.logger/tests
 ```
 
-## Hinweis
+## Notice
 
 > [!CAUTION]
-> Die Plugins wurden größtenteils von einer KI (Anthropic Claude) geschrieben und nur stichprobenartig getestet
-> (Kamera mit einer Webcam, CAN und Radio mit Unit-Tests, nicht im Fahrzeug). Nutzung auf eigene Gefahr, keine
-> Gewährleistung. Nicht während der Fahrt bedienen.
+> The plugins were mostly written by an AI (Anthropic Claude) and only tested by sampling (camera with a webcam, CAN
+> and radio with unit tests, not in a vehicle). Use at your own risk, no warranty. Do not operate while driving.

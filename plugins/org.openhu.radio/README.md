@@ -1,208 +1,208 @@
 # Radio (`org.openhu.radio`)
 
-FM/AM/DAB+-Radio mit einem RTL-SDR-USB-Stick: `rtl_fm` → `pacat`, RDS über `redsea` (mit `sox`), Sendersuche über
-`rtl_power`; DAB+ über den eigenen Decoder `openhu-dab`. `openhu-dab` und `redsea` kommen mit dem Plugin (ein Archiv
-pro Architektur, amd64 und arm64, gebaut für Debian trixie, siehe [Eigene Programme](#eigene-programme)).
+FM/AM/DAB+ radio with an RTL-SDR USB stick: `rtl_fm` → `pacat`, RDS via `redsea` (with `sox`), station scan via
+`rtl_power`; DAB+ via the own decoder `openhu-dab`. `openhu-dab` and `redsea` come with the plugin (one archive per
+architecture, amd64 and arm64, built for Debian trixie, see [Own programs](#own-programs)).
 
-**Pakete auf der Head-Unit** (Debian trixie; im OpenHU-OS-Image enthalten, auch in `packages` im Manifest):
+**Packages on the head unit** (Debian trixie; included in the OpenHU OS image, also in `packages` in the manifest):
 
-| Paket | wofür |
+| Package | What for |
 |---|---|
-| `rtl-sdr` | `rtl_fm`, `rtl_power` (FM/AM, Sendersuche) |
-| `pulseaudio-utils` | `pacat` (Ton) |
-| `sox` | RDS (Ton aus dem FM-Multiplex) |
-| `librtlsdr0`, `libfaad2`, `libfftw3-single3`, `libsamplerate0` | Bibliotheken von `openhu-dab` |
-| `libliquid1`, `libsndfile1` | Bibliotheken von `redsea` |
+| `rtl-sdr` | `rtl_fm`, `rtl_power` (FM/AM, station scan) |
+| `pulseaudio-utils` | `pacat` (sound) |
+| `sox` | RDS (audio from the FM multiplex) |
+| `librtlsdr0`, `libfaad2`, `libfftw3-single3`, `libsamplerate0` | libraries of `openhu-dab` |
+| `libliquid1`, `libsndfile1` | libraries of `redsea` |
 
-Fehlt eine Bibliothek, zeigt die Seite, welche (z. B. „DAB nicht verfügbar, es fehlt: librtlsdr.so.0 (librtlsdr0)“),
-ebenso `radio.state.dabMissing` / `rdsMissing`. Für den DVB-T-Treiber gilt wie immer: `dvb_usb_rtl28xxu` darf den
-Stick nicht belegen (im OS-Image gesperrt).
+If a library is missing, the page shows which one (e.g. "DAB not available, missing: librtlsdr.so.0 (librtlsdr0)"),
+and so do `radio.state.dabMissing` / `rdsMissing`. As always, the DVB-T driver `dvb_usb_rtl28xxu` must not claim
+the stick (blocked in the OS image).
 
-Status `radio.state`, Befehle `radio.command` und Konfiguration: siehe Kopf von [`bin/radio.py`](bin/radio.py).
-`radio.state.bands` enthält beide Bänder mit Sendern, Favoriten und den RDS-Namen und PI-Codes, die sich das Plugin
-pro Frequenz merkt (für Android Auto, openhu#75).
+State `radio.state`, commands `radio.command` and configuration: see the head of [`bin/radio.py`](bin/radio.py).
+`radio.state.bands` contains both bands with stations, favorites and the RDS names and PI codes the plugin remembers
+per frequency (for Android Auto, openhu#75).
 
-**RDS-PI:** Der PI-Code kennzeichnet ein Programm unabhängig von der Frequenz (NDR 2 ist `0xD382` auf 96,2 MHz in
-Hannover wie auf 97,8 MHz in Lingen). Das Plugin zeigt ihn in `radio.state.rds.pi`, merkt ihn sich pro Frequenz
-(`bands.fm.pis`) und stellt mit `{"cmd": "tunePi", "value": "0xD382"}` die stärkste bekannte Frequenz des Programms
-ein (Pegel aus dem letzten Suchlauf); kennt es keine, steht ein Fehler in `radio.state.error`. Android Auto kann
-Sender so über den PI wählen.
+**RDS PI:** The PI code identifies a program independently of the frequency (NDR 2 is `0xD382` on 96.2 MHz in
+Hannover as well as on 97.8 MHz in Lingen). The plugin shows it in `radio.state.rds.pi`, remembers it per frequency
+(`bands.fm.pis`) and, with `{"cmd": "tunePi", "value": "0xD382"}`, tunes to the strongest known frequency of the
+program (level from the last scan); if it knows none, an error appears in `radio.state.error`. This way Android Auto
+can select stations by their PI.
 
 ## DAB+
 
-Das Band `dab` (Knopf „DAB+“): ein Sender ist ein Dienst in einem Ensemble (Multiplex) auf einem Kanal 5A–13F, sein
-Schlüssel die Service-ID (`"0xD882"`) statt einer Frequenz (`frequency`, `stations`, `presets`, `tune`).
+The band `dab` (button "DAB+"): a station is a service in an ensemble (multiplex) on a channel 5A–13F, its key is the
+service ID (`"0xD882"`) instead of a frequency (`frequency`, `stations`, `presets`, `tune`).
 
-- **Empfang:** `openhu-dab --channel <Kanal> --service <sid> --rate 48000 --events-fd <fd> --slides <dir>`
-  (dazu `--gain`, `--ppm`, `--bias-tee` aus der Konfiguration). Ton: PCM (s16le, Stereo, 48 kHz) direkt aus
-  `openhu-dab` in `pacat`, kein MP3-Umweg, kein Netzwerk-Port. Ein Stick: der Bandwechsel beendet FM/AM bzw.
+- **Reception:** `openhu-dab --channel <channel> --service <sid> --rate 48000 --events-fd <fd> --slides <dir>`
+  (plus `--gain`, `--ppm`, `--bias-tee` from the configuration). Audio: PCM (s16le, stereo, 48 kHz) straight from
+  `openhu-dab` into `pacat`, no MP3 detour, no network port. One stick: switching the band ends FM/AM or
   `openhu-dab`.
-- **Metadaten:** Dienstname als `rds.ps`, DLS (Dynamic Label) als `rds.rt`, Ensemble in `radio.state.dab`.
-- **Slideshow (MOT SLS):** das Bild aus der Sendung im Thema `radio.slide` (`{band, station, image}`, Data-URL) und
-  als `media.metadata.cover` (sonst das Senderlogo). Nur Bilder, die der Sender selbst ausstrahlt.
-- **Sendersuche:** `openhu-dab --scan` geht alle Kanäle nacheinander durch: bis zu `dabSyncSeconds` (3 s) für ein
-  DAB-Signal, mit Signal höchstens `dabScanSeconds` (10 s) für Ensemble und Dienstnamen. Dauert einige Minuten;
-  Fortschritt in `radio.state.scan`, „Abbrechen“ (`stop`) behält die alte Liste. `dabChannels` in `config.json`
-  beschränkt die Suche auf bestimmte Kanäle (z. B. `["5C", "7A", "8C"]` in Hannover).
-- **Kein Stick / Stick belegt:** `openhu-dab` meldet `no-device` bzw. `device-busy` und endet; die Seite zeigt
-  „Kein RTL-SDR-Stick gefunden“ bzw. „Der RTL-SDR-Stick wird von einem anderen Programm benutzt“.
-- **Antennenspeisung:** `"biasTee": true` in `config.json` schaltet die Phantomspeisung des Sticks ein (RTL-SDR Blog
-  V3/V4 und kompatible) für aktive Antennen.
+- **Metadata:** service name as `rds.ps`, DLS (Dynamic Label) as `rds.rt`, ensemble in `radio.state.dab`.
+- **Slideshow (MOT SLS):** the picture from the broadcast in the topic `radio.slide` (`{band, station, image}`, data
+  URL) and as `media.metadata.cover` (otherwise the station logo). Only pictures the station broadcasts itself.
+- **Station scan:** `openhu-dab --scan` goes through all channels one after another: up to `dabSyncSeconds` (3 s) for
+  a DAB signal, with a signal at most `dabScanSeconds` (10 s) for ensemble and service names. Takes a few minutes;
+  progress in `radio.state.scan`, "Cancel" (`stop`) keeps the old list. `dabChannels` in `config.json` restricts the
+  scan to certain channels (e.g. `["5C", "7A", "8C"]` in Hannover).
+- **No stick / stick busy:** `openhu-dab` reports `no-device` or `device-busy` and exits; the page shows
+  "No RTL-SDR stick found" or "The RTL-SDR stick is used by another program".
+- **Antenna power:** `"biasTee": true` in `config.json` switches on the stick's phantom power (RTL-SDR Blog V3/V4 and
+  compatible) for active antennas.
 
-Der echte DAB-Empfang ist noch nicht mit einem Stick getestet (nur der simulierte Stick und der Start von
-`openhu-dab` ohne Stick); offen ist auch, wie viel CPU `openhu-dab` auf einem Raspberry Pi 4 neben der Android-Auto-
-Videodekodierung braucht (auf arm64 nutzt der Viterbi-Decoder noch keine NEON-Befehle).
+Real DAB reception has not been tested with a stick yet (only the simulated stick and the start of `openhu-dab`
+without a stick); it is also open how much CPU `openhu-dab` needs on a Raspberry Pi 4 next to the Android Auto video
+decoding (on arm64, the Viterbi decoder does not use NEON instructions yet).
 
 ### openhu-dab
 
-Eigener kleiner Empfänger auf der DAB-Bibliothek von [dab-cmdline](https://github.com/JvanKatwijk/dab-cmdline)
-(J. van Katwijk), Quelltext in [`native/openhu-dab/`](native/openhu-dab). Kein Netzwerk-Port; beendet sich sauber bei
-SIGTERM und mit dem Plugin (`PR_SET_PDEATHSIG`).
+Own small receiver on the DAB library of [dab-cmdline](https://github.com/JvanKatwijk/dab-cmdline)
+(J. van Katwijk), source in [`native/openhu-dab/`](native/openhu-dab). No network port; exits cleanly on
+SIGTERM and with the plugin (`PR_SET_PDEATHSIG`).
 
 ```
-openhu-dab --channel 7A [--service 0xD882] [Optionen]   Kanal einstellen, Ensemble/Dienste melden, Dienst spielen
-openhu-dab --scan [--channels 5C,7A] [Optionen]          Kanäle nacheinander absuchen, dann Ende
-  --gain DB|auto  --ppm N  --bias-tee  --device N  --rate N (Standard 48000, 0 = Rate des Dienstes)
-  --events-fd N (Standard 2)  --slides DIR (sonst base64 im Ereignis)  --sync-seconds N  --scan-seconds N
+openhu-dab --channel 7A [--service 0xD882] [options]   tune the channel, report ensemble/services, play a service
+openhu-dab --scan [--channels 5C,7A] [options]         scan the channels one after another, then exit
+  --gain DB|auto  --ppm N  --bias-tee  --device N  --rate N (default 48000, 0 = rate of the service)
+  --events-fd N (default 2)  --slides DIR (otherwise base64 in the event)  --sync-seconds N  --scan-seconds N
 ```
 
-Ton: PCM s16le Stereo auf stdout, auf `--rate` umgerechnet (libsamplerate), damit `pacat` bei 32-kHz-Diensten nicht
-neu starten muss. Ereignisse: eine JSON-Zeile pro Ereignis auf `--events-fd`:
+Audio: PCM s16le stereo on stdout, converted to `--rate` (libsamplerate), so `pacat` does not have to restart for
+32 kHz services. Events: one JSON line per event on `--events-fd`:
 
-| `event` | Felder |
+| `event` | Fields |
 |---|---|
-| `device` | `name`, `gain` (Zehntel dB, -1 automatisch), `biasTee`, `version` |
+| `device` | `name`, `gain` (tenths of dB, -1 automatic), `biasTee`, `version` |
 | `tuned` | `channel`, `frequency` (kHz) |
-| `sync` | `channel`, `synced` (DAB-Signal gefunden) |
-| `ensemble` | `channel`, `id` (`"0x1188"`), `label`, `ecc` (`"0xE0"`, leer solange unbekannt; kann ein zweites Mal kommen) |
+| `sync` | `channel`, `synced` (DAB signal found) |
+| `ensemble` | `channel`, `id` (`"0x1188"`), `label`, `ecc` (`"0xE0"`, empty while unknown; can come a second time) |
 | `service` | `channel`, `sid`, `label`, `shortLabel`, `audio`, `dabPlus`, `bitrate` |
-| `playing` | `sid`, `label`, `dabPlus`, `bitrate` – der Dienst läuft |
-| `audio` | `rate`, `channels` (2), `format` (`s16le`), `sourceRate` – vor dem ersten Ton und wenn sich die Rate ändert |
+| `playing` | `sid`, `label`, `dabPlus`, `bitrate` – the service is playing |
+| `audio` | `rate`, `channels` (2), `format` (`s16le`), `sourceRate` – before the first sound and when the rate changes |
 | `dls` | `sid`, `text` (Dynamic Label) |
-| `slide` | `sid`, `mime`, `name`, `size`, `path` (Datei in `--slides`, die letzten zwei bleiben) oder `data` (base64) |
-| `signal` | `synced`, `snr`, `fic` (FIC-Qualität in %), höchstens alle 5 s |
-| `scan` | `channel`, `index`, `total`, `found` – Beginn eines Kanals beim Suchlauf |
-| `channel` | `channel`, `ensemble` (bool), `services` (neue Dienste) – Ende eines Kanals |
-| `done` | `complete`, `ensembles`, `services` – Ende des Suchlaufs |
+| `slide` | `sid`, `mime`, `name`, `size`, `path` (file in `--slides`, the last two are kept) or `data` (base64) |
+| `signal` | `synced`, `snr`, `fic` (FIC quality in %), at most every 5 s |
+| `scan` | `channel`, `index`, `total`, `found` – start of a channel during the scan |
+| `channel` | `channel`, `ensemble` (bool), `services` (new services) – end of a channel |
+| `done` | `complete`, `ensembles`, `services` – end of the scan |
 | `error` | `code` (`no-device`, `device-busy`, `device-lost`, `device`, `slides`, …), `message` |
 
-Exit-Status: 0 fertig/beendet, 2 falsche Argumente, 3 Stick-Fehler.
+Exit status: 0 done/ended, 2 wrong arguments, 3 stick error.
 
-## Eigene Programme
+## Own programs
 
-`native/build.sh` baut `openhu-dab` und `redsea` für die Architektur, auf der es läuft (Debian trixie), nach
-`bin/<arch>/`, zusammen mit den Lizenzen und `build-info.json`. Die Quellen sind festgelegt und werden mit sha256
-geprüft (ein Quell-Tarball pro Projekt statt eines Git-Submoduls: kein Submodul-Checkout, ein Archiv, das so auch
-veröffentlicht wird):
+`native/build.sh` builds `openhu-dab` and `redsea` for the architecture it runs on (Debian trixie) into
+`bin/<arch>/`, together with the licenses and `build-info.json`. The sources are pinned and checked with sha256
+(one source tarball per project instead of a git submodule: no submodule checkout, and an archive that is published
+as it is):
 
-| Projekt | Version | Lizenz |
+| Project | Version | License |
 |---|---|---|
-| [dab-cmdline](https://github.com/JvanKatwijk/dab-cmdline) (DAB-Bibliothek) | Commit `8b82305` + [`patches/`](native/openhu-dab/patches) | GPL-2.0-or-later (einzelne Dateien: GPL ohne Version, kjmp2 zlib) |
+| [dab-cmdline](https://github.com/JvanKatwijk/dab-cmdline) (DAB library) | commit `8b82305` + [`patches/`](native/openhu-dab/patches) | GPL-2.0-or-later (individual files: GPL without version, kjmp2 zlib) |
 | [redsea](https://github.com/windytan/redsea) | 1.3.1 | MIT |
-| `openhu-dab` selbst | – | GPL-3.0-or-later |
+| `openhu-dab` itself | – | GPL-3.0-or-later |
 
-Der Workflow `native.yml` baut beides in einem `debian:trixie`-Container für amd64 und arm64 (GitHub-arm64-Runner)
-und startet die Programme einmal (`--version`, `--help`, Fehlerereignis ohne Stick). Nach dem Merge legt
-`index.yml` sie in die Archive `dist/org.openhu.radio-<version>-<arch>.tar.gz` und die Quell-Tarballs nach
-`dist/sources/` (GPL: die Quellen liegen neben den Programmen); unveränderte Quellen nehmen die Programme aus dem
-veröffentlichten Archiv, damit dessen Prüfsumme gleich bleibt. Das Plugin nimmt `bin/<arch>/openhu-dab` und
-`bin/<arch>/redsea` für die Architektur des Geräts, sonst (Entwicklung) die aus `PATH`.
+The workflow `native.yml` builds both in a `debian:trixie` container for amd64 and arm64 (GitHub arm64 runner) and
+starts the programs once (`--version`, `--help`, error event without a stick). After the merge, `index.yml` puts them
+into the archives `dist/org.openhu.radio-<version>-<arch>.tar.gz` and the source tarballs into `dist/sources/` (GPL:
+the sources are published next to the programs); unchanged sources take the programs from the published archive so
+that its checksum stays the same. The plugin uses `bin/<arch>/openhu-dab` and `bin/<arch>/redsea` for the device's
+architecture, otherwise (development) the ones from `PATH`.
 
-Bauabhängigkeiten: `build-essential cmake pkg-config ca-certificates curl patch librtlsdr-dev libfftw3-dev
+Build dependencies: `build-essential cmake pkg-config ca-certificates curl patch librtlsdr-dev libfftw3-dev
 libfaad-dev zlib1g-dev libsamplerate0-dev meson ninja-build libsndfile1-dev nlohmann-json3-dev libliquid-dev`.
 
-## Senderlogos
+## Station logos
 
-Das Plugin bringt keine Logos mit (sie sind Marken der Sender) und lädt nichts aus dem Internet. Eigene Bilder
-kommen in den Ordner `logos/` im Datenverzeichnis des Plugins (`~/.openhu/plugin-data/org.openhu.radio/logos/`,
-legt das Plugin beim Start an):
+The plugin does not bring any logos (they are trademarks of the stations) and does not load anything from the
+internet. Your own pictures go into the folder `logos/` in the plugin's data directory
+(`~/.openhu/plugin-data/org.openhu.radio/logos/`, created by the plugin at startup):
 
-| Dateiname | gilt für |
+| File name | applies to |
 |---|---|
-| `96.2.png`, `96,2.jpg` | UKW 96,2 MHz |
+| `96.2.png`, `96,2.jpg` | FM 96.2 MHz |
 | `1008.png` | MW 1008 kHz |
-| `NDR 2.png`, `ndr2.jpg` | den Sender, dessen RDS-Name (DAB: Dienstname) sich das Plugin gemerkt hat (Groß-/Kleinschreibung, Leer- und Satzzeichen zählen nicht) |
-| `0xD882.png` | den DAB-Dienst mit dieser Service-ID |
+| `NDR 2.png`, `ndr2.jpg` | the station whose RDS name (DAB: service name) the plugin has remembered (case, spaces and punctuation do not matter) |
+| `0xD882.png` | the DAB service with this service ID |
 
-Die Frequenz hat Vorrang vor dem Namen. PNG oder JPEG, höchstens 512 KB (256×256 Pixel reichen; OpenHU verkleinert
-sie für Android Auto auf 128×128). Neue oder geänderte Dateien erkennt das Plugin nach spätestens 10 Sekunden.
+The frequency takes precedence over the name. PNG or JPEG, at most 512 KB (256×256 pixels are enough; OpenHU scales
+them down to 128×128 for Android Auto). The plugin notices new or changed files after 10 seconds at the latest.
 
-Die Logos stehen als Data-URLs im Thema `radio.logos` (`{"fm": {"96.2": "data:image/png;base64,…"}, "am": {…}}`),
-nur bei Änderungen gesendet, damit `radio.state` klein bleibt. Sie erscheinen auf der Seite des Plugins, als Cover
-auf der Startseite (`media.metadata.cover`, solange das Radio spielt) und in Android Auto bei Senderliste,
-Favoriten und aktuellem Sender.
+The logos are in the topic `radio.logos` as data URLs (`{"fm": {"96.2": "data:image/png;base64,…"}, "am": {…}}`),
+sent only on changes so `radio.state` stays small. They appear on the plugin's page, as cover on the home page
+(`media.metadata.cover`, while the radio is playing) and in Android Auto in the station list, favorites and the
+current station.
 
-## Simulierter Stick (Test ohne Hardware)
+## Simulated stick (test without hardware)
 
-`tools/fake-sdr/` ersetzt `rtl_fm`, `rtl_power`, `redsea` und `openhu-dab`, zum Beispiel in der Entwicklungs-VM. Jeder Sender
-in einer Senderliste spielt einen **Internetradio-Stream** (oder eine Datei, oder einen Testton), als würde er über
-UKW empfangen:
+`tools/fake-sdr/` replaces `rtl_fm`, `rtl_power`, `redsea` and `openhu-dab`, for example in the development VM. It is
+a development tool only: the plugin itself never needs the internet. Each station in a station list plays an
+**internet radio stream** (or a file, or a test tone), as if it were received over FM:
 
-- Einstellen auf eine Frequenz aus der Liste spielt deren Stream, dazwischen leises Rauschen.
-- RDS: Sendername aus der Liste, Radiotext ist der aktuelle Titel aus dem Stream (Icecast-Metadaten).
-- Die Sendersuche findet genau die Sender der Liste.
-- Bricht der Stream ab, gibt es Rauschen, bis er wieder verbunden ist.
-- Fehler zum Testen: `"error": "no-device"` oder `"busy"` in der Senderliste.
+- Tuning to a frequency from the list plays its stream, in between there is quiet noise.
+- RDS: station name from the list, radio text is the current title from the stream (Icecast metadata).
+- The station scan finds exactly the stations of the list.
+- If the stream breaks off, there is noise until it is connected again.
+- Errors for testing: `"error": "no-device"` or `"busy"` in the station list.
 
-Die Oberfläche zeigt dann „Simulierter Stick“, `radio.state` hat `simulated: true`.
+The UI then shows "Simulated stick", `radio.state` has `simulated: true`.
 
-**Einschalten** (eins davon):
+**Switching it on** (one of these):
 
-- `"fakeSdr": true` in `config.json` im Datenverzeichnis des Plugins
+- `"fakeSdr": true` in `config.json` in the plugin's data directory
   (`~/.openhu/plugin-data/org.openhu.radio/config.json`),
-- Befehl `radio.command` `{"cmd": "fakeSdr", "value": true}` (wirkt sofort, wird gespeichert),
-- Umgebungsvariable `OPENHU_FAKE_SDR=1` für den Plugin-Prozess.
+- command `radio.command` `{"cmd": "fakeSdr", "value": true}` (takes effect immediately, is saved),
+- environment variable `OPENHU_FAKE_SDR=1` for the plugin process.
 
-Ein echter Stick wird dabei nicht angesprochen; ausschalten mit `false`.
+A real stick is not touched meanwhile; switch it off with `false`.
 
-**Braucht:** `ffmpeg` für Streams und Dateien (Testton-Sender gehen ohne), `sox` für RDS, `pacat` wie immer.
+**Needs:** `ffmpeg` for streams and files (test tone stations work without), `sox` for RDS, `pacat` as always.
 
-**Senderliste:** `fake-sdr-stations.json` im Datenverzeichnis des Plugins, sonst die mitgelieferte
-[`tools/fake-sdr/stations.json`](tools/fake-sdr/stations.json) (Raum Hannover: NDR, Deutschlandfunk, ffn, Radio 21,
-Radio Hannover, Leibniz.FM auf ihren echten UKW-Frequenzen mit ihren echten PI-Codes laut FMLIST, ein Testton auf
-87,6 MHz). Logos haben dort nur die beiden Testtöne (selbst gezeichnete Sinuskurven); Senderlogos zum Testen selbst in
-`logos/` legen. Pfad auch über `OPENHU_FAKE_SDR_STATIONS`.
+**Station list:** `fake-sdr-stations.json` in the plugin's data directory, otherwise the bundled
+[`tools/fake-sdr/stations.json`](tools/fake-sdr/stations.json) (Hannover area: NDR, Deutschlandfunk, ffn, Radio 21,
+Radio Hannover, Leibniz.FM on their real FM frequencies with their real PI codes according to FMLIST, a test tone on
+87.6 MHz). Only the two test tones have logos there (self-drawn sine waves); to test station logos, put them into
+`logos/` yourself. The path can also be set with `OPENHU_FAKE_SDR_STATIONS`.
 
 ```json
 {
   "fm": [
     {"frequency": 96.2, "name": "NDR 2", "ps": "NDR 2", "url": "https://icecast.ndr.de/ndr/ndr2/niedersachsen/mp3/128/stream.mp3"},
-    {"frequency": 87.6, "name": "Testton", "ps": "TESTTON", "tone": 440, "rt": "Simulierter Sender"}
+    {"frequency": 87.6, "name": "Test tone", "ps": "TESTTON", "tone": 440, "rt": "Simulated station"}
   ],
   "am": [
-    {"frequency": 1008, "name": "AM-Test", "tone": 800}
+    {"frequency": 1008, "name": "AM test", "tone": 800}
   ],
   "error": null
 }
 ```
 
-| Feld | |
+| Field | |
 |---|---|
-| `frequency` | MHz (FM, 0,1er-Raster) bzw. kHz (AM) |
-| `name` | Name, Standard für RDS |
-| `ps` | RDS-Sendername, 8 Zeichen (Standard: `name`) |
-| `pi` | RDS-PI-Code, z. B. `"0xD382"` (Standard: aus dem Namen abgeleitet); gleicher PI auf zwei Frequenzen = ein Programm auf zwei Sendern |
-| `url` | Stream (MP3, AAC, HLS, Icecast, auch `.m3u`/`.pls`) oder lokale Datei (läuft in Schleife) |
-| `tone` | statt `url`: Sinuston in Hz, ohne Netzwerk und ohne `ffmpeg` |
-| `rt` | fester RDS-Radiotext (Standard: Titel aus dem Stream, sonst `name`) |
-| `level` | Pegel für die Sendersuche in dB (Standard -10, Rauschen -40, unter -30 wird der Sender nicht gefunden) |
-| `logo` | Senderlogo, lokale PNG/JPEG-Datei (relativ zur Senderliste); eine Datei in `logos/` hat Vorrang |
+| `frequency` | MHz (FM, 0.1 grid) or kHz (AM) |
+| `name` | name, default for RDS |
+| `ps` | RDS station name, 8 characters (default: `name`) |
+| `pi` | RDS PI code, e.g. `"0xD382"` (default: derived from the name); the same PI on two frequencies = one program on two transmitters |
+| `url` | stream (MP3, AAC, HLS, Icecast, also `.m3u`/`.pls`) or local file (loops) |
+| `tone` | instead of `url`: sine tone in Hz, without network and without `ffmpeg` |
+| `rt` | fixed RDS radio text (default: title from the stream, otherwise `name`) |
+| `level` | level for the station scan in dB (default -10, noise -40, below -30 the station is not found) |
+| `logo` | station logo, local PNG/JPEG file (relative to the station list); a file in `logos/` takes precedence |
 
-Die Streams in der Liste sind die öffentlichen Web-Streams der Sender, zum Anhören beim Testen. Eigene Listen
-bitte nur mit Streams, die man so nutzen darf.
+The streams in the list are the stations' public web streams, to listen to while testing. Please only use your own
+lists with streams you may use this way.
 
-**DAB+ simuliert:** Abschnitt `dab` der Senderliste – Ensembles mit Kanal, Ensemble-ID, Name und Diensten
-(`sid`, `label`, `shortLabel`, `url` oder `tone`, `dls` fest statt des Stream-Titels, `slides` als Slideshow-Bilder
-im Wechsel alle `slideSeconds`, `logo`). Mitgeliefert: die Hannoveraner Ensembles 5C (DR Deutschland), 7A (NDR NDS)
-und 8C (NI HANNOVER K8C) mit echten Kanälen, Ensemble- und Service-IDs laut DABLIST (sender-tabelle.de) und den
-Web-Streams der Sender; 12D „OpenHU Test“ ist erfunden (Testton, selbst gezeichnete Testbilder als Slideshow). Das
-simulierte `openhu-dab` hat dieselben Optionen und Ereignisse wie das echte und braucht `ffmpeg` (Ton als PCM); bei
-`"error"` meldet es `no-device` bzw. `device-busy` wie das echte.
+**Simulated DAB+:** section `dab` of the station list – ensembles with channel, ensemble ID, name and services
+(`sid`, `label`, `shortLabel`, `url` or `tone`, `dls` fixed instead of the stream title, `slides` as slideshow
+pictures alternating every `slideSeconds`, `logo`). Included: the Hannover ensembles 5C (DR Deutschland), 7A (NDR NDS)
+and 8C (NI HANNOVER K8C) with real channels, ensemble and service IDs according to DABLIST (sender-tabelle.de) and the
+stations' web streams; 12D "OpenHU Test" is made up (test tone, self-drawn test pictures as slideshow). The simulated
+`openhu-dab` has the same options and events as the real one and needs `ffmpeg` (audio as PCM); with `"error"` it
+reports `no-device` or `device-busy` like the real one.
 
-**Grenzen:** getestet wird alles oberhalb der Hardware (Plugin, Oberfläche, Favoriten, Suchlauf, RDS-Anzeige,
-später die Android-Auto-Anbindung). Nicht simuliert: echter Empfang, Verstärkung, `ppm`, AM-Direct-Sampling,
-echte RDS-Dekodierung. Dafür einen echten Stick in die VM durchreichen:
-`scripts/run-vm.sh --phone 0bda:2838` (openhu-os; auf dem Host vorher `dvb_usb_rtl28xxu` entladen).
+**Limits:** everything above the hardware is tested (plugin, UI, favorites, scan, RDS display, later the Android Auto
+integration). Not simulated: real reception, gain, `ppm`, AM direct sampling, real RDS decoding. For that, pass a real
+stick through to the VM: `scripts/run-vm.sh --phone 0bda:2838` (openhu-os; unload `dvb_usb_rtl28xxu` on the host
+first).
 
 ## Tests
 
@@ -210,5 +210,5 @@ echte RDS-Dekodierung. Dafür einen echten Stick in die VM durchreichen:
 python3 -m unittest discover -s plugins/org.openhu.radio/tests
 ```
 
-Tests mit `ffmpeg`/`sox` werden übersprungen, wenn die Programme fehlen. Die Plugin-Tests nutzen das simulierte
-`openhu-dab`; das echte wird in CI gebaut und ohne Stick gestartet (`native.yml`).
+Tests with `ffmpeg`/`sox` are skipped if the programs are missing. The plugin tests use the simulated
+`openhu-dab`; the real one is built in CI and started without a stick (`native.yml`).
