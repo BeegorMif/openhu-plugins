@@ -1,5 +1,5 @@
 {
   "name": "OpenHU Plugins",
-  "description": "Offizielle Plugins für OpenHU: CAN-Bus, Lenkradtasten, Rückfahrkamera, FM/AM-Radio",
-  "maintainer": "average-web-dev"
+  "description": "Official plugins for OpenHU: CAN bus, steering wheel keys, reverse camera, vehicle data logger, FM/AM/DAB+ radio",
+  "maintainer": "Leon Strauß <openhu.dev@alias.strauss-hub.de>"
 }
