@@ -17,8 +17,8 @@
         "camera"
       ],
       "archive": "dist/org.openhu.camera-1.0.0.tar.gz",
-      "sha256": "c824ea4053b20d18c45f70d00d6d521f964127e540a4fef594d9cd98c5a526fc",
-      "size": 9292
+      "sha256": "3d2c03507f6a81cf3842e4314b77a7b175d75c0c3a920b98fd2376abf9fec687",
+      "size": 9304
     },
     {
       "id": "org.openhu.can",
@@ -34,8 +34,8 @@
         "input"
       ],
       "archive": "dist/org.openhu.can-1.0.0.tar.gz",
-      "sha256": "2085d3955da93287ac5f431bb5ba500d8c20f080f0bae8645dd54325905c7e9f",
-      "size": 11369
+      "sha256": "09a76315ca5a5fed52fe45027ea7cbbb166ebeaab18c1685bd0874c96006e1ba",
+      "size": 12423
     },
     {
       "id": "org.openhu.logger",
@@ -50,8 +50,8 @@
         "storage"
       ],
       "archive": "dist/org.openhu.logger-1.0.0.tar.gz",
-      "sha256": "02dc9368ba64a665e283fe18e5e08353a9c1bf306f2047d494ef1fca69460510",
-      "size": 40692
+      "sha256": "3ecf566b5f53158ad0520dd24c61d97ae4daabc04b2060c28a91f12ef38f8521",
+      "size": 41063
     },
     {
       "id": "org.openhu.radio",
@@ -111,6 +111,34 @@
       "archive": "dist/org.openhu.swc-1.0.0.tar.gz",
       "sha256": "e793f22c0d901159013772d7b9b2bf7e8ffb0fa018ab2b135f3d9a51d5d93366",
       "size": 9690
+    },
+    {
+      "id": "org.openhu.vehicle",
+      "name": "Vehicle data",
+      "version": "1.0.0",
+      "description": "Passes the vehicle data of the CAN plugin (speed, gear, parking brake, fuel …) to Android Auto and to the vehicle topics of OpenHU.",
+      "arch": [
+        "all"
+      ],
+      "api": 2,
+      "permissions": [],
+      "androidAuto": {
+        "sensors": [
+          "speed",
+          "parkingBrake",
+          "gear",
+          "fuel",
+          "odometer",
+          "engine",
+          "climate",
+          "compass",
+          "drivingStatus",
+          "info"
+        ]
+      },
+      "archive": "dist/org.openhu.vehicle-1.0.0.tar.gz",
+      "sha256": "023235fdb71b0dee51ad8ec6295c206776428472402670a8eccc73e37de654db",
+      "size": 6265
     }
   ]
 }
