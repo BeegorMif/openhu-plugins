@@ -16,9 +16,12 @@
       "permissions": [
         "camera"
       ],
+      "recommends": [
+        "org.openhu.vehicle"
+      ],
       "archive": "dist/org.openhu.camera-1.0.0.tar.gz",
-      "sha256": "3d2c03507f6a81cf3842e4314b77a7b175d75c0c3a920b98fd2376abf9fec687",
-      "size": 9304
+      "sha256": "bc1c81d59bd42fda51e79b3740449dcca259c3901780f31cf2172daac955fbe6",
+      "size": 9319
     },
     {
       "id": "org.openhu.can",
@@ -49,9 +52,12 @@
       "permissions": [
         "storage"
       ],
+      "recommends": [
+        "org.openhu.vehicle"
+      ],
       "archive": "dist/org.openhu.logger-1.0.0.tar.gz",
-      "sha256": "3ecf566b5f53158ad0520dd24c61d97ae4daabc04b2060c28a91f12ef38f8521",
-      "size": 41063
+      "sha256": "eb7f14aede751acfc7b56a03e7eb200b2517df8b0a673101a774f875a32b5256",
+      "size": 41080
     },
     {
       "id": "org.openhu.radio",
@@ -139,9 +145,12 @@
           "carControl"
         ]
       },
+      "requires": {
+        "org.openhu.can": "1.0.0"
+      },
       "archive": "dist/org.openhu.vehicle-1.0.0.tar.gz",
-      "sha256": "7ebdb489f73566f3b314de0ec0d280197b46e95d8525b158bd666930dacfce72",
-      "size": 7485
+      "sha256": "bb42cad837c763327e303932fa760b646007f63b6f3947b3b1e9707339a7f573",
+      "size": 7501
     }
   ]
 }
