@@ -63,6 +63,10 @@
         <source></source>
         <translation>Station with PI %1 unknown</translation>
     </message>
+    <message id="org.openhu.radio.main.all_stations">
+        <source></source>
+        <translation>All stations</translation>
+    </message>
     <message id="org.openhu.radio.main.cancel">
         <source></source>
         <translation>Cancel</translation>
@@ -71,13 +75,33 @@
         <source></source>
         <translation>DAB unavailable, missing: %1</translation>
     </message>
+    <message id="org.openhu.radio.main.favorite">
+        <source></source>
+        <translation>Favorite</translation>
+    </message>
+    <message id="org.openhu.radio.main.favorites">
+        <source></source>
+        <translation>Favorites</translation>
+    </message>
+    <message id="org.openhu.radio.main.next_station">
+        <source></source>
+        <translation>Next station</translation>
+    </message>
     <message id="org.openhu.radio.main.no_stations">
         <source></source>
         <translation>No stations yet – start a scan</translation>
     </message>
+    <message id="org.openhu.radio.main.no_stations_am">
+        <source></source>
+        <translation>Keep stations with the heart</translation>
+    </message>
     <message id="org.openhu.radio.main.play">
         <source></source>
         <translation>Play</translation>
+    </message>
+    <message id="org.openhu.radio.main.previous_station">
+        <source></source>
+        <translation>Previous station</translation>
     </message>
     <message id="org.openhu.radio.main.rds_missing">
         <source></source>
@@ -98,6 +122,18 @@
     <message id="org.openhu.radio.main.simulated_stick">
         <source></source>
         <translation>Simulated stick</translation>
+    </message>
+    <message id="org.openhu.radio.main.stations">
+        <source></source>
+        <translation>Stations</translation>
+    </message>
+    <message id="org.openhu.radio.main.step_down">
+        <source></source>
+        <translation>Lower frequency (hold for faster)</translation>
+    </message>
+    <message id="org.openhu.radio.main.step_up">
+        <source></source>
+        <translation>Higher frequency (hold for faster)</translation>
     </message>
     <message id="org.openhu.radio.main.stop">
         <source></source>

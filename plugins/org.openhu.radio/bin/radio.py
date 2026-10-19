@@ -16,6 +16,7 @@ State: "radio.state" {band, frequency, unit, playing, scanning, scan, rds: {pi, 
           ("librtlsdr.so.0 (librtlsdr0)") or a program ("pacat (pulseaudio-utils)")
 Commands: bus.emit "radio.command" {cmd: "play"|"stop"|"toggle"|"tune"|"step"|"band"|"preset"|"savePreset"|
           "removePreset"|"scan"|"fakeSdr"|"tunePi", value}
+          savePreset: value is the station to keep (frequency / service id), without one the station that plays
           tunePi: value is a PI code ("0xD382"): tunes FM to the strongest remembered frequency with it (level of the
           last scan), an error if no frequency is known for it
           band "dab": tune/presets with service ids; step/seek go through the station list; scan runs in the
@@ -535,9 +536,11 @@ class RadioPlugin(dab.DabMixin):
             save_config(self.config)
             await (self.start() if self.playing else self.publish_state())
         elif command == "savePreset":
+            # value: a station of the list (the heart of a row), else the one that plays
+            frequency = self.frequency if value is None else radiolib.clamp_frequency(self.band, value)
             presets = self.config["presets"].setdefault(self.band, [])
-            if self.frequency not in presets:
-                presets.append(self.frequency)
+            if frequency is not None and frequency not in presets:
+                presets.append(frequency)
                 presets.sort()
             save_config(self.config)
             await self.publish_state()
