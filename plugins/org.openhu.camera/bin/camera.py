@@ -5,7 +5,7 @@ Config (plugin data dir, editable on the plugin page), published as "camera.conf
     device        camera device id ("" = default camera)
     mirror        mirror the picture horizontally
     guides        draw parking guide lines
-    autoReverse   show the camera while vehicle.gear.reverse is true (CAN plugin)
+    autoReverse   show the camera while vehicle.gear.reverse is true (vehicle plugin, from the CAN bus)
     display       "page" (default): camera page inside the shell, "overlay": full screen above everything;
                   with "page" OpenHU returns to the previous page when the camera is hidden
 Commands: bus.emit "camera.command" {cmd: "show"|"hide"|"toggle"|"set", key, value}

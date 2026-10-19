@@ -16,7 +16,7 @@ S = 1000
 MIN = 60 * S
 CONFIG = {
     "enabled": True,
-    "groups": {"vehicle": True, "openhu": True, "health": True, "position": False},
+    "groups": {"vehicle": True, "openhu": True, "health": True, "position": False, "can": False},
     "interval": 5, "rates": {"vehicle.*": 5}, "stopMinutes": 10, "engineOffSeconds": 60,
     "recording": {"keys": ["vehicle.*"], "triggers": [], "preSeconds": 5, "postSeconds": 10, "maxSeconds": 600,
                   "limitMB": 256},
@@ -145,6 +145,18 @@ class RecorderTest(unittest.TestCase):
         self.config["groups"]["health"] = True
         r.tick(15 * S, {"headunit.cpu_temp_c": 50})
         self.assertEqual(self.raw("headunit.cpu_temp_c"), [(15 * S, 50)])
+
+    def test_can_group(self):
+        """The CAN plugin's decoded values (openhu-plugins#29): own group, off by default; its state is no value"""
+        r = self.recorder
+        r.on_topic("can.speed", {"kmh": 50}, 0)
+        r.flush()
+        self.assertEqual(self.store.sample_count(), 0)
+        self.config["groups"]["can"] = True
+        r.on_topic("can.gear", {"reverse": True}, S)
+        r.on_topic("can.state", {"connected": True, "framesPerSecond": 100}, S)
+        self.assertEqual(self.raw("can.gear.reverse"), [(S, 1)])
+        self.assertEqual(self.store.sample_count(), 1)
 
     def test_trip_written_and_announced(self):
         r = self.recorder

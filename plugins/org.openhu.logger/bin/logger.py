@@ -5,7 +5,7 @@ use the interface below (README.md).
 
 Config (plugin data dir, config.json; the page and "set" change it):
     enabled           logging on (default off: nothing is recorded until the user switches it on)
-    groups            {"vehicle": true, "openhu": true, "health": true, "position": false}
+    groups            {"vehicle": true, "openhu": true, "health": true, "position": false, "can": false}
     interval          seconds between readings of the head unit values (1-60, default 5)
     rates             {"<signal or pattern>": seconds (0.1-3600) or "update"}, default {"vehicle.*": 5}, e.g.
                       {"vehicle.engine.*": "update", "vehicle.speed.kmh": 1}; the most specific pattern wins;
@@ -51,7 +51,7 @@ log = logging.getLogger("logger")
 
 DEFAULTS = {
     "enabled": False,
-    "groups": {"vehicle": True, "openhu": True, "health": True, "position": False},
+    "groups": {"vehicle": True, "openhu": True, "health": True, "position": False, "can": False},
     "interval": 5,
     "rates": {"vehicle.*": 5},
     "limitMB": 1024,
@@ -66,7 +66,7 @@ DEFAULTS = {
 SETTABLE = {
     "enabled": bool, "interval": (1, 60), "limitMB": (50, 1_048_576), "maxAgeDays": (0, 36_500),
     "stopMinutes": (1, 240), "engineOffSeconds": (0, 3600), "flushSeconds": (5, 600),
-    "groups.vehicle": bool, "groups.openhu": bool, "groups.health": bool, "groups.position": bool,
+    "groups.vehicle": bool, "groups.openhu": bool, "groups.health": bool, "groups.position": bool, "groups.can": bool,
     "recording.limitMB": (10, 1_048_576), "recording.preSeconds": (0, 60), "recording.postSeconds": (0, 3600),
     "recording.maxSeconds": (1, 86_400),
 }
@@ -170,6 +170,7 @@ class LoggerPlugin:
         self.stopping = asyncio.Event()
 
         self.api.on("vehicle.*", self.on_topic)
+        self.api.on("can.*", self.on_topic)
         for topic in OPENHU_TOPICS:
             self.api.on(topic, self.on_topic)
         self.api.on(METADATA_TOPIC, self.on_signals_info)

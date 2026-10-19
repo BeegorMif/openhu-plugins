@@ -23,6 +23,10 @@
         <source></source>
         <translation>Fehler: %1</translation>
     </message>
+    <message id="org.openhu.logger.main.group_can">
+        <source></source>
+        <translation>CAN-Bus-Werte (can.*)</translation>
+    </message>
     <message id="org.openhu.logger.main.group_health">
         <source></source>
         <translation>Head-Unit (Temperatur, Last, freier Speicher)</translation>
