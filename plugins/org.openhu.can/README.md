@@ -12,6 +12,12 @@ und übersetzt ihn mit einem Fahrzeugprofil:
   kommen.
 - `buttons` → Aktionen (`media.next`, `volume.up`, … siehe `input.actions`), mit Drücken/Loslassen
 - `triggers` → Aktion oder API-Methode bei einer Wertänderung (Rückwärtsgang → `camera.show`, Licht → `daynight.set`)
+- `controls` → Klima-Bedienelemente für Android Auto (openhu#121), über das Plugin „Fahrzeugdaten“: `read` liest den
+  aktuellen Wert wie ein Signal, `write` schickt eine Änderung vom Handy als Frame (Vorlage `data` als Hex, der Wert
+  an `byte`/`bit`/`length` mit `scale`/`offset`/`map` wie beim Lesen). Namen, Bereiche und `min`/`max`/`step` wie bei
+  `vehicle.controls` in OpenHUs docs/api.md; `driverSide` (`left`/`right`) und `units` (`celsius`/`fahrenheit`) auf
+  oberster Ebene. Höchstens ein Frame pro Bedienelement alle 100 ms, nur auf Bedienung hin; `"whileDriving": false`
+  lehnt Änderungen während der Fahrt ab. Ohne `read` gilt der geschriebene Wert als gesetzt.
 
 Eigene Profile: `<data>/plugin-data/org.openhu.can/profiles/<name>.json`, dann auf der Plugin-Seite wählen.
 Der CAN-Monitor auf der Plugin-Seite zeigt alle empfangenen IDs – Taste drücken bzw. Gang einlegen und
