@@ -40,6 +40,17 @@ class VehicleTest(unittest.TestCase):
         self.assertEqual(forwarder.check(vehicle.STATE_TIMEOUT + 1), [("vehicle.speed", {"available": False})])
         self.assertEqual(forwarder.check(vehicle.STATE_TIMEOUT + 2), [])
 
+    def test_demo_controls(self):
+        demo = vehicle.demo_controls()
+        names = [(entry["name"], vehicle.area_of(entry)) for entry in demo["properties"]]
+        self.assertIn(("temperature", "driver"), names)
+        self.assertIn(("steeringWheelHeating", "global"), names)
+        self.assertIn(("defrost", "windshield"), names)
+        self.assertTrue(vehicle.apply_set(demo, {"name": "temperature", "area": "passenger", "value": 23.5}))
+        self.assertEqual(demo["properties"][1]["value"], 23.5)
+        self.assertTrue(vehicle.apply_set(demo, {"name": "steeringWheelHeating", "area": "global", "value": 2}))
+        self.assertFalse(vehicle.apply_set(demo, {"name": "temperature", "area": "rear", "value": 20}))
+
 
 if __name__ == "__main__":
     unittest.main()
