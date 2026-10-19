@@ -10,6 +10,10 @@ Config (plugin data dir, editable on the plugin page):
     profile     vehicle profile, profiles/<name>.json (plugin) or <data dir>/profiles/<name>.json (own)
     monitor     publish all received frames as "can.monitor" (to find the ids of a car)
 Commands: bus.emit "can.command" {cmd: "interface"|"profile"|"monitor"|"reload", value}
+
+Car controls (profile "controls", openhu#121): can.controls with the values read from the bus; can.control.set
+{name, area, value, requestId, restricted} (from the vehicle plugin) sends the profile's write frame, at most one
+per control every WRITE_INTERVAL, and answers with can.control.result {requestId, ok, error}.
 """
 
 import asyncio
@@ -32,6 +36,7 @@ log = logging.getLogger("can")
 DEFAULTS = {"interface": "can0", "profile": "example", "monitor": False}
 PUBLISH_INTERVAL = 0.1
 QUIET_SECONDS = 3
+WRITE_INTERVAL = 0.1
 
 
 def profile_dirs():
@@ -70,7 +75,9 @@ class CanPlugin:
         self.last_frame = 0.0    # time.monotonic() of the last frame
         self.quiet = False       # topics were marked unavailable
         self.reopen = asyncio.Event()
+        self.last_write = {}     # (name, area) -> time.monotonic()
         self.api.on("can.command", self.on_command)
+        self.api.on("can.control.set", self.on_control_set)
         self.load_profile()
 
     def load_profile(self):
@@ -80,6 +87,8 @@ class CanPlugin:
             log.info("profile %s: %s", self.config["profile"], self.profile.name)
             for warning in self.profile.warnings:
                 log.warning("profile %s: %s", self.config["profile"], warning)
+            # the controls are announced to Android Auto at the next connection of the phone
+            self.pending["can.controls"] = self.profile.controls_state()
         except (OSError, ValueError, KeyError) as error:
             self.profile = None
             self.profile_error = str(error)
@@ -188,6 +197,35 @@ class CanPlugin:
         for topic in self.profile.values:
             await self.api.safe(self.api.publish(topic, available=False))
 
+    async def on_connect(self):
+        if self.profile is not None:
+            await self.api.safe(self.api.publish("can.controls", **self.profile.controls_state()))
+        await self.publish_state()
+
+    async def on_control_set(self, topic, data):
+        name, area, request_id = data.get("name"), data.get("area"), data.get("requestId")
+        error = None
+        if self.profile is None:
+            error = "no profile"
+        elif self.sock is None:
+            error = "CAN bus not connected"
+        elif time.monotonic() - self.last_write.get((name, area), 0) < WRITE_INTERVAL:
+            error = "busy"
+        else:
+            frame, error = self.profile.set_control(name, area, data.get("value"), bool(data.get("restricted")))
+            if frame is not None:
+                self.last_write[(name, area)] = time.monotonic()
+                try:
+                    self.sock.send(canbus.pack_frame(*frame))
+                    log.info("control %s %s = %s: 0x%X %s", name, area, data.get("value"), frame[0], frame[1].hex(" "))
+                    self.pending["can.controls"] = self.profile.controls_state()
+                except OSError as send_error:
+                    error = str(send_error)
+        if error:
+            log.info("control %s %s: %s", name, area, error)
+        await self.api.safe(self.api.emit("can.control.result", requestId=request_id, ok=error is None,
+                                          **({"error": error} if error else {})))
+
     async def publish_state(self):
         await self.api.safe(self.api.publish(
             "can.state",
@@ -223,7 +261,7 @@ class CanPlugin:
         await self.publish_state()
 
     async def main(self):
-        await asyncio.gather(self.api.run(self.publish_state), self.can_loop(), self.publish_loop(), self.state_loop())
+        await asyncio.gather(self.api.run(self.on_connect), self.can_loop(), self.publish_loop(), self.state_loop())
 
 
 if __name__ == "__main__":
