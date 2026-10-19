@@ -62,4 +62,13 @@ Item {
         color: Theme.background
         opacity: 0.72
     }
+
+    // dithering: faint noise breaks up the bands of the dark gradient on displays with fewer colours (16/18 bit
+    // panels, the VM's RGB565 output)
+    Image {
+        anchors.fill: parent
+        source: "noise.png"
+        fillMode: Image.Tile
+        opacity: 0.04
+    }
 }
