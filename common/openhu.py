@@ -12,7 +12,9 @@
     texts.follow(api, on_change)                       # ...also after a switch
     texts.tr("org.example.speed.error.no_sensor")      # i18n/<language>.ts, like qsTrId() in QML
 
-Environment (set by OpenHU): OPENHU_API_URL, OPENHU_PLUGIN_ID, OPENHU_PLUGIN_DIR, OPENHU_DATA_DIR, OPENHU_LANGUAGE.
+Environment (set by OpenHU): OPENHU_API_URL, OPENHU_PLUGIN_ID, OPENHU_PLUGIN_DIR, OPENHU_DATA_DIR, OPENHU_LANGUAGE,
+OPENHU_PLUGIN_TOKEN (the process logs in with it, so its values count as the plugin's: only plugins that declare
+"androidAuto" in their manifest feed Android Auto, openhu#123).
 OPENHU_API_TOKEN (optional, not set by OpenHU): API token, only needed from another computer, e.g. while developing
 a plugin against a head unit (OPENHU_API_URL=ws://<head unit>:5520). On the head unit itself no token is needed.
 """
@@ -140,6 +142,7 @@ class OpenHU:
     def __init__(self, url=None, token=None):
         self.url = url or os.environ.get("OPENHU_API_URL", "ws://127.0.0.1:5520")
         self.token = token or os.environ.get("OPENHU_API_TOKEN")
+        self.plugin_token = os.environ.get("OPENHU_PLUGIN_TOKEN")
         self._ws = None
         self._next_id = 0
         self._pending = {}
@@ -192,7 +195,9 @@ class OpenHU:
                     self._ws = ws
                     log.info("connected to %s", self.url)
                     # answered with {"type":"auth"}; messages are handled in order, so no need to wait for it
-                    if self.token:
+                    if self.plugin_token:
+                        await ws.send(json.dumps({"type": "auth", "pluginToken": self.plugin_token}))
+                    elif self.token:
                         await ws.send(json.dumps({"type": "auth", "token": self.token}))
                     topics = sorted({pattern for pattern, _ in self._handlers})
                     if topics:

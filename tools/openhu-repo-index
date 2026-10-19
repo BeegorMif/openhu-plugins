@@ -197,6 +197,8 @@ def main():
             "permissions": manifest.get("permissions", []),
             # Debian packages the plugin needs on the head unit (informational)
             **({"packages": manifest["packages"]} if manifest.get("packages") else {}),
+            # what it provides to Android Auto (openhu#123), shown in the store before installing
+            **({"androidAuto": manifest["androidAuto"]} if manifest.get("androidAuto") else {}),
             **entry,
         })
 
