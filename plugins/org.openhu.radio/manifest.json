@@ -9,6 +9,7 @@
   "process": {"exec": "bin/radio.py", "restart": "on-failure"},
   "permissions": ["audio", "usb"],
   "shared": ["openhu.py"],
+  "androidAuto": {"services": ["radio"]},
   "packages": ["rtl-sdr", "pulseaudio-utils", "sox", "librtlsdr0", "libfaad2", "libfftw3-single3", "libsamplerate0",
                "libliquid1", "libsndfile1"]
 }

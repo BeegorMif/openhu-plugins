@@ -33,7 +33,7 @@ class RepoIndexTest(unittest.TestCase):
         native = os.path.join(self.repo, "plugins", "org.example.native")
         write(os.path.join(native, "manifest.json"), json.dumps(
             {"id": "org.example.native", "name": "Native", "version": "1.2.0", "api": 2, "arch": ["amd64", "arm64"],
-             "shared": ["openhu.py"], "packages": ["librtlsdr0"]}))
+             "shared": ["openhu.py"], "packages": ["librtlsdr0"], "androidAuto": {"services": ["radio"]}}))
         write(os.path.join(native, "bin", "main.py"), "print()\n", 0o755)
         write(os.path.join(native, "native", "build.sh"), "#!/bin/sh\n", 0o755)
         write(os.path.join(native, "tests", "test_x.py"), "\n")
@@ -67,6 +67,8 @@ class RepoIndexTest(unittest.TestCase):
         self.assertNotIn("archive", native)
         self.assertEqual(native["arch"], ["amd64", "arm64"])
         self.assertEqual(native["packages"], ["librtlsdr0"])
+        self.assertEqual(native["androidAuto"], {"services": ["radio"]})
+        self.assertNotIn("androidAuto", plain)
         self.assertEqual(sorted(native["archives"]), ["amd64", "arm64"])
         for arch, other in (("amd64", "arm64"), ("arm64", "amd64")):
             entry = native["archives"][arch]

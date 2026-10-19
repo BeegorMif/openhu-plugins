@@ -99,5 +99,50 @@ class TextsTest(unittest.TestCase):
         self.assertEqual(texts.tr("x.main.hello", 1, 2), "Hallo 1, 2 & 1")
 
 
+
+@unittest.skipUnless(importlib.util.find_spec("websockets"), "websockets not installed")
+class LoginTest(unittest.TestCase):
+    """The first message: the plugin token if OpenHU started the process (openhu#123), else the API token."""
+
+    def first_message(self, environment):
+        import json
+        import openhu
+        import websockets
+        received = []
+
+        async def main():
+            async def handler(ws, *args):
+                received.append(json.loads(await ws.recv()))
+
+            async with websockets.serve(handler, "127.0.0.1", 0) as server:
+                port = server.sockets[0].getsockname()[1]
+                old = {key: os.environ.get(key) for key in environment}
+                os.environ.update({key: value for key, value in environment.items() if value is not None})
+                try:
+                    api = openhu.OpenHU("ws://127.0.0.1:%d" % port)
+                finally:
+                    for key, value in old.items():
+                        if value is None:
+                            os.environ.pop(key, None)
+                        else:
+                            os.environ[key] = value
+                task = asyncio.create_task(api.run())
+                for _ in range(100):
+                    if received:
+                        break
+                    await asyncio.sleep(0.02)
+                task.cancel()
+
+        asyncio.run(main())
+        return received[0] if received else None
+
+    def test_plugin_token(self):
+        self.assertEqual(self.first_message({"OPENHU_PLUGIN_TOKEN": "p", "OPENHU_API_TOKEN": "t"}),
+                         {"type": "auth", "pluginToken": "p"})
+
+    def test_api_token(self):
+        self.assertEqual(self.first_message({"OPENHU_PLUGIN_TOKEN": None, "OPENHU_API_TOKEN": "t"}),
+                         {"type": "auth", "token": "t"})
+
 if __name__ == "__main__":
     unittest.main()
