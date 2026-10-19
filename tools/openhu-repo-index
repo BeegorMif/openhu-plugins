@@ -199,6 +199,9 @@ def main():
             **({"packages": manifest["packages"]} if manifest.get("packages") else {}),
             # what it provides to Android Auto (openhu#123), shown in the store before installing
             **({"androidAuto": manifest["androidAuto"]} if manifest.get("androidAuto") else {}),
+            # other plugins it needs / works with (openhu#104): the store installs requirements first
+            **({"requires": manifest["requires"]} if manifest.get("requires") else {}),
+            **({"recommends": manifest["recommends"]} if manifest.get("recommends") else {}),
             **entry,
         })
 

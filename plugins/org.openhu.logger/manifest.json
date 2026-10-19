@@ -8,5 +8,6 @@
   "ui": {"page": "qml/Main.qml", "icon": "icon.svg"},
   "process": {"exec": "bin/logger.py", "restart": "on-failure"},
   "permissions": ["storage"],
-  "shared": ["openhu.py"]
+  "shared": ["openhu.py"],
+  "recommends": ["org.openhu.vehicle"]
 }

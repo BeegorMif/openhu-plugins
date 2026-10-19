@@ -8,6 +8,7 @@
   "ui": {"icon": "icon.svg"},
   "process": {"exec": "bin/vehicle.py", "restart": "on-failure"},
   "shared": ["openhu.py"],
+  "requires": {"org.openhu.can": "1.0.0"},
   "androidAuto": {"sensors": ["speed", "parkingBrake", "gear", "fuel", "odometer", "engine", "climate", "compass",
                               "drivingStatus", "info"],
                   "services": ["carControl"]}
