@@ -71,6 +71,10 @@
         <source></source>
         <translation>Cancel</translation>
     </message>
+    <message id="org.openhu.radio.main.choose_station">
+        <source></source>
+        <translation>Choose a station</translation>
+    </message>
     <message id="org.openhu.radio.main.dab_missing">
         <source></source>
         <translation>DAB unavailable, missing: %1</translation>

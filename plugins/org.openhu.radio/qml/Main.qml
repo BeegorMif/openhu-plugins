@@ -294,8 +294,9 @@ Item {
                 overline: page.dab ? page.detailOf(page.shown)
                     : page.currentName ? page.formatFrequency(page.shown)
                     : page.am ? "AM" : "FM"  // untranslated: band names
-                title: page.dab ? (page.currentName || String(page.shown || "–"))
-                    : page.currentName || page.formatFrequency(page.shown) || "–"
+                // DAB before the first station: a hint instead of an empty title
+                title: page.shown === null ? qsTrId("org.openhu.radio.main.choose_station")
+                    : page.currentName || (page.dab ? String(page.shown) : page.formatFrequency(page.shown))
                 text: !page.previewing && page.playing ? (page.rds.rt || "").trim() : ""
                 error: page.previewing ? "" : radio.data.error || ""
                 dimmed: !page.playing && !page.previewing
