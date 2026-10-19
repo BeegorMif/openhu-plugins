@@ -34,8 +34,8 @@
         "input"
       ],
       "archive": "dist/org.openhu.can-1.0.0.tar.gz",
-      "sha256": "09a76315ca5a5fed52fe45027ea7cbbb166ebeaab18c1685bd0874c96006e1ba",
-      "size": 12423
+      "sha256": "343c8c2d99da9d22d1e16c85cde5a5f6c559d0450d55bafddfb8378ae5556ef2",
+      "size": 14878
     },
     {
       "id": "org.openhu.logger",
