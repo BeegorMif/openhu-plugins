@@ -17,8 +17,8 @@
         "camera"
       ],
       "archive": "dist/org.openhu.camera-1.0.0.tar.gz",
-      "sha256": "3a8f79ca52840aec5baece268bbee9978ac3a69fd9c70e3a851ec67e2aa36968",
-      "size": 9199
+      "sha256": "c824ea4053b20d18c45f70d00d6d521f964127e540a4fef594d9cd98c5a526fc",
+      "size": 9292
     },
     {
       "id": "org.openhu.can",
@@ -34,8 +34,8 @@
         "input"
       ],
       "archive": "dist/org.openhu.can-1.0.0.tar.gz",
-      "sha256": "429165a436246405291ace3152a4cef560a5dc8033f20a94a1abe07790331aa3",
-      "size": 11271
+      "sha256": "2085d3955da93287ac5f431bb5ba500d8c20f080f0bae8645dd54325905c7e9f",
+      "size": 11369
     },
     {
       "id": "org.openhu.logger",
@@ -50,8 +50,8 @@
         "storage"
       ],
       "archive": "dist/org.openhu.logger-1.0.0.tar.gz",
-      "sha256": "356224367435214f850a4839c1df71ff441c580f22aff56db0e33a5bc46c954e",
-      "size": 40591
+      "sha256": "02dc9368ba64a665e283fe18e5e08353a9c1bf306f2047d494ef1fca69460510",
+      "size": 40692
     },
     {
       "id": "org.openhu.radio",
@@ -78,16 +78,21 @@
         "libliquid1",
         "libsndfile1"
       ],
+      "androidAuto": {
+        "services": [
+          "radio"
+        ]
+      },
       "archives": {
         "amd64": {
           "archive": "dist/org.openhu.radio-1.0.0-amd64.tar.gz",
-          "sha256": "d34ae6ad22590e10d0f3b80da1ace70478b339c3c20b4be37207389b7301d09c",
-          "size": 514068
+          "sha256": "fbff73126b617f10d49a774d65e8dfa7d9f46f53b075b2f3bb838fc7e615876b",
+          "size": 514167
         },
         "arm64": {
           "archive": "dist/org.openhu.radio-1.0.0-arm64.tar.gz",
-          "sha256": "9c51998d3786b40dbb0da0fe61f2bb5a8f0bb5b3aadff47a78b462938e63b8ae",
-          "size": 476150
+          "sha256": "5b11c19b6e14b18b6a54b3c27c34bdc22876ae81df288265c422a04f2b722293",
+          "size": 476247
         }
       }
     },
@@ -104,8 +109,8 @@
         "input"
       ],
       "archive": "dist/org.openhu.swc-1.0.0.tar.gz",
-      "sha256": "8b4013cd7a5cb09c04332f8630c6717ff9d59f609aadad21cc828e36560fa4ec",
-      "size": 9591
+      "sha256": "e793f22c0d901159013772d7b9b2bf7e8ffb0fa018ab2b135f3d9a51d5d93366",
+      "size": 9690
     }
   ]
 }
