@@ -1,0 +1,30 @@
+{
+  "name": "BMW F20",
+  "description": "BMW F20 CAN signals derived from can.js; verify on vehicle",
+  "signals": [
+    {"id": "0x1A1", "topic": "vehicle.speed", "field": "mph", "byte": 2, "length": 16, "endian": "little", "scale": 0.01},
+    {"id": "0x2CA", "topic": "vehicle.climate", "field": "outsideTemp", "byte": 0, "length": 8, "scale": 0.5, "offset": -40},
+    {"id": "0x2E6", "topic": "vehicle.climate", "field": "temperatureC", "byte": 7, "length": 8, "scale": 0.5},
+    {"id": "0x2E6", "topic": "vehicle.climate", "field": "fanSpeed", "byte": 5, "length": 8},
+    {"id": "0x202", "topic": "vehicle.dashboard", "field": "brightnessRaw", "byte": 0, "length": 8},
+    {"id": "0x3B4", "topic": "vehicle.battery", "field": "engineStatusByte", "byte": 2, "length": 8},
+    {"id": "0x330", "topic": "vehicle.fuel", "field": "averageFuelLitres", "byte": 3, "length": 8},
+    {"id": "0x349", "topic": "vehicle.fuel", "field": "leftFuelRaw", "byte": 0, "length": 16, "endian": "little", "scale": 0.00625},
+    {"id": "0x349", "topic": "vehicle.fuel", "field": "rightFuelRaw", "byte": 2, "length": 16, "endian": "little", "scale": 0.00625},
+    {"id": "0x21A", "topic": "vehicle.lights", "field": "dipBeam", "byte": 0, "bit": 0, "length": 1},
+    {"id": "0x21A", "topic": "vehicle.lights", "field": "mainBeam", "byte": 0, "bit": 1, "length": 1},
+    {"id": "0x21A", "topic": "vehicle.lights", "field": "sideLights", "byte": 0, "bit": 2, "length": 1},
+    {"id": "0x21A", "topic": "vehicle.lights", "field": "brakeLights", "byte": 0, "bit": 7, "length": 1},
+    {"id": "0x21A", "topic": "vehicle.lights", "field": "reverseLights", "byte": 1, "bit": 0, "length": 1},
+    {"id": "0x200", "topic": "vehicle.ignition", "field": "terminal15", "byte": 2, "bit": 2, "length": 1},
+    {"id": "0x200", "topic": "vehicle.ignition", "field": "terminalR", "byte": 2, "bit": 4, "length": 1},
+    {"id": "0x3A7", "topic": "vehicle.drivingMode", "field": "dtcOff", "byte": 6, "bit": 2, "length": 1},
+    {"id": "0x3F9", "topic": "vehicle.battery", "field": "stopStartActive", "byte": 6, "bit": 1, "length": 1}
+  ],
+  "buttons": [],
+  "triggers": [
+    {"topic": "vehicle.lights", "field": "dipBeam", "equals": true,
+     "then": {"method": "daynight.set", "params": {"night": true}},
+     "else": {"method": "daynight.set", "params": {"night": false}}}
+  ]
+}
