@@ -1,10 +1,10 @@
 # OpenHU Plugins
 
-Plugin repository for [OpenHU](https://github.com/average-web-dev/openhu), already registered in the store as an
+Plugin repository for [OpenHU](https://github.com/BeegorMif/openhu), registered in the store as an
 official source:
 
 ```
-github average-web-dev/openhu-plugins main
+github BeegorMif/openhu-plugins main
 ```
 
 | Plugin | |
@@ -36,7 +36,7 @@ install them again once.
 
 ## Translations
 
-The plugins follow OpenHU's language (English, German; [openhu/docs/translations.md](https://github.com/average-web-dev/openhu/blob/main/docs/translations.md)).
+The plugins follow OpenHU's language (English, German; [openhu/docs/translations.md](https://github.com/BeegorMif/openhu/blob/main/docs/translations.md)).
 The code only contains text IDs prefixed with the plugin ID; the texts per language are in
 `plugins/<id>/i18n/<language>.ts`, English included:
 
@@ -71,8 +71,8 @@ For development, a plugin process can also run on your own machine and talk to a
 (token under **Settings → Network → API token**; the API must be enabled for the network there). On the head unit
 itself, plugins need no token.
 
-Plugin format, QML module and a complete example: [openhu/docs/plugins.md](https://github.com/average-web-dev/openhu/blob/main/docs/plugins.md),
-API: [openhu/docs/api.md](https://github.com/average-web-dev/openhu/blob/main/docs/api.md).
+Plugin format, QML module and a complete example: [openhu/docs/plugins.md](https://github.com/BeegorMif/openhu/blob/main/docs/plugins.md),
+API: [openhu/docs/api.md](https://github.com/BeegorMif/openhu/blob/main/docs/api.md).
 
 ## Tests
 

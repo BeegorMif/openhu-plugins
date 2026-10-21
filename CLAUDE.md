@@ -13,7 +13,7 @@ The official OpenHU plugins and the plugin store repository: `index.json` plus t
 
 ## The OpenHU project
 
-Four repositories under github.com/average-web-dev, usually checked out next to each other:
+OpenHU, OpenHU OS and plugins live under github.com/BeegorMif and are usually checked out next to each other. The currently compatible AASDK fork is still under github.com/average-web-dev:
 
 | Repo | What | Default branch |
 |---|---|---|

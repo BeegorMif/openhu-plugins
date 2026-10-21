@@ -173,7 +173,7 @@ hours long, but the start and end times are those of the clock.
 
 ## Interface for other plugins
 
-All over the EventBus (WebSocket API, [openhu/docs/api.md](https://github.com/average-web-dev/openhu/blob/main/docs/api.md)).
+All over the EventBus (WebSocket API, [openhu/docs/api.md](https://github.com/BeegorMif/openhu/blob/main/docs/api.md)).
 Times are **ms since 1970**. Queries and commands are one-shot events (`bus.emit`); the answer is the one-shot
 event `logger.result` with the same `id`. Subscribe to `logger.result` **before** sending, and use ids that are
 unique for your plugin (e.g. `"org.example.charts:17"`): every subscriber sees every answer.
