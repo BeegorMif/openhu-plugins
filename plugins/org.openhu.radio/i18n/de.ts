@@ -63,21 +63,49 @@
         <source></source>
         <translation>Sender mit PI %1 unbekannt</translation>
     </message>
+    <message id="org.openhu.radio.main.all_stations">
+        <source></source>
+        <translation>Alle Sender</translation>
+    </message>
     <message id="org.openhu.radio.main.cancel">
         <source></source>
         <translation>Abbrechen</translation>
+    </message>
+    <message id="org.openhu.radio.main.choose_station">
+        <source></source>
+        <translation>Sender wählen</translation>
     </message>
     <message id="org.openhu.radio.main.dab_missing">
         <source></source>
         <translation>DAB nicht verfügbar, es fehlt: %1</translation>
     </message>
+    <message id="org.openhu.radio.main.favorite">
+        <source></source>
+        <translation>Favorit</translation>
+    </message>
+    <message id="org.openhu.radio.main.favorites">
+        <source></source>
+        <translation>Favoriten</translation>
+    </message>
+    <message id="org.openhu.radio.main.next_station">
+        <source></source>
+        <translation>Nächster Sender</translation>
+    </message>
     <message id="org.openhu.radio.main.no_stations">
         <source></source>
         <translation>Noch keine Sender – Suchlauf starten</translation>
     </message>
+    <message id="org.openhu.radio.main.no_stations_am">
+        <source></source>
+        <translation>Sender mit dem Herz merken</translation>
+    </message>
     <message id="org.openhu.radio.main.play">
         <source></source>
         <translation>Abspielen</translation>
+    </message>
+    <message id="org.openhu.radio.main.previous_station">
+        <source></source>
+        <translation>Vorheriger Sender</translation>
     </message>
     <message id="org.openhu.radio.main.rds_missing">
         <source></source>
@@ -98,6 +126,18 @@
     <message id="org.openhu.radio.main.simulated_stick">
         <source></source>
         <translation>Simulierter Stick</translation>
+    </message>
+    <message id="org.openhu.radio.main.stations">
+        <source></source>
+        <translation>Sender</translation>
+    </message>
+    <message id="org.openhu.radio.main.step_down">
+        <source></source>
+        <translation>Frequenz runter (halten für schneller)</translation>
+    </message>
+    <message id="org.openhu.radio.main.step_up">
+        <source></source>
+        <translation>Frequenz hoch (halten für schneller)</translation>
     </message>
     <message id="org.openhu.radio.main.stop">
         <source></source>

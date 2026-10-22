@@ -18,6 +18,12 @@ If a library is missing, the page shows which one (e.g. "DAB not available, miss
 and so do `radio.state.dabMissing` / `rdsMissing`. As always, the DVB-T driver `dvb_usb_rtl28xxu` must not claim
 the stick (blocked in the OS image).
 
+**Page:** band tabs; the station that plays with its logo or DAB slideshow picture (initials on a colour of the
+name without one), radio text and a soft background from the picture; for FM/AM a scale to tap or drag to any
+frequency and − / + (held: faster, after about 1.5 s in bigger steps); the frequency is tuned when the finger is
+lifted. The station list shows the favorites first, a heart in each row keeps or removes a station, the station that
+plays shows its radio text. The icons are drawn for the plugin (`qml/Icons.js`).
+
 State `radio.state`, commands `radio.command` and configuration: see the head of [`bin/radio.py`](bin/radio.py).
 `radio.state.bands` contains both bands with stations, favorites and the RDS names and PI codes the plugin remembers
 per frequency (for Android Auto, openhu#75).
@@ -30,7 +36,7 @@ can select stations by their PI.
 
 ## DAB+
 
-The band `dab` (button "DAB+"): a station is a service in an ensemble (multiplex) on a channel 5A–13F, its key is the
+The band `dab` (tab "DAB+"): a station is a service in an ensemble (multiplex) on a channel 5A–13F, its key is the
 service ID (`"0xD882"`) instead of a frequency (`frequency`, `stations`, `presets`, `tune`).
 
 - **Reception:** `openhu-dab --channel <channel> --service <sid> --rate 48000 --events-fd <fd> --slides <dir>`
@@ -42,7 +48,7 @@ service ID (`"0xD882"`) instead of a frequency (`frequency`, `stations`, `preset
   URL) and as `media.metadata.cover` (otherwise the station logo). Only pictures the station broadcasts itself.
 - **Station scan:** `openhu-dab --scan` goes through all channels one after another: up to `dabSyncSeconds` (3 s) for
   a DAB signal, with a signal at most `dabScanSeconds` (10 s) for ensemble and service names. Takes a few minutes;
-  progress in `radio.state.scan`, "Cancel" (`stop`) keeps the old list. `dabChannels` in `config.json` restricts the
+  progress in `radio.state.scan`, cancelling (✕ above the progress, `stop`) keeps the old list. `dabChannels` in `config.json` restricts the
   scan to certain channels (e.g. `["5C", "7A", "8C"]` in Hannover).
 - **No stick / stick busy:** `openhu-dab` reports `no-device` or `device-busy` and exits; the page shows
   "No RTL-SDR stick found" or "The RTL-SDR stick is used by another program".
