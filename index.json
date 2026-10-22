@@ -92,13 +92,13 @@
       "archives": {
         "amd64": {
           "archive": "dist/org.openhu.radio-1.0.0-amd64.tar.gz",
-          "sha256": "6577781d68b4dcb75a0e1d85055d547390bb55dda0caa23a367d03c19fc581fc",
-          "size": 513553
+          "sha256": "9172c99ac8ac3489f7f4e269004ce506bb12db9d0873f2c45977cb8e9fdd51a4",
+          "size": 527160
         },
         "arm64": {
           "archive": "dist/org.openhu.radio-1.0.0-arm64.tar.gz",
-          "sha256": "f29f154e778ca539a2fe8f73d28941f27af91eac8499b69bbc69a586da7d5d87",
-          "size": 475795
+          "sha256": "8971646e740dc54a14e244214cb97ea11c82e81a39c095deef843e9341f8efbd",
+          "size": 489830
         }
       }
     },
