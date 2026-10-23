@@ -1,0 +1,12 @@
+{
+  "id": "org.beegor.display",
+  "name": "Display control",
+  "version": "1.0.0",
+  "api": 2,
+  "description": "Set monitor brightness from a CAN dimmer byte and open a black screen with status bar settings.",
+  "arch": ["all"],
+  "ui": {"page": "qml/Main.qml", "icon": "icon.svg", "statusBar": true},
+  "process": {"exec": "bin/display.py", "restart": "on-failure"},
+  "packages": ["ddcutil"],
+  "shared": ["openhu.py"]
+}
