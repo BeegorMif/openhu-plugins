@@ -2,7 +2,8 @@
 
 Uses `ddcutil` and DDC/CI to set monitor brightness from a raw CAN dimmer byte. The status bar shortcut opens
 a completely black page; tap the small gear button to open display settings, configure the signal, or adjust
-brightness manually. The black page leaves the monitor powered on.
+brightness manually. The black page leaves the monitor powered on. **Extra dim the whole interface** adds a
+translucent black layer over the shell, including the dock, status bar, and black page; it does not block touch.
 
 By default the plugin watches `can.display` field `dimByte`. Add a matching numeric signal to the selected
 profile in `org.openhu.can`; for example:

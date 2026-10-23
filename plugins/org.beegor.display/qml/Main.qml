@@ -61,6 +61,11 @@ Item {
                     onClicked: page.command("configure", {topic: topic.text, field: field.text, display: display.text, enabled: canEnabled.checked})
                 }
             }
+            CheckBox {
+                text: qsTr("Extra dim the whole interface")
+                checked: state.data.extraDim === true
+                onToggled: page.command("extraDim", {enabled: checked})
+            }
             GridLayout {
                 columns: 2
                 Layout.fillWidth: true

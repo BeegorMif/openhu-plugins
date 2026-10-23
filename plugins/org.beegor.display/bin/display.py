@@ -9,9 +9,10 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "lib"))
 
-from openhu import OpenHU, load_config, save_config, setup_logging  # noqa: E402
+from openhu import PLUGIN_ID, OpenHU, load_config, save_config, setup_logging  # noqa: E402
 
-DEFAULTS = {"topic": "can.display", "field": "dimByte", "display": "", "enabled": True}
+DEFAULTS = {"topic": "can.display", "field": "dimByte", "display": "", "enabled": True,
+            "extraDim": False}
 
 
 class DisplayPlugin:
@@ -47,7 +48,8 @@ class DisplayPlugin:
     async def publish(self):
         await self.api.publish("display.state", topic=self.config["topic"], field=self.config["field"],
                                enabled=self.config["enabled"], display=self.config["display"],
-                               lastSignal=self.last_signal, error=self.error)
+                               lastSignal=self.last_signal, extraDim=self.config["extraDim"], error=self.error)
+        await self.api.publish("ui.extraDim", enabled=self.config["extraDim"], source=PLUGIN_ID)
 
     async def set_brightness(self, value):
         value = max(0, min(100, round(float(value))))
@@ -90,6 +92,9 @@ class DisplayPlugin:
                 save_config(self.config)
                 current = await self.api.request("bus.get", topic=can_topic)
                 await self.on_can(can_topic, current)
+            elif command == "extraDim":
+                self.config["extraDim"] = bool(data.get("enabled", False))
+                save_config(self.config)
             elif command == "manual":
                 await self.set_brightness(data.get("value", 0))
             else:
