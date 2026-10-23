@@ -1,12 +1,14 @@
 {
   "id": "org.openhu.can",
   "name": "CAN bus",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "api": 2,
   "description": "Vehicle data (speed, gear, lights …) and steering wheel keys from the CAN bus via SocketCAN. Vehicle profiles describe the CAN IDs.",
   "arch": ["all"],
   "ui": {"page": "qml/Main.qml", "icon": "icon.svg"},
   "process": {"exec": "bin/can.py", "restart": "on-failure"},
   "permissions": ["can", "input"],
-  "shared": ["openhu.py"]
+  "shared": ["openhu.py"],
+  "androidAuto": {"sensors": ["speed", "fuel", "odometer", "engine", "climate",
+                              "drivingStatus", "info"]}
 }

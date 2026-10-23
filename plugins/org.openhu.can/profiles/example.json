@@ -6,7 +6,8 @@
     {"id": "0x100", "topic": "engine", "field": "rpm", "byte": 2, "length": 16, "endian": "big"},
     {"id": "0x200", "topic": "gear", "field": "reverse", "byte": 0, "bit": 0, "length": 1},
     {"id": "0x200", "topic": "lights", "field": "headlights", "byte": 0, "bit": 1, "length": 1},
-    {"id": "0x200", "topic": "climate", "field": "outsideTemp", "byte": 1, "length": 8, "signed": true, "scale": 0.5}
+    {"id": "0x200", "topic": "climate", "field": "outsideTemp", "byte": 1, "length": 8, "signed": true, "scale": 0.5},
+    {"id": "0x330","topic": "odometer","field": "km","byte": 0,"length": 24,"signed": false,"scale": 1}
   ],
   "buttons": [
     {"id": "0x300", "byte": 0, "mask": "0x01", "action": "volume.up"},

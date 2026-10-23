@@ -19,7 +19,8 @@
     {"id": "0x200", "topic": "vehicle.ignition", "field": "terminal15", "byte": 2, "bit": 2, "length": 1},
     {"id": "0x200", "topic": "vehicle.ignition", "field": "terminalR", "byte": 2, "bit": 4, "length": 1},
     {"id": "0x3A7", "topic": "vehicle.drivingMode", "field": "dtcOff", "byte": 6, "bit": 2, "length": 1},
-    {"id": "0x3F9", "topic": "vehicle.battery", "field": "stopStartActive", "byte": 6, "bit": 1, "length": 1}
+    {"id": "0x3F9", "topic": "vehicle.battery", "field": "stopStartActive", "byte": 6, "bit": 1, "length": 1},
+    {"id": "0x330","topic": "odometer","field": "km","byte": 0,"length": 24,"signed": false,"scale": 1}
   ],
   "buttons": [],
   "triggers": [
