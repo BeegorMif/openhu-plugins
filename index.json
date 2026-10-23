@@ -5,6 +5,23 @@
   "api": 2,
   "plugins": [
     {
+      "id": "org.beegor.display",
+      "name": "Display control",
+      "version": "1.0.0",
+      "description": "Set monitor brightness from a CAN dimmer byte and open a black screen with status bar settings.",
+      "arch": [
+        "all"
+      ],
+      "api": 2,
+      "permissions": [],
+      "packages": [
+        "ddcutil"
+      ],
+      "archive": "dist/org.beegor.display-1.0.0.tar.gz",
+      "sha256": "056dbd49b7c8511ac57bb69b574b1db71e2a6ec5690e225fd0b4a8135c75cf4f",
+      "size": 6912
+    },
+    {
       "id": "org.openhu.camera",
       "name": "Reverse camera",
       "version": "1.0.0",
@@ -26,7 +43,7 @@
     {
       "id": "org.openhu.can",
       "name": "CAN bus",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "Vehicle data (speed, gear, lights …) and steering wheel keys from the CAN bus via SocketCAN. Vehicle profiles describe the CAN IDs.",
       "arch": [
         "all"
@@ -36,9 +53,37 @@
         "can",
         "input"
       ],
-      "archive": "dist/org.openhu.can-1.0.0.tar.gz",
-      "sha256": "85f5b01afb2928a1cb7a1ad47c0a0226d6e16c259beb91c5e828647d0727c51c",
-      "size": 14608
+      "androidAuto": {
+        "sensors": [
+          "speed",
+          "fuel",
+          "odometer",
+          "engine",
+          "climate",
+          "drivingStatus",
+          "info"
+        ]
+      },
+      "archive": "dist/org.openhu.can-1.0.1.tar.gz",
+      "sha256": "961c350853dfedfff386ba55d967326485969a17097a489d2739bcff830e5387",
+      "size": 15254
+    },
+    {
+      "id": "org.openhu.display",
+      "name": "Display control",
+      "version": "1.0.0",
+      "description": "Set monitor brightness from a CAN dimmer byte and open a black screen with status bar settings.",
+      "arch": [
+        "all"
+      ],
+      "api": 2,
+      "permissions": [],
+      "packages": [
+        "ddcutil"
+      ],
+      "archive": "dist/org.openhu.display-1.0.0.tar.gz",
+      "sha256": "38e1ef74eb72e47057e44000ffe710b01a369254c4f9278c719441b468037f33",
+      "size": 6906
     },
     {
       "id": "org.openhu.logger",
@@ -56,8 +101,8 @@
         "org.openhu.vehicle"
       ],
       "archive": "dist/org.openhu.logger-1.0.0.tar.gz",
-      "sha256": "eb7f14aede751acfc7b56a03e7eb200b2517df8b0a673101a774f875a32b5256",
-      "size": 41080
+      "sha256": "98f6dd1a2b1231062dbda4786d1295dd04363084ec88a99ab3955ecae4223236",
+      "size": 41081
     },
     {
       "id": "org.openhu.radio",
