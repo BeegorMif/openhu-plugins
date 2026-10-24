@@ -10,7 +10,8 @@ Item {
     BusTopic { id: canState; topic: "can.state" }
     BusTopic { id: monitor; topic: "can.monitor" }
 
-    // vehicle.* topics -> {topic: {field: value}}
+    // Decoded values -> {topic: {field: value}}. Ignition remains can.ignition because it is not
+    // an Android Auto vehicle sensor, so include it explicitly alongside vehicle.* here.
     property var vehicle: ({})
 
     function command(cmd, value) {
@@ -27,7 +28,7 @@ Item {
         interfaceField.text = canState.data.interface || ""
         var topics = api.request("bus.topics").result || []
         for (var i = 0; i < topics.length; ++i)
-            if (topics[i].indexOf("vehicle.") === 0)
+            if (topics[i].indexOf("vehicle.") === 0 || topics[i] === "can.ignition")
                 updateVehicle(topics[i], eventBus.last(topics[i]))
     }
 
@@ -36,7 +37,7 @@ Item {
         function onEvent(topic, data) {
             if (topic === "can.state" && !interfaceField.activeFocus)
                 interfaceField.text = data.interface || ""
-            else if (topic.indexOf("vehicle.") === 0)
+            else if (topic.indexOf("vehicle.") === 0 || topic === "can.ignition")
                 page.updateVehicle(topic, data)
         }
     }
