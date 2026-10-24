@@ -7,7 +7,7 @@
     {
       "id": "org.beegor.display",
       "name": "Display control",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "description": "Set monitor brightness from a CAN dimmer byte and open a black screen with status bar settings.",
       "arch": [
         "all"
@@ -17,9 +17,9 @@
       "packages": [
         "ddcutil"
       ],
-      "archive": "dist/org.beegor.display-1.0.1.tar.gz",
-      "sha256": "6f28b382579c45463fcdbf9956b91e4071dd2463fbc073e3be74e51dab00c8ca",
-      "size": 7092
+      "archive": "dist/org.beegor.display-1.0.2.tar.gz",
+      "sha256": "6585dba80f9d8bd8402bf7edf359b04f338cbbf6943a4c910a5eeb48d42a50b3",
+      "size": 7155
     },
     {
       "id": "org.openhu.camera",
