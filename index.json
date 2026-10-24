@@ -65,8 +65,8 @@
         ]
       },
       "archive": "dist/org.openhu.can-1.0.1.tar.gz",
-      "sha256": "961c350853dfedfff386ba55d967326485969a17097a489d2739bcff830e5387",
-      "size": 15254
+      "sha256": "a33e2e51baa893b60e3039bff286d888ca28fcc9cf9509b8d521aedca72eda78",
+      "size": 15250
     },
     {
       "id": "org.openhu.display",
