@@ -24,6 +24,7 @@ Item {
     }
 
     Component.onCompleted: {
+        interfaceField.text = canState.data.interface || ""
         var topics = api.request("bus.topics").result || []
         for (var i = 0; i < topics.length; ++i)
             if (topics[i].indexOf("vehicle.") === 0)
@@ -33,7 +34,9 @@ Item {
     Connections {
         target: eventBus
         function onEvent(topic, data) {
-            if (topic.indexOf("vehicle.") === 0)
+            if (topic === "can.state" && !interfaceField.activeFocus)
+                interfaceField.text = data.interface || ""
+            else if (topic.indexOf("vehicle.") === 0)
                 page.updateVehicle(topic, data)
         }
     }
@@ -67,7 +70,7 @@ Item {
                 id: interfaceField
                 Layout.preferredWidth: Theme.dockWidth * 1.3
                 placeholderText: "can0"  // untranslated: an interface name
-                text: canState.data.interface || ""
+                // Keep the user's draft while editing; CAN state is republished every second.
                 onAccepted: page.command("interface", text)
             }
             ComboBox {
