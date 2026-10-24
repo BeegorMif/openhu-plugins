@@ -85,6 +85,10 @@ class RepoIndexTest(unittest.TestCase):
             self.assertEqual(members["org.example.native/bin/%s/tool" % arch].mode, 0o755)
             self.assertFalse([name for name in members if "/bin/%s/" % other in name])
             self.assertIn("org.example.native/lib/openhu.py", members)
+            self.assertFalse(members["org.example.native/lib/openhu.py"].issym())
+            with tarfile.open(os.path.join(self.repo, entry["archive"])) as tar:
+                self.assertEqual(sum(member.name == "org.example.native/lib/openhu.py"
+                                     for member in tar.getmembers()), 1)
             self.assertIn("org.example.native/native/build.sh", members)
             self.assertFalse([name for name in members if "/tests/" in name])
         # source archives of the binaries stay, others go

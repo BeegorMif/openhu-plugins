@@ -43,7 +43,7 @@
     {
       "id": "org.openhu.can",
       "name": "CAN bus",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "description": "Vehicle data (speed, gear, lights …) and steering wheel keys from the CAN bus via SocketCAN. Vehicle profiles describe the CAN IDs.",
       "arch": [
         "all"
@@ -64,9 +64,9 @@
           "info"
         ]
       },
-      "archive": "dist/org.openhu.can-1.0.1.tar.gz",
-      "sha256": "6294d718099c4163d3ae4e1b11ed0e20dc1d7533d114bf1bc700a229367c5631",
-      "size": 15398
+      "archive": "dist/org.openhu.can-1.0.2.tar.gz",
+      "sha256": "fd23936d38fe3812ae08aa31e1348472a9b562ab69fcd91db62f0e1cf677c614",
+      "size": 15353
     },
     {
       "id": "org.openhu.display",

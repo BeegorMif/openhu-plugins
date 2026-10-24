@@ -70,6 +70,8 @@ def build_archive(repo, plugin_dir, manifest, arch=None):
     """Reproducible tar.gz of a plugin; with arch only that architecture's bin/<arch>/ (no other one)."""
     plugin_id = manifest["id"]
     bin_dir = os.path.join(plugin_dir, "bin")
+    shared = manifest.get("shared", [])
+    shared_members = {plugin_id + "/lib/" + name for name in shared}
     files = []
     for root, dirs, names in os.walk(plugin_dir):
         dirs[:] = sorted(d for d in dirs if d not in ("__pycache__", ".git", "tests")
@@ -78,12 +80,18 @@ def build_archive(repo, plugin_dir, manifest, arch=None):
             if name.endswith(".pyc"):
                 continue
             path = os.path.join(root, name)
-            files.append((path, plugin_id + "/" + os.path.relpath(path, plugin_dir)))
-    for shared in manifest.get("shared", []):
-        path = os.path.join(repo, "common", shared)
+            member = plugin_id + "/" + os.path.relpath(path, plugin_dir)
+            # Plugin source trees may symlink lib/<shared> to ../../../common/<shared> for local
+            # development. Do not archive that dangling-in-installation symlink: the shared file
+            # below is copied into the archive as a regular file at the same member path.
+            if member in shared_members:
+                continue
+            files.append((path, member))
+    for shared_name in shared:
+        path = os.path.join(repo, "common", shared_name)
         if not os.path.isfile(path):
-            fail("%s: shared file common/%s not found" % (plugin_id, shared))
-        files.append((path, plugin_id + "/lib/" + shared))
+            fail("%s: shared file common/%s not found" % (plugin_id, shared_name))
+        files.append((path, plugin_id + "/lib/" + shared_name))
 
     raw = io.BytesIO()
     with tarfile.open(fileobj=raw, mode="w", format=tarfile.PAX_FORMAT) as tar:
