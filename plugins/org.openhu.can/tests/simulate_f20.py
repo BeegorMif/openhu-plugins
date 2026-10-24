@@ -28,7 +28,6 @@ STATIC = {
     0x3B4: "00 00 01 00 00 00 00 00",  # engine status byte 1
     0x330: "00 00 00 07 00 00 00 00",  # average fuel 7
     0x349: "80 0C 40 0B 00 00 00 00",  # left 20.0 (0x0C80=3200*0.00625), right 18.0 (0x0B40=2880)
-    0x200: "00 00 14 00 00 00 00 00",  # terminal 15 and terminal R on (byte 2 bits 2 and 4)
 }
 
 s = socket.socket(socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW)
@@ -42,6 +41,12 @@ while True:
     t = time.monotonic() - start
     for cid, hexdata in STATIC.items():
         send(cid, bytes.fromhex(hexdata))
+
+    # Exercise the BMW F20 profile's actual ignition signal: byte 0 bit 0 is
+    # terminal R and bit 2 is terminal 15. Alternate on/off every 20 seconds;
+    # choose a shutdown delay longer than 20 s to observe blackout then cancel.
+    ignition = 0x05 if int(t // 20) % 2 == 0 else 0x00
+    send(0x130, [ignition, 0, 0, 0, 0, 0, 0, 0])
 
     mph = 35 + 35 * math.sin(t / 8)                  # sweeps 0..70
     send(0x1A1, [0, 0, *struct.pack("<H", int(mph / 0.01)), 0, 0, 0, 0])

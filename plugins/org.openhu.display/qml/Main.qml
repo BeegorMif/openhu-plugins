@@ -20,6 +20,7 @@ Item {
 
         // The status bar shortcut opens this deliberately empty, black page.
         Button {
+            id: settingsButton
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.margins: Theme.spacing / 2
@@ -29,7 +30,7 @@ Item {
             text: "⚙"
             font.pixelSize: Theme.fontNormal
             background: Rectangle { color: "transparent" }
-            contentItem: Text { text: parent.text; color: "#777"; font: parent.font; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+            contentItem: Text { text: settingsButton.text; color: "#777"; font: settingsButton.font; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
             onClicked: page.settingsOpen = true
         }
 
@@ -65,13 +66,13 @@ Item {
                 columns: 2
                 Layout.fillWidth: true
                 Text { text: qsTr("CAN topic"); color: Theme.textDim }
-                TextField { id: topic; Layout.fillWidth: true; text: state.data.topic || "can.display"; placeholderText: "can.display" }
+                TextField { id: topic; Layout.fillWidth: true; text: state.data.topic || "can.display"; placeholderText: "can.display" } // untranslated: example CAN topic
                 Text { text: qsTr("Signal field"); color: Theme.textDim }
-                TextField { id: field; Layout.fillWidth: true; text: state.data.field || "dimByte"; placeholderText: "dimByte" }
+                TextField { id: field; Layout.fillWidth: true; text: state.data.field || "dimByte"; placeholderText: "dimByte" } // untranslated: example CAN field
                 Text { text: qsTr("Display number (optional)"); color: Theme.textDim }
                 TextField { id: display; Layout.fillWidth: true; text: state.data.display || ""; placeholderText: qsTr("Auto detect"); inputMethodHints: Qt.ImhDigitsOnly }
             }
-            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.outline }
+            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.outline }
             Text { text: qsTr("Manual brightness"); color: Theme.text; font.pixelSize: Theme.fontLarge }
             RowLayout {
                 Layout.fillWidth: true

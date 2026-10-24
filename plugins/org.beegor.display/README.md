@@ -18,3 +18,15 @@ If you have multiple monitors, set the numeric `ddcutil` display number there; l
 selection. The head unit needs `ddcutil` installed and DDC/CI enabled in the monitor's settings.
 
 The monitor must support DDC/CI VCP code `10` for brightness adjustment.
+
+## Ignition power-off
+
+For the BMW F20 profile, `0x130` publishes `terminalR` and `terminal15` on `can.ignition`. Enable **Black screen and
+power off after ignition off** in the display plugin and set the delay (5 minutes by default). After the plugin has
+seen either terminal active, both terminals becoming false covers the whole OpenHU interface with a touch-blocking
+black overlay and starts the countdown. If either terminal becomes active again before the deadline, the countdown is
+cancelled and the overlay is removed. When it expires, the plugin requests system power-off through `loginctl`; the
+OpenHU OS polkit rule permits this for the `openhu` user. CAN `available: false` events do not count as ignition-off.
+
+The option is off by default. The `can.ignition` profile topic must contain both boolean fields `terminalR` and
+`terminal15`; the plugin reads the current topic on connect as well as live updates.
