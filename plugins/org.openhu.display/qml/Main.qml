@@ -65,9 +65,9 @@ Item {
                 columns: 2
                 Layout.fillWidth: true
                 Text { text: qsTr("CAN topic"); color: Theme.textDim }
-                TextField { id: topic; Layout.fillWidth: true; text: state.data.topic || "can.display"; placeholderText: "can.display" }
+                TextField { id: topic; Layout.fillWidth: true; text: state.data.topic || "can.display"; placeholderText: "can.display" } // untranslated: example CAN topic
                 Text { text: qsTr("Signal field"); color: Theme.textDim }
-                TextField { id: field; Layout.fillWidth: true; text: state.data.field || "dimByte"; placeholderText: "dimByte" }
+                TextField { id: field; Layout.fillWidth: true; text: state.data.field || "dimByte"; placeholderText: "dimByte" } // untranslated: example CAN field
                 Text { text: qsTr("Display number (optional)"); color: Theme.textDim }
                 TextField { id: display; Layout.fillWidth: true; text: state.data.display || ""; placeholderText: qsTr("Auto detect"); inputMethodHints: Qt.ImhDigitsOnly }
             }
