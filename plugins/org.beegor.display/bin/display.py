@@ -46,7 +46,9 @@ class DisplayPlugin:
         return stdout.decode(errors="replace")
 
     async def publish(self):
-        await self.api.publish("display.state", topic=self.config["topic"], field=self.config["field"],
+        # `topic` is already the first argument to OpenHU.publish; keep the CAN
+        # source topic under a distinct field name in the published state.
+        await self.api.publish("display.state", canTopic=self.config["topic"], field=self.config["field"],
                                enabled=self.config["enabled"], display=self.config["display"],
                                lastSignal=self.last_signal, extraDim=self.config["extraDim"], error=self.error)
         await self.api.publish("ui.extraDim", enabled=self.config["extraDim"], source=PLUGIN_ID)

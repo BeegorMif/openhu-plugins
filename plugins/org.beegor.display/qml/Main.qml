@@ -48,7 +48,7 @@ Item {
                 Layout.fillWidth: true
                 text: state.data.error || qsTr("CAN brightness: %1% from %2.%3")
                       .arg(state.data.lastSignal === undefined || state.data.lastSignal === null ? "—" : state.data.lastSignal)
-                      .arg(state.data.topic || "can.display").arg(state.data.field || "dimByte")
+                      .arg(state.data.canTopic || "can.display").arg(state.data.field || "dimByte")
                 color: state.data.error ? "#ff8a80" : Theme.textDim
                 font.pixelSize: Theme.fontNormal
                 wrapMode: Text.Wrap
@@ -70,7 +70,7 @@ Item {
                 columns: 2
                 Layout.fillWidth: true
                 Text { text: qsTr("CAN topic"); color: Theme.textDim }
-                TextField { id: topic; Layout.fillWidth: true; text: state.data.topic || "can.display"; placeholderText: "can.display" }
+                TextField { id: topic; Layout.fillWidth: true; text: state.data.canTopic || "can.display"; placeholderText: "can.display" }
                 Text { text: qsTr("Signal field"); color: Theme.textDim }
                 TextField { id: field; Layout.fillWidth: true; text: state.data.field || "dimByte"; placeholderText: "dimByte" }
                 Text { text: qsTr("Display number (optional)"); color: Theme.textDim }
