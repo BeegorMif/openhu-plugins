@@ -26,7 +26,11 @@
   "triggers": [
     {"topic": "vehicle.lights", "field": "dipBeam", "equals": true,
      "then": {"method": "daynight.set", "params": {"night": true}},
-     "else": {"method": "daynight.set", "params": {"night": false}}}
+     "else": {"method": "daynight.set", "params": {"night": false}}},
+    {"topic": "vehicle.lights", "field": "dipBeam", "equals": true,
+     "then": {"method": "ui.toast", "params": {"text": "Dipped headlights on", "duration": 2500}}},
+    {"topic": "vehicle.lights", "field": "dipBeam", "equals": false,
+     "then": {"method": "ui.toast", "params": {"text": "Dipped headlights off", "duration": 2500}}}
   ],
   "controls": [
     {"name": "temperature", "area": "driver", "min": 16, "max": 32, "step": 0.5,
