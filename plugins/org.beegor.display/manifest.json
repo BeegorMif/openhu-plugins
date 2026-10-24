@@ -1,7 +1,7 @@
 {
   "id": "org.beegor.display",
   "name": "Display control",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "api": 2,
   "description": "Set monitor brightness from CAN and power off the system after ignition-off delay.",
   "arch": ["all"],

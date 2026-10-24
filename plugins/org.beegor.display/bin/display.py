@@ -155,11 +155,11 @@ class DisplayPlugin:
 
     async def request_poweroff(self):
         process = await asyncio.create_subprocess_exec(
-            "loginctl", "poweroff", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            "systemctl", "poweroff", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=20)
         if process.returncode:
             detail = (stderr or stdout).decode(errors="replace").strip()
-            raise RuntimeError(detail or "loginctl poweroff exited with status %d" % process.returncode)
+            raise RuntimeError(detail or "systemctl poweroff exited with status %d" % process.returncode)
 
     async def set_brightness(self, value):
         value = max(0, min(100, round(float(value))))
