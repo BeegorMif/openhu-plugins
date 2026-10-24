@@ -23,6 +23,10 @@ Own profiles: `<data>/plugin-data/org.openhu.can/profiles/<name>.json`, then sel
 The CAN monitor on the plugin page shows all received IDs – press a key or shift into a gear and see which bytes
 change.
 
+The BMW F20 profile decodes ignition from CAN ID `0x130` into `can.ignition` fields `terminalR` (byte 0 bit 0) and
+`terminal15` (byte 0 bit 2). The display plugin uses both fields; both false means ignition off. The F20 simulator
+alternates these bits every 20 seconds so the blackout and cancellation path can be checked without a car.
+
 Signal: `id`, `byte`, `bit` (0 = lowest), `length` (bits), `endian` (`big`/`little`), `signed`,
 `scale`, `offset`, `map` ({"raw value": "text"}). Button: `id`, `byte`, `mask`, `value` (default = mask), `action`.
 

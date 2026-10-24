@@ -66,6 +66,42 @@ Item {
                 checked: state.data.extraDim === true
                 onToggled: page.command("extraDim", {enabled: checked})
             }
+            RowLayout {
+                Layout.fillWidth: true
+                CheckBox {
+                    id: ignitionPowerOff
+                    Layout.fillWidth: true
+                    text: qsTr("Black screen and power off after ignition off")
+                    checked: state.data.ignitionPowerOff === true
+                    onToggled: page.command("ignitionPowerOff", {
+                        enabled: checked,
+                        delayMinutes: ignitionDelay.text || "5"
+                    })
+                }
+                TextField {
+                    id: ignitionDelay
+                    Layout.preferredWidth: Theme.spacing * 4
+                    text: String(Math.max(1, Math.round((state.data.ignitionDelaySeconds || 300) / 60)))
+                    placeholderText: "5"
+                    inputMethodHints: Qt.ImhDigitsOnly
+                    enabled: ignitionPowerOff.checked
+                    onEditingFinished: if (ignitionPowerOff.checked) page.command("ignitionPowerOff", {
+                        enabled: true,
+                        delayMinutes: text || "5"
+                    })
+                }
+                Text { text: qsTr("min"); color: Theme.textDim; font.pixelSize: Theme.fontNormal }
+            }
+            Text {
+                Layout.fillWidth: true
+                text: state.data.ignitionPowerOff === true
+                      ? qsTr("CAN ignition: %1%2").arg(state.data.ignitionState || "UNKNOWN")
+                        .arg(state.data.shutdownPending ? qsTr(" · power off in %1 s").arg(state.data.shutdownInSeconds) : "")
+                      : qsTr("CAN ignition: %1 · automatic power off disabled").arg(state.data.ignitionState || "UNKNOWN")
+                color: Theme.textDim
+                font.pixelSize: Theme.fontSmall
+                wrapMode: Text.Wrap
+            }
             GridLayout {
                 columns: 2
                 Layout.fillWidth: true
