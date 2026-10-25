@@ -174,7 +174,7 @@
         ]
       },
       "requires": {
-        "org.openhu.can": "1.0.0"
+        "org.beegor.can": "1.0.0"
       },
       "archive": "dist/org.openhu.vehicle-1.0.0.tar.gz",
       "sha256": "bb42cad837c763327e303932fa760b646007f63b6f3947b3b1e9707339a7f573",
