@@ -69,23 +69,6 @@
       "size": 15563
     },
     {
-      "id": "org.openhu.display",
-      "name": "Display control",
-      "version": "1.0.0",
-      "description": "Set monitor brightness from a CAN dimmer byte and open a black screen with status bar settings.",
-      "arch": [
-        "all"
-      ],
-      "api": 2,
-      "permissions": [],
-      "packages": [
-        "ddcutil"
-      ],
-      "archive": "dist/org.openhu.display-1.0.0.tar.gz",
-      "sha256": "8ade9af527ee40002ef217bde20d2b37abe26f4af63620631046f0438bc51db6",
-      "size": 7630
-    },
-    {
       "id": "org.openhu.logger",
       "name": "Vehicle data logger",
       "version": "1.0.0",
