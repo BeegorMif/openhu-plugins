@@ -35,7 +35,7 @@
     {
       "id": "org.beegor.display",
       "name": "Display control",
-      "version": "1.0.5",
+      "version": "1.0.6",
       "description": "Set monitor brightness from CAN and power off the system after ignition-off delay.",
       "arch": [
         "all"
@@ -45,9 +45,9 @@
       "packages": [
         "ddcutil"
       ],
-      "archive": "dist/org.beegor.display-1.0.5.tar.gz",
-      "sha256": "15f88d456ac8a6e6ce2559e50436db5f0971546766c2d81bb1814fa0536057a7",
-      "size": 12358
+      "archive": "dist/org.beegor.display-1.0.6.tar.gz",
+      "sha256": "82182bf116cd2bc8967673839e0cfc50dce7ee72053824321e4f71d22b979274",
+      "size": 12459
     },
     {
       "id": "org.openhu.camera",
