@@ -1,7 +1,7 @@
 {
   "id": "org.beegor.can",
   "name": "CAN bus",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "api": 2,
   "description": "Vehicle data (speed, gear, lights …) and steering wheel keys from the CAN bus via SocketCAN. Vehicle profiles describe the CAN IDs.",
   "arch": ["all"],
