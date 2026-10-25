@@ -29,8 +29,8 @@
         ]
       },
       "archive": "dist/org.beegor.can-1.0.1.tar.gz",
-      "sha256": "547e7508acc03d430f49d7c7349560a3825338f7102e5939f3941f9473579446",
-      "size": 17065
+      "sha256": "1abc00873e69837cfc74085f180bf9dc39f6e99ab8dfcf919d480046d57cccb2",
+      "size": 17009
     },
     {
       "id": "org.beegor.display",
@@ -174,7 +174,7 @@
         ]
       },
       "requires": {
-        "org.beegor.can": "1.0.0"
+        "org.openhu.can": "1.0.0"
       },
       "archive": "dist/org.openhu.vehicle-1.0.0.tar.gz",
       "sha256": "bb42cad837c763327e303932fa760b646007f63b6f3947b3b1e9707339a7f573",
