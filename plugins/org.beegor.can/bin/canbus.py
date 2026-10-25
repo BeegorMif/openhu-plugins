@@ -152,6 +152,7 @@ class Profile:
             button["value"] = parse_number(button.get("value", button["mask"]))
             self.buttons.setdefault(parse_number(button["id"]), []).append(button)
         self.triggers = [dict(trigger, topic=self._topic(trigger.get("topic"))) for trigger in spec.get("triggers", [])]
+        self._trigger_last_values = {}
         # car controls: {"name", "area", "min", "max", "step", "read": signal, "write": frame, "whileDriving"}
         self.driver_side = spec.get("driverSide", "left")
         self.units = spec.get("units", "celsius")
@@ -259,8 +260,29 @@ class Profile:
 
     def _triggers(self, topic, field, old, new):
         commands = []
-        for trigger in self.triggers:
+        for index, trigger in enumerate(self.triggers):
             if trigger.get("topic") != topic or trigger.get("field") != field:
+                continue
+            if "diff" in trigger:
+                if not isinstance(new, (int, float)) or isinstance(new, bool):
+                    continue
+                last = self._trigger_last_values.get(index)
+                if last is None:
+                    self._trigger_last_values[index] = new
+                    continue
+                delta = abs(new - last)
+                if delta < trigger["diff"]:
+                    continue
+                self._trigger_last_values[index] = new
+                command = trigger.get("then")
+                if command:
+                    command = dict(command)
+                    if "params" in command:
+                        command["params"] = dict(command["params"])
+                        for key, value in command["params"].items():
+                            if isinstance(value, str):
+                                command["params"][key] = value.replace("%1", str(new))
+                    commands.append(command)
                 continue
             expected = trigger.get("equals")
             was, now = old == expected, new == expected
