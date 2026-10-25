@@ -5,45 +5,9 @@
   "api": 2,
   "plugins": [
     {
-      "id": "org.beegor.display",
-      "name": "Display control",
-      "version": "1.0.5",
-      "description": "Set monitor brightness from CAN and power off the system after ignition-off delay.",
-      "arch": [
-        "all"
-      ],
-      "api": 2,
-      "permissions": [],
-      "packages": [
-        "ddcutil"
-      ],
-      "archive": "dist/org.beegor.display-1.0.5.tar.gz",
-      "sha256": "a9f598bf3236bff7ce956f4f797499f77be9943138479d42aa6621cbdcb324fd",
-      "size": 12072
-    },
-    {
-      "id": "org.openhu.camera",
-      "name": "Reverse camera",
-      "version": "1.0.0",
-      "description": "Camera picture with guide lines in the content area or full screen, automatically in reverse gear (CAN plugin) or with the actions camera.show / camera.hide / camera.toggle.",
-      "arch": [
-        "all"
-      ],
-      "api": 2,
-      "permissions": [
-        "camera"
-      ],
-      "recommends": [
-        "org.openhu.vehicle"
-      ],
-      "archive": "dist/org.openhu.camera-1.0.0.tar.gz",
-      "sha256": "bc1c81d59bd42fda51e79b3740449dcca259c3901780f31cf2172daac955fbe6",
-      "size": 9319
-    },
-    {
-      "id": "org.openhu.can",
+      "id": "org.beegor.can",
       "name": "CAN bus",
-      "version": "1.0.5",
+      "version": "1.0.0",
       "description": "Vehicle data (speed, gear, lights …) and steering wheel keys from the CAN bus via SocketCAN. Vehicle profiles describe the CAN IDs.",
       "arch": [
         "all"
@@ -64,9 +28,45 @@
           "info"
         ]
       },
-      "archive": "dist/org.openhu.can-1.0.5.tar.gz",
-      "sha256": "c3f6e2868334fbd7d01130eb94e8c79c4c4c5cbfa01033a82e1bc3838fb45eb6",
-      "size": 15563
+      "archive": "dist/org.beegor.can-1.0.0.tar.gz",
+      "sha256": "e8fb30fe46d5738d3d7bb840c7f64a6010807a4bd681ac2f83e1f2631c4b506f",
+      "size": 15903
+    },
+    {
+      "id": "org.beegor.display",
+      "name": "Display control",
+      "version": "1.0.5",
+      "description": "Set monitor brightness from CAN and power off the system after ignition-off delay.",
+      "arch": [
+        "all"
+      ],
+      "api": 2,
+      "permissions": [],
+      "packages": [
+        "ddcutil"
+      ],
+      "archive": "dist/org.beegor.display-1.0.5.tar.gz",
+      "sha256": "57f7f7d487f65df8f4da5f93d705820a42314c8f1450e92cf5249130e7a7af29",
+      "size": 12335
+    },
+    {
+      "id": "org.openhu.camera",
+      "name": "Reverse camera",
+      "version": "1.0.0",
+      "description": "Camera picture with guide lines in the content area or full screen, automatically in reverse gear (CAN plugin) or with the actions camera.show / camera.hide / camera.toggle.",
+      "arch": [
+        "all"
+      ],
+      "api": 2,
+      "permissions": [
+        "camera"
+      ],
+      "recommends": [
+        "org.openhu.vehicle"
+      ],
+      "archive": "dist/org.openhu.camera-1.0.0.tar.gz",
+      "sha256": "bc1c81d59bd42fda51e79b3740449dcca259c3901780f31cf2172daac955fbe6",
+      "size": 9319
     },
     {
       "id": "org.openhu.logger",
