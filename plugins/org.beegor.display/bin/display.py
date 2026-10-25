@@ -41,16 +41,8 @@ class DisplayPlugin:
         self.api.on("can.*", self.on_can)
         self.api.on("display.command", self.on_command)
 
-    def display_args(self):
-        value = str(self.config.get("display", "")).strip()
-        if not value:
-            return []
-        if not value.isdigit():
-            raise ValueError("Display must be a numeric ddcutil display number")
-        return ["--display", value]
-
     async def ddc(self, *args):
-        command = ["ddcutil", *self.display_args(), *map(str, args)]
+        command = ["ddcutil", "--display", "1", *map(str, args)]
         try:
             result = await asyncio.create_subprocess_exec(*command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         except FileNotFoundError:
