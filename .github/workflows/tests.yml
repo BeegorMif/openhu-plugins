@@ -52,6 +52,6 @@ jobs:
       - name: QML
         run: |
           branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          git clone --depth 1 --branch "$branch" https://github.com/average-web-dev/openhu.git /tmp/openhu \
-            || git clone --depth 1 https://github.com/average-web-dev/openhu.git /tmp/openhu
+          git clone --depth 1 --branch "$branch" https://github.com/beegormif/openhu.git /tmp/openhu \
+            || git clone --depth 1 https://github.com/beegormif/openhu.git /tmp/openhu
           bash /tmp/openhu/tests/qmllint.sh plugins/*/qml
