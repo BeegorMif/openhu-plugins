@@ -240,7 +240,7 @@ Rectangle {
                             AppTextField {
                                 id: topic
                                 text: state.data.canTopic || "can.display"
-                                placeholderText: "can.display"
+                                placeholderText: qsTr("can.display")
                             }
 
                             AppSecondaryText {
@@ -250,7 +250,7 @@ Rectangle {
                             AppTextField {
                                 id: field
                                 text: state.data.field || "dimByte"
-                                placeholderText: "dimByte"
+                                placeholderText: qsTr("dimByte")
                             }
 
                             AppSecondaryText {
@@ -260,7 +260,7 @@ Rectangle {
                             AppTextField {
                                 id: lightsTopic
                                 text: state.data.lightsTopic || ""
-                                placeholderText: "can.display"
+                                placeholderText: qsTr("can.display")
                             }
 
                             AppSecondaryText {
@@ -270,7 +270,7 @@ Rectangle {
                             AppTextField {
                                 id: lightsField
                                 text: state.data.lightsField || ""
-                                placeholderText: "lightsOn"
+                                placeholderText: qsTr("lightsOn")
                             }
                         }
 

@@ -60,8 +60,8 @@ Item {
             }
             Text {
                 text: canState.data.connected
-                      ? qsTrId("org.openhu.can.main.frames_per_second").arg(canState.data.interface).arg(canState.data.framesPerSecond || 0)
-                      : (canState.data.error || qsTrId("org.openhu.can.main.process_not_running"))
+                      ? qsTrId("org.beegor.can.main.frames_per_second").arg(canState.data.interface).arg(canState.data.framesPerSecond || 0)
+                      : (canState.data.error || qsTrId("org.beegor.can.main.process_not_running"))
                 color: Theme.text
                 font.pixelSize: Theme.fontNormal
                 Layout.fillWidth: true
@@ -85,7 +85,7 @@ Item {
 
         Text {
             visible: !!canState.data.profileName
-            text: qsTrId("org.openhu.can.main.profile").arg(canState.data.profileName)
+            text: qsTrId("org.beegor.can.main.profile").arg(canState.data.profileName)
             color: Theme.textDim
             font.pixelSize: Theme.fontSmall
         }
@@ -130,7 +130,7 @@ Item {
                     Text {
                         anchors.centerIn: parent
                         visible: parent.count === 0
-                        text: qsTrId("org.openhu.can.main.no_vehicle_data")
+                        text: qsTrId("org.beegor.can.main.no_vehicle_data")
                         color: Theme.textDim
                         font.pixelSize: Theme.fontNormal
                     }
@@ -153,7 +153,7 @@ Item {
                         Layout.fillWidth: true
                         Text {
                             Layout.fillWidth: true
-                            text: qsTrId("org.openhu.can.main.monitor")
+                            text: qsTrId("org.beegor.can.main.monitor")
                             color: Theme.text
                             font.pixelSize: Theme.fontNormal
                             font.bold: true
