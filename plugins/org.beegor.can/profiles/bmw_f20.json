@@ -111,10 +111,6 @@
     {"id": "0x302", "topic": "steering", "field": "effectiveRaw", "byte": 2, "length": 16, "endian": "little"}
   ],
   "buttons": [    
-    // {"id": "0x1D6", "topic": "steeringButtons", "field": "telephone", "byte": 0, "bit": 0, "length": 1},
-    // {"id": "0x1D6", "topic": "steeringButtons", "field": "rtButton", "byte": 0, "bit": 1, "length": 1},
-    // {"id": "0x1D6", "topic": "steeringButtons", "field": "scrollDown", "byte": 0, "bit": 2, "length": 1},
-    // {"id": "0x1D6", "topic": "steeringButtons", "field": "scrollUp", "byte": 0, "bit": 3, "length": 1},
     {"id": "0x1D6", "byte": 1, "mask": "0x10", "action": "volume.down"},
     {"id": "0x1D6", "byte": 1, "mask": "0x20", "action": "volume.up"}
   ],
