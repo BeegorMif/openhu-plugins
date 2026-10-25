@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, patch
 
 PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO = os.path.dirname(os.path.dirname(PLUGIN_DIR))
-sys.path.insert(0, os.path.join(REPO, "plugins", "org.openhu.can", "lib"))
-sys.path.insert(0, os.path.join(REPO, "plugins", "org.openhu.can", "bin"))
+sys.path.insert(0, os.path.join(REPO, "plugins", "org.beegor.can", "lib"))
+sys.path.insert(0, os.path.join(REPO, "plugins", "org.beegor.can", "bin"))
 sys.path.insert(0, os.path.join(PLUGIN_DIR, "bin"))
 
 import canbus  # noqa: E402
