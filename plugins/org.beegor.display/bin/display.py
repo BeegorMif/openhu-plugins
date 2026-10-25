@@ -301,8 +301,9 @@ class DisplayPlugin:
                     raise ValueError("Signal field is required")
                 if display and not display.isdigit():
                     raise ValueError("Display must be a numeric ddcutil display number")
-                self.config.update(topic=can_topic, field=field, display=display,
-                                   enabled=bool(data.get("enabled", True)))
+                self.config.update(topic=can_topic,field=field,
+                                    enabled=bool(data.get("enabled", True)),
+                                    lightsTopic=str(data.get("lightsTopic", "")).strip(),lightsField=str(data.get("lightsField", "")).strip())
                 save_config(self.config)
                 current = await self.api.request("bus.get", topic=can_topic)
                 await self.on_can(can_topic, current)
