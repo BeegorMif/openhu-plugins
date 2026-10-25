@@ -1,14 +1,14 @@
 {
   "id": "org.openhu.vehicle",
   "name": "Vehicle data",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "api": 2,
   "description": "Passes the vehicle data of the CAN plugin (speed, gear, parking brake, fuel …) to Android Auto and to the vehicle topics of OpenHU.",
   "arch": ["all"],
   "ui": {"icon": "icon.svg"},
   "process": {"exec": "bin/vehicle.py", "restart": "on-failure"},
   "shared": ["openhu.py"],
-  "requires": {"org.openhu.can": "1.0.0"},
+  "requires": {"org.beegor.can": "1.0.0"},
   "androidAuto": {"sensors": ["speed", "parkingBrake", "gear", "fuel", "odometer", "engine", "climate", "compass",
                               "drivingStatus", "info"],
                   "services": ["carControl"]}
