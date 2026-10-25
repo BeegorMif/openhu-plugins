@@ -38,7 +38,7 @@ class FakeApi:
 
 class IgnitionTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        profile_path = os.path.join(REPO, "plugins", "org.openhu.can", "profiles", "bmw_f20.json")
+        profile_path = os.path.join(REPO, "plugins", "org.beegor.can", "profiles", "bmw_f20.json")
         with open(profile_path, encoding="utf-8") as file:
             self.profile = canbus.Profile(json.load(file))
         self.api = FakeApi()
