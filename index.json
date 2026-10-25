@@ -149,7 +149,7 @@
     {
       "id": "org.openhu.vehicle",
       "name": "Vehicle data",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "Passes the vehicle data of the CAN plugin (speed, gear, parking brake, fuel …) to Android Auto and to the vehicle topics of OpenHU.",
       "arch": [
         "all"
@@ -174,11 +174,11 @@
         ]
       },
       "requires": {
-        "org.openhu.can": "1.0.0"
+        "org.beegor.can": "1.0.0"
       },
-      "archive": "dist/org.openhu.vehicle-1.0.0.tar.gz",
-      "sha256": "bb42cad837c763327e303932fa760b646007f63b6f3947b3b1e9707339a7f573",
-      "size": 7501
+      "archive": "dist/org.openhu.vehicle-1.0.1.tar.gz",
+      "sha256": "d5b7ab9f01237a77f98fad641e8b13ae4a91a58eb707610e4e15321579ca04a4",
+      "size": 7507
     }
   ]
 }
