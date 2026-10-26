@@ -1,0 +1,112 @@
+
+{
+    "id": "bmw_f20",
+    "name": "BMW F20",
+    "items": [
+        {
+            "id": "speed",
+            "title": "Speed",
+            "topic": "can.speed",
+            "field": "mph",
+            "unit": "mph",
+            "decimals": 0,
+            "enabled": true
+        },
+        {
+            "id": "rpm",
+            "title": "Engine RPM",
+            "topic": "can.engine",
+            "field": "rpm",
+            "unit": "RPM",
+            "decimals": 0,
+            "enabled": true
+        },
+        {
+            "id": "coolant",
+            "title": "Coolant",
+            "topic": "can.engine",
+            "field": "coolantTemp",
+            "unit": "°C",
+            "decimals": 0,
+            "enabled": false
+        },
+        {
+            "id": "outside",
+            "title": "Outside Temperature",
+            "topic": "can.fuel",
+            "field": "externalTempC",
+            "unit": "°C",
+            "decimals": 1,
+            "enabled": true
+        },
+        {
+            "id": "cabin",
+            "title": "Cabin Temperature",
+            "topic": "can.climate",
+            "field": "temperatureC",
+            "unit": "°C",
+            "decimals": 1,
+            "enabled": true
+        },
+        {
+            "id": "fan",
+            "title": "Fan Speed",
+            "topic": "can.climate",
+            "field": "fanSpeed",
+            "unit": "",
+            "decimals": 0,
+            "displayType": "mapped",
+            "valueLabels": {
+                "4": "Slow",
+                "5": "Quick",
+                "6": "Turbo"
+            },
+            "enabled": true
+        },
+
+        {
+            "id": "range",
+            "title": "Fuel Range",
+            "topic": "can.fuel",
+            "field": "rangeMiles",
+            "unit": "mi",
+            "decimals": 0,
+            "enabled": true
+        },
+        {
+            "id": "odometer",
+            "title": "Odometer",
+            "topic": "can.odometer",
+            "field": "odometerMiles",
+            "unit": "mi",
+            "decimals": 0,
+            "enabled": true
+        },
+        {
+            "id": "ignition",
+            "title": "Ignition",
+            "topic": "can.ignition",
+            "field": "terminal15",
+            "displayType": "boolean",
+            "onText": "On",
+            "offText": "Off",
+            "enabled": true
+        },
+ {
+    "id": "dipBeam",
+    "topic": "can.lights",
+    "field": "dipBeam",
+    "title": "Lights",
+    "displayType": "dynamicIcon",
+    "iconValues": {
+        "0": "○",
+        "1": "◐"
+    },
+    "valueLabels": {
+        "0": "Off",
+        "1": "Dipped Beam"
+    },
+    "enabled": true
+}
+    ]
+}
