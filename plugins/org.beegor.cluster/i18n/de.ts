@@ -99,9 +99,5 @@
         <source></source>
         <translation>Live-Daten</translation>
     </message>
-    <message id="org.beegor.cluster.main.unavailable">
-        <source></source>
-        <translation>Nicht verfügbar</translation>
-    </message>
 </context>
 </TS>
