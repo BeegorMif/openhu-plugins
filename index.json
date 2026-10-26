@@ -33,6 +33,26 @@
       "size": 17009
     },
     {
+      "id": "org.beegor.cluster",
+      "name": "Instrument cluster",
+      "version": "1.0.1",
+      "description": "Live digital instrument cluster for speed, engine RPM, climate, fuel and vehicle status from the CAN bus.",
+      "arch": [
+        "all"
+      ],
+      "api": 2,
+      "permissions": [
+        "can",
+        "input"
+      ],
+      "requires": {
+        "org.beegor.can": "1.0.0"
+      },
+      "archive": "dist/org.beegor.cluster-1.0.1.tar.gz",
+      "sha256": "498e02832de6da1549a0c02481d1fc8c8605e9c55d1d17ec1e3d01dc2ab3263a",
+      "size": 10525
+    },
+    {
       "id": "org.beegor.display",
       "name": "Display control",
       "version": "1.0.6",
