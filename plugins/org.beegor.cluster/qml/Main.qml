@@ -401,7 +401,7 @@ Item {
                         width: Theme.spacing * 16
                         height: Theme.spacing * 4
                         radius: Theme.radius / 2
-                        color: Theme.background
+                        color: Theme.surface
                         Column {
                             anchors.fill: parent
                             anchors.margins: Theme.spacing / 2
