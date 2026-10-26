@@ -1,0 +1,42 @@
+{
+  "id": "Example",
+  "name": "Example",
+  "items": [
+    {
+      "id": "speed",
+      "title": "Speed",
+      "topic": "can.speed",
+      "field": "mph",
+      "unit": "mph",
+      "decimals": 0,
+      "enabled": true
+    },
+    {
+      "id": "rpm",
+      "title": "Engine RPM",
+      "topic": "can.engine",
+      "field": "rpm",
+      "unit": "RPM",
+      "decimals": 0,
+      "enabled": true
+    },
+    {
+      "id": "fuel_range",
+      "title": "Fuel range",
+      "topic": "can.fuel",
+      "field": "rangeMiles",
+      "unit": "mi",
+      "decimals": 0,
+      "enabled": true
+    },
+    {
+      "id": "outside_temperature",
+      "title": "Outside temperature",
+      "topic": "can.fuel",
+      "field": "externalTempC",
+      "unit": "°C",
+      "decimals": 1,
+      "enabled": true
+    }
+  ]
+}
