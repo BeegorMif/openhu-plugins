@@ -10,6 +10,11 @@ import asyncio
 import json
 import logging
 import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "lib"))
+sys.path.insert(0, HERE)
 
 from openhu import DATA_DIR, PLUGIN_DIR, OpenHU, load_config, save_config, setup_logging
 
