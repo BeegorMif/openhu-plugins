@@ -29,8 +29,8 @@
         ]
       },
       "archive": "dist/org.beegor.can-1.0.1.tar.gz",
-      "sha256": "1abc00873e69837cfc74085f180bf9dc39f6e99ab8dfcf919d480046d57cccb2",
-      "size": 17009
+      "sha256": "ea41e4866c0859d232d73d9a0934ed2a58fec6395d55f084355070a5426683a9",
+      "size": 17614
     },
     {
       "id": "org.beegor.cluster",
