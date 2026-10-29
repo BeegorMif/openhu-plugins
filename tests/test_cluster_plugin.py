@@ -14,11 +14,12 @@ class ClusterPluginTest(unittest.TestCase):
         with open(os.path.join(PLUGIN, "manifest.json"), encoding="utf-8") as file:
             manifest = json.load(file)
         self.assertEqual(manifest["id"], "org.beegor.cluster")
-        self.assertEqual(manifest["version"], "1.0.0")
+        self.assertEqual(manifest["version"], "1.0.1")
         self.assertEqual(manifest["ui"]["page"], "qml/Main.qml")
         self.assertIn("org.beegor.can", manifest["requires"])
         required_version = tuple(
-            int(part) for part in manifest["requires"]["org.beegor.can"].split(".")
+            int(part)
+            for part in manifest["requires"]["org.beegor.can"].split(".")
         )
         self.assertGreaterEqual(required_version, (1, 0, 0))
         self.assertTrue(os.path.isfile(os.path.join(PLUGIN, manifest["ui"]["page"])))
@@ -41,14 +42,35 @@ class ClusterPluginTest(unittest.TestCase):
         self.assertIn("org.beegor.cluster.description", messages["en"])
 
     def test_page_subscribes_to_live_and_raw_topics(self):
-        with open(os.path.join(PLUGIN, "qml", "Main.qml"), encoding="utf-8") as file:
+        with open(
+            os.path.join(PLUGIN, "qml", "Main.qml"),
+            encoding="utf-8",
+        ) as file:
             qml = file.read()
-        for topic in ('"vehicle."', '"can."', '"can.state"', '"can.monitor"',
-                      '"speed"', '"engine"', '"climate"', '"fuel"', '"odometer"',
-                      '"ignition"', '"lights"'):
+
+        # Live topic subscriptions and cached event data.
+        for topic in (
+            '"vehicle."',
+            '"can."',
+            '"can.state"',
+            '"can.monitor"',
+            '"cluster.state"',
+            '"cluster.data"',
+        ):
             self.assertIn(topic, qml)
         self.assertIn("eventBus.last(topic)", qml)
+        self.assertIn("function onEvent(topic, data)", qml)
         self.assertIn("available !== false", qml)
+
+        # The dashboard is data-driven: fields and source topics come
+        # from the configured display items, not hardcoded QML topic names.
+        self.assertIn("page.enabledDisplayItems", qml)
+        self.assertIn("item.topic", qml)
+        self.assertIn("item.field", qml)
+        self.assertIn("function configuredValue(item)", qml)
+        # Raw CAN monitoring is supported.
+        self.assertIn('"can.monitor"', qml)
+        self.assertIn("page.monitor", qml)
 
 
 if __name__ == "__main__":
