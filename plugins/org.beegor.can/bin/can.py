@@ -33,7 +33,7 @@ from openhu import DATA_DIR, PLUGIN_DIR, OpenHU, load_config, save_config, setup
 
 log = logging.getLogger("can")
 
-DEFAULTS = {"interface": "can0", "profile": "example", "monitor": False}
+DEFAULTS = {"interface": "can0", "bitrate": 500000, "profile": "example", "monitor": False}
 PUBLISH_INTERVAL = 0.1
 QUIET_SECONDS = 3
 WRITE_INTERVAL = 0.1
