@@ -60,6 +60,68 @@ def load_profile(name):
     raise FileNotFoundError("profile %s not found" % name)
 
 
+def ensure_interface(interface, bitrate):
+    import re
+    import subprocess
+
+    def ip(*args):
+        return subprocess.run(
+            ["ip", *args],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    result = ip("-details", "link", "show", "dev", interface)
+    if result.returncode:
+        raise OSError(
+            result.stderr.strip() or f"{interface} does not exist"
+        )
+
+    details = result.stdout
+
+    # Check the interface flags, not just the word "UP" in the output.
+    flags_match = re.search(r"<([^>]*)>", details)
+    flags = set(flags_match.group(1).split(",")) if flags_match else set()
+    is_up = "UP" in flags
+
+    # Only treat this as CAN if the kernel identifies it as such.
+    if not re.search(r"\blink/can\b", details):
+        raise OSError(f"{interface} is not a SocketCAN interface")
+
+    bitrate_match = re.search(r"\bbitrate\s+(\d+)\b", details)
+    current_bitrate = int(bitrate_match.group(1)) if bitrate_match else None
+
+    if is_up and current_bitrate == bitrate:
+        return
+
+    # CAN bitrate normally needs to be changed while the interface is down.
+    if is_up:
+        result = ip("link", "set", "dev", interface, "down")
+        if result.returncode:
+            raise OSError(
+                f"Cannot bring {interface} down: {result.stderr.strip()}"
+            )
+
+    result = ip(
+        "link", "set", "dev", interface,
+        "type", "can", "bitrate", str(bitrate),
+    )
+    if result.returncode:
+        raise OSError(
+            f"Cannot configure {interface} at {bitrate} bit/s: "
+            f"{result.stderr.strip()}"
+        )
+
+    result = ip("link", "set", "dev", interface, "up")
+    if result.returncode:
+        raise OSError(
+            f"Cannot bring {interface} up: {result.stderr.strip()}"
+        )
+
+    log.info("configured %s at %d bit/s and brought it up", interface, bitrate)
+
+
 class CanPlugin:
     def __init__(self):
         self.config = load_config(DEFAULTS)
@@ -101,22 +163,24 @@ class CanPlugin:
         while True:
             self.reopen.clear()
             interface = self.config["interface"]
+            bitrate = int(self.config.get("bitrate", 500000))
             try:
+                ensure_interface(interface, bitrate)
                 self.sock = socket.socket(socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW)
                 self.sock.bind((interface,))
                 self.sock.setblocking(False)
                 loop.add_reader(self.sock.fileno(), self.on_readable)
                 self.error = ""
-                log.info("listening on %s", interface)
+                log.info("listening on %s at %d bit/s", interface, bitrate)
                 await self.reopen.wait()
-            except OSError as error:
+            except (OSError, ValueError) as error:
                 self.error = "%s: %s" % (interface, error.strerror or error)
                 log.warning("%s, retrying in 5 s", self.error)
             finally:
                 if self.sock is not None:
                     try:
                         loop.remove_reader(self.sock.fileno())
-                    except ValueError:
+                    except (ValueError, OSError):
                         pass
                     self.sock.close()
                     self.sock = None
