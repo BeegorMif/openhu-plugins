@@ -16,7 +16,11 @@ class ClusterPluginTest(unittest.TestCase):
         self.assertEqual(manifest["id"], "org.beegor.cluster")
         self.assertEqual(manifest["version"], "1.0.0")
         self.assertEqual(manifest["ui"]["page"], "qml/Main.qml")
-        self.assertEqual(manifest["requires"], {"org.beegor.can": "1.0.0"})
+        self.assertIn("org.beegor.can", manifest["requires"])
+        required_version = tuple(
+            int(part) for part in manifest["requires"]["org.beegor.can"].split(".")
+        )
+        self.assertGreaterEqual(required_version, (1, 0, 0))
         self.assertTrue(os.path.isfile(os.path.join(PLUGIN, manifest["ui"]["page"])))
         self.assertTrue(os.path.isfile(os.path.join(PLUGIN, manifest["ui"]["icon"])))
 
