@@ -1,7 +1,7 @@
 {
   "id": "org.beegor.cluster",
   "name": "Instrument cluster",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "api": 2,
   "description": "Live digital instrument cluster for speed, engine RPM, climate, fuel and vehicle status from the CAN bus.",
   "arch": ["all"],
