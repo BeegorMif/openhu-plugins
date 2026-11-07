@@ -15,6 +15,7 @@ github BeegorMif/openhu-plugins main
 | `org.openhu.logger` | Vehicle data logger: records `vehicle.*`, Android Auto state and head unit values on the device (SQLite, compressed, size limit), detects trips and high-rate recordings; interface for other plugins (trips, measurements, live values) |
 | `org.beegor.display` | Monitor brightness from a CAN signal and status bar controls for blackout and DDC/CI power off |
 | `org.openhu.radio` | FM/AM/DAB+ radio with an RTL-SDR stick, station scan, favorites, RDS (`redsea`), DAB+ with DLS and slideshow (own decoder `openhu-dab`); one archive per architecture (amd64, arm64) |
+| `org.openhu.media` | Music player for USB sticks and the head unit's Music folder: albums, artists, songs, playlists (M3U, PLS, XSPF, own playlists on the stick) and folders, a queue with order, shuffle and random, gapless playback with `mpv` |
 
 ## Layout
 
@@ -83,6 +84,7 @@ python3 -m unittest discover -s plugins/org.openhu.can/tests
 python3 -m unittest discover -s plugins/org.openhu.swc/tests
 python3 -m unittest discover -s plugins/org.openhu.radio/tests
 python3 -m unittest discover -s plugins/org.openhu.logger/tests
+python3 -m unittest discover -s plugins/org.openhu.media/tests
 ```
 
 ## Notice
