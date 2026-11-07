@@ -1,7 +1,7 @@
 import QtQuick
 import OpenHU 1.0
 
-// Soft background from the cover (from the radio plugin): the picture loaded at 6×6 pixels and stretched with smooth
+// Soft background from a cover or station picture: the picture loaded at 6×6 pixels and stretched with smooth
 // scaling gives large colour blobs like a strong blur, also with the software renderer (MultiEffect needs a GPU).
 // Cross-fades when the picture changes; without one a faint tint.
 Item {

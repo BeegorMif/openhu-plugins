@@ -26,6 +26,8 @@ class RepoIndexTest(unittest.TestCase):
         self.repo = self.temp.name
         write(os.path.join(self.repo, "repo.json"), json.dumps({"name": "Test"}))
         write(os.path.join(self.repo, "common", "openhu.py"), "# shared\n")
+        write(os.path.join(self.repo, "common", "qml", "Tile.qml"), "Item {}\n")
+        write(os.path.join(self.repo, "common", "qml", "icons", "Icons.js"), ".pragma library\n")
         plain = os.path.join(self.repo, "plugins", "org.example.plain")
         write(os.path.join(plain, "manifest.json"), json.dumps(
             {"id": "org.example.plain", "name": "Plain", "version": "1.0.0", "api": 2, "arch": ["all"]}))
@@ -33,10 +35,12 @@ class RepoIndexTest(unittest.TestCase):
         native = os.path.join(self.repo, "plugins", "org.example.native")
         write(os.path.join(native, "manifest.json"), json.dumps(
             {"id": "org.example.native", "name": "Native", "version": "1.2.0", "api": 2, "arch": ["amd64", "arm64"],
-             "shared": ["openhu.py"], "packages": ["librtlsdr0"], "androidAuto": {"services": ["radio"]},
+             "shared": ["openhu.py", "qml"], "packages": ["librtlsdr0"], "androidAuto": {"services": ["radio"]},
              "requires": {"org.example.plain": "1.0.0"}, "recommends": ["org.example.other"]}))
         write(os.path.join(native, "bin", "main.py"), "print()\n", 0o755)
         write(os.path.join(native, "native", "build.sh"), "#!/bin/sh\n", 0o755)
+        # the source checkout: lib/ points to common/ (not packed itself)
+        os.symlink(os.path.join("..", "..", "common"), os.path.join(native, "lib"))
         write(os.path.join(native, "tests", "test_x.py"), "\n")
         for arch in ("amd64", "arm64"):
             write(os.path.join(native, "bin", arch, "tool"), "#!/bin/sh\necho %s\n" % arch, 0o755)
@@ -85,10 +89,13 @@ class RepoIndexTest(unittest.TestCase):
             self.assertEqual(members["org.example.native/bin/%s/tool" % arch].mode, 0o755)
             self.assertFalse([name for name in members if "/bin/%s/" % other in name])
             self.assertIn("org.example.native/lib/openhu.py", members)
-            self.assertFalse(members["org.example.native/lib/openhu.py"].issym())
+            # a shared folder with its subfolders, each file once
+            self.assertIn("org.example.native/lib/qml/Tile.qml", members)
+            self.assertIn("org.example.native/lib/qml/icons/Icons.js", members)
             with tarfile.open(os.path.join(self.repo, entry["archive"])) as tar:
-                self.assertEqual(sum(member.name == "org.example.native/lib/openhu.py"
-                                     for member in tar.getmembers()), 1)
+                names = tar.getnames()
+            self.assertEqual(len(names), len(set(names)))
+            self.assertFalse([name for name in names if name.startswith("org.example.native/lib/lib")])
             self.assertIn("org.example.native/native/build.sh", members)
             self.assertFalse([name for name in members if "/tests/" in name])
         # source archives of the binaries stay, others go

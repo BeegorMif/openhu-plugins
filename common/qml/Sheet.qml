@@ -9,6 +9,8 @@ Item {
     property string title
     property bool shown: false
     property bool nearTop: false
+    // accessible name of the close button
+    property string closeText
     property real cardWidth: Math.min(sheet.width - Theme.spacing * 2, Math.round(560 * Theme.scale))
     default property alias content: body.data
 
@@ -76,7 +78,7 @@ Item {
                 flat: true
                 iconName: "close"
                 iconScale: 0.4
-                Accessible.name: qsTrId("org.openhu.media.main.close")
+                Accessible.name: sheet.closeText
                 onClicked: sheet.close()
             }
         }

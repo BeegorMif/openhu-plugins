@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import OpenHU 1.0
+import "../lib/qml"
 
 // The head of an album, artist or playlist page: back, the cover (or mosaic), title, subtitle, number of tracks and
 // length, then Play, Shuffle and Add to playlist (own playlists also Rename and Delete through "more")

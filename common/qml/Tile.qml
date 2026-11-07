@@ -1,21 +1,30 @@
 import QtQuick
 import OpenHU 1.0
-import "Music.js" as Music
 
-// A tile of the library grid: a square picture (cover or mosaic), a small round badge with what it is (top left),
-// the marker of the track that plays (top right), an optional label (Own, M3U, ...) and two caption lines.
-// The same size in every tab. Tap: open/play, long press: the menu.
+// A tile of a grid (music library, radio stations): a square picture (cover, mosaic or logo), a small round badge
+// in the top left (an icon of what it is, or a short text such as the band), the marker of what plays (top right),
+// an optional label (Own, M3U, ...) and two caption lines. The same size in every tab. Tap: open/play, long press:
+// the menu or the favorite.
 Item {
     id: tile
 
     property var covers: []
     property string title
     property string subtitle
-    property string kind
+    // badge in the top left: an icon (Icons.js) in badgeColor, else a short text; neither: no badge
+    property string badgeIcon
+    property color badgeColor: "#ffffff"
+    property string badgeText
     property string placeholderIcon: "note"
+    // the initials on the placeholder; without a name the placeholder icon
+    property string pictureName: tile.placeholderIcon === "folder" ? "" : tile.title
     property string label
     property bool playing: false
     property bool dimmed: false
+    // the whole picture (station logos) instead of filling the square
+    property bool fit: false
+    // the second line in the accent colour (the radio text of the station that plays)
+    property bool subtitleLive: false
     // the "New playlist" tile: a plus instead of a picture
     property bool create: false
 
@@ -35,9 +44,10 @@ Item {
             anchors.fill: parent
             visible: !tile.create
             covers: tile.covers
-            name: tile.placeholderIcon === "folder" ? "" : tile.title
+            name: tile.pictureName
             icon: tile.placeholderIcon
             dimmed: tile.dimmed
+            fit: tile.fit
         }
 
         Rectangle {
@@ -59,21 +69,31 @@ Item {
 
         // what the tile is
         Rectangle {
-            visible: !tile.create && tile.kind !== ""
+            visible: !tile.create && (tile.badgeIcon !== "" || tile.badgeText !== "")
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.margins: Math.round(tile.side * 0.05)
-            width: Math.max(20, Math.round(tile.side * 0.17))
-            height: width
-            radius: width / 2
+            height: Math.max(20, Math.round(tile.side * 0.17))
+            width: tile.badgeIcon !== "" ? height : Math.max(height, badgeLabel.implicitWidth + height * 0.7)
+            radius: height / 2
             color: Qt.rgba(0, 0, 0, 0.55)
 
             Icon {
                 anchors.centerIn: parent
-                width: Math.round(parent.width * 0.62)
+                visible: tile.badgeIcon !== ""
+                width: Math.round(parent.height * 0.62)
                 height: width
-                name: Music.badgeIcon(tile.kind)
+                name: tile.badgeIcon
+                color: tile.badgeColor
+            }
+            Text {
+                id: badgeLabel
+                anchors.centerIn: parent
+                visible: tile.badgeIcon === ""
+                text: tile.badgeText
                 color: "#ffffff"
+                font.pixelSize: Math.max(11, Math.round(parent.height * 0.5))
+                font.weight: Font.Medium
             }
         }
 
@@ -135,7 +155,7 @@ Item {
         Text {
             width: parent.width
             text: tile.subtitle
-            color: Theme.textDim
+            color: tile.subtitleLive ? Qt.lighter(Theme.primary, 1.25) : Theme.textDim
             font.pixelSize: Theme.fontSmall * 0.9
             elide: Text.ElideRight
         }

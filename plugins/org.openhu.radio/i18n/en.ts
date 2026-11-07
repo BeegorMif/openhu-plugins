@@ -67,6 +67,14 @@
         <source></source>
         <translation>All stations</translation>
     </message>
+    <message id="org.openhu.radio.main.back">
+        <source></source>
+        <translation>Back</translation>
+    </message>
+    <message id="org.openhu.radio.main.band_stations">
+        <source></source>
+        <translation>%1 stations</translation>
+    </message>
     <message id="org.openhu.radio.main.cancel">
         <source></source>
         <translation>Cancel</translation>
@@ -74,6 +82,14 @@
     <message id="org.openhu.radio.main.choose_station">
         <source></source>
         <translation>Choose a station</translation>
+    </message>
+    <message id="org.openhu.radio.main.close">
+        <source></source>
+        <translation>Close</translation>
+    </message>
+    <message id="org.openhu.radio.main.columns">
+        <source></source>
+        <translation>Tiles per row</translation>
     </message>
     <message id="org.openhu.radio.main.dab_missing">
         <source></source>
@@ -90,6 +106,10 @@
     <message id="org.openhu.radio.main.next_station">
         <source></source>
         <translation>Next station</translation>
+    </message>
+    <message id="org.openhu.radio.main.no_favorites">
+        <source></source>
+        <translation>No favorites yet – tap the heart of a station</translation>
     </message>
     <message id="org.openhu.radio.main.no_stations">
         <source></source>
@@ -123,13 +143,13 @@
         <source></source>
         <translation>Scanning … channel %1 (%2/%3), %4 stations</translation>
     </message>
+    <message id="org.openhu.radio.main.settings">
+        <source></source>
+        <translation>Settings</translation>
+    </message>
     <message id="org.openhu.radio.main.simulated_stick">
         <source></source>
         <translation>Simulated stick</translation>
-    </message>
-    <message id="org.openhu.radio.main.stations">
-        <source></source>
-        <translation>Stations</translation>
     </message>
     <message id="org.openhu.radio.main.step_down">
         <source></source>
@@ -142,6 +162,14 @@
     <message id="org.openhu.radio.main.stop">
         <source></source>
         <translation>Stop</translation>
+    </message>
+    <message id="org.openhu.radio.main.stopped">
+        <source></source>
+        <translation>Stopped</translation>
+    </message>
+    <message id="org.openhu.radio.main.tab_favorites">
+        <source></source>
+        <translation>Favorites</translation>
     </message>
     <message id="org.openhu.radio.name">
         <source></source>

@@ -35,8 +35,11 @@ class PresetTest(unittest.TestCase):
         self.radio.DATA_DIR, self.openhu.DATA_DIR = self.old_data_dir
         self.data.cleanup()
 
-    def command(self, cmd, value=None):
-        asyncio.run(self.plugin.handle_command({"cmd": cmd, "value": value}))
+    def command(self, cmd, value=None, band=None):
+        data = {"cmd": cmd, "value": value}
+        if band:
+            data["band"] = band
+        asyncio.run(self.plugin.handle_command(data))
         return [data for topic, data in self.plugin.api.published if topic == "radio.state"][-1]
 
     def test_station_that_plays(self):
@@ -54,6 +57,32 @@ class PresetTest(unittest.TestCase):
         self.assertEqual(self.command("savePreset", "0xd312")["presets"], ["0xD312"])
         # an invalid service id is ignored
         self.assertEqual(self.command("savePreset", "radio")["presets"], ["0xD312"])
+
+    def test_other_band(self):
+        # the favorites tab of the page: hearts of stations of another band
+        state = self.command("savePreset", "0xd312", band="dab")
+        self.assertEqual(state["band"], "fm")
+        self.assertEqual(state["bands"]["dab"]["presets"], ["0xD312"])
+        self.assertEqual(state["presets"], [])
+        state = self.command("savePreset", 1008, band="am")
+        self.assertEqual(state["bands"]["am"]["presets"], [1008])
+        # without a value only the band that plays has a station that plays
+        self.assertEqual(self.command("savePreset", band="am")["bands"]["am"]["presets"], [1008])
+        self.assertEqual(self.command("removePreset", "0xD312", band="dab")["bands"]["dab"]["presets"], [])
+
+    def test_tune_other_band(self):
+        state = self.command("tune", 1422, band="am")
+        self.assertEqual((state["band"], state["frequency"]), ("am", 1422))
+        state = self.command("tune", 100.0, band="fm")
+        self.assertEqual((state["band"], state["frequency"]), ("fm", 100.0))
+        # an unknown band is ignored: the current one
+        state = self.command("tune", 101.0, band="sw")
+        self.assertEqual((state["band"], state["frequency"]), ("fm", 101.0))
+
+    def test_columns(self):
+        self.assertEqual(self.command("columns", 6)["columns"], 6)
+        self.assertEqual(self.command("columns", 9)["columns"], 6)
+        self.assertEqual(self.plugin.config["columns"], 6)
 
 
 if __name__ == "__main__":

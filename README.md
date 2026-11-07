@@ -24,6 +24,8 @@ repo.json                    name/description of the repository
 plugins/<id>/manifest.json   one folder per plugin (format: openhu/docs/plugins.md)
 common/openhu.py             API client for Python plugins, copied into the archive via "shared"
 common/openhu.ts             the same for TypeScript plugins run with bun (copy it via "shared" as well)
+common/qml/                  QML components and icons of the radio and music pages ("shared": ["qml"]);
+                             plugins/<id>/lib is a symlink to common/ so the pages also work from the checkout
 tools/openhu-repo-index      builds dist/*.tar.gz and index.json
 tools/openhu-translations    keeps plugins/<id>/i18n/*.ts up to date and compiles the .qm files
 index.json, dist/            generated – do not edit by hand

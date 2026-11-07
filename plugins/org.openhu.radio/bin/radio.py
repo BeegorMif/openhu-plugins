@@ -4,7 +4,7 @@ DAB+ with openhu-dab (dab.py: PCM from openhu-dab -> pacat, DLS, slideshow, scan
 redsea come with the plugin archive (bin/<arch>/, native/build.sh); the simulated stick has stand-ins for both.
 
 State: "radio.state" {band, frequency, unit, playing, scanning, scan, rds: {pi, ps, rt}, presets, stations, error,
-          rdsAvailable, dabAvailable, rdsMissing, dabMissing, dab, simulated, bands: {fm|am: {min, max, step, unit,
+          rdsAvailable, dabAvailable, rdsMissing, dabMissing, dab, simulated, columns, bands: {fm|am: {min, max, step, unit,
           stations, presets, names: {"96.2": "NDR 2"}, pis: {"96.2": "0xD382"}}, dab: {unit, stations, presets, names,
           channels, services: {"0xD882": {label, shortLabel, channel, ensemble, ensembleLabel, ecc}}}}}
           (presets/stations: current band; bands: all, with the RDS names and PI codes remembered per frequency;
@@ -15,8 +15,11 @@ State: "radio.state" {band, frequency, unit, playing, scanning, scan, rds: {pi, 
           rdsMissing/dabMissing: what RDS or DAB needs and is missing ("" if nothing), e.g. a library of openhu-dab
           ("librtlsdr.so.0 (librtlsdr0)") or a program ("pacat (pulseaudio-utils)")
 Commands: bus.emit "radio.command" {cmd: "play"|"stop"|"toggle"|"tune"|"step"|"band"|"preset"|"savePreset"|
-          "removePreset"|"scan"|"fakeSdr"|"tunePi", value}
+          "removePreset"|"scan"|"fakeSdr"|"tunePi"|"columns", value, band}
           savePreset: value is the station to keep (frequency / service id), without one the station that plays
+          tune/savePreset/removePreset: band (optional) is the band of the station, e.g. from the favorites of all
+          bands on the page; tune switches to it
+          columns: tiles per row on the page (3-6), sent back in radio.state "columns"
           tunePi: value is a PI code ("0xD382"): tunes FM to the strongest remembered frequency with it (level of the
           last scan), an error if no frequency is known for it
           band "dab": tune/presets with service ids; step/seek go through the station list; scan runs in the
@@ -79,7 +82,9 @@ DEFAULTS = {
     "rds": True,
     "pauseForAndroidAuto": True,
     "fakeSdr": False,
+    "columns": 4,
 }
+COLUMNS = (3, 4, 5, 6)
 CHUNK = 4096
 
 
@@ -511,6 +516,8 @@ class RadioPlugin(dab.DabMixin):
 
     async def handle_command(self, data):
         command, value = data.get("cmd"), data.get("value")
+        # the band of the station (tune and the favorites from another band's tab); without one the current band
+        band = data.get("band") if data.get("band") in radiolib.ALL_BANDS else self.band
         if self.scanning and command != "stop":
             return
         if self.scanning:
@@ -526,6 +533,8 @@ class RadioPlugin(dab.DabMixin):
         elif command == "toggle":
             await (self.stop() if self.playing else self.start())
         elif command == "tune" and value is not None:
+            if band != self.band:
+                self.config["band"] = band
             await self.tune(value)
         elif command == "step" and self.band == radiolib.DAB:
             await self.tune(self.neighbour_station(value or 1))
@@ -539,15 +548,18 @@ class RadioPlugin(dab.DabMixin):
             await (self.start() if self.playing else self.publish_state())
         elif command == "savePreset":
             # value: a station of the list (the heart of a row), else the one that plays
-            frequency = self.frequency if value is None else radiolib.clamp_frequency(self.band, value)
-            presets = self.config["presets"].setdefault(self.band, [])
+            if value is None:
+                frequency = self.frequency if band == self.band else None
+            else:
+                frequency = radiolib.clamp_frequency(band, value)
+            presets = self.config["presets"].setdefault(band, [])
             if frequency is not None and frequency not in presets:
                 presets.append(frequency)
                 presets.sort()
             save_config(self.config)
             await self.publish_state()
         elif command == "removePreset":
-            presets = self.config["presets"].get(self.band, [])
+            presets = self.config["presets"].get(band, [])
             if value in presets:
                 presets.remove(value)
             save_config(self.config)
@@ -558,6 +570,11 @@ class RadioPlugin(dab.DabMixin):
             asyncio.create_task(self.scan_dab())
         elif command == "scan":
             await self.scan()
+        elif command == "columns":
+            if value in COLUMNS:
+                self.config["columns"] = value
+                save_config(self.config)
+            await self.publish_state()
         elif command == "tunePi":
             await self.tune_pi(value)
         elif command == "fakeSdr":
@@ -653,6 +670,7 @@ class RadioPlugin(dab.DabMixin):
             error=str(self.error),
             simulated=self.simulated(),
             bands=radiolib.band_summary(self.config),
+            columns=self.config["columns"] if self.config["columns"] in COLUMNS else 4,
         ))
 
 

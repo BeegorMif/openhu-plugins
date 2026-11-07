@@ -1,5 +1,6 @@
 import QtQuick
 import OpenHU 1.0
+import "../lib/qml"
 import "Music.js" as Music
 
 // The library grid: the same square tiles and columns in every tab (columns: the plugin setting). items: tiles
@@ -46,7 +47,7 @@ GridView {
             x: Math.round(grid.gap / 2)
             width: grid.tileSide
             height: parent.height
-            kind: cell.modelData.create ? "" : cell.modelData.kind
+            badgeIcon: cell.modelData.create ? "" : Music.badgeIcon(cell.modelData.kind)
             create: cell.modelData.create === true
             covers: cell.modelData.covers || (cell.modelData.cover ? [cell.modelData.cover] : [])
             title: grid.page.tileTitle(cell.modelData)

@@ -7,8 +7,9 @@
 Layout:
     repo.json                   {"name": ..., "description": ..., "maintainer": ...}
     plugins/<id>/manifest.json  one folder per plugin
-    common/                     shared files, copied into a plugin's lib/ when listed in its
-                                manifest ("shared": ["openhu.py"])
+    common/                     shared files and folders, copied into a plugin's lib/ when listed in its
+                                manifest ("shared": ["openhu.py", "qml"]); in the source checkout plugins/<id>/lib
+                                may be a symlink to ../../common, which is not packed itself
     plugins/<id>/i18n/          translations, <language>.ts and the compiled .qm (tools/openhu-translations)
     plugins/<id>/bin/<arch>/    native programs of a plugin whose manifest names architectures ("arch": ["amd64",
                                 "arm64"]): one archive per architecture, dist/<id>-<version>-<arch>.tar.gz, with only
@@ -152,28 +153,30 @@ def build_archive(repo, plugin_dir, manifest, arch=None):
     """Reproducible tar.gz of a plugin; with arch only that architecture's bin/<arch>/ (no other one)."""
     plugin_id = manifest["id"]
     bin_dir = os.path.join(plugin_dir, "bin")
-    shared = manifest.get("shared", [])
-    shared_members = {plugin_id + "/lib/" + name for name in shared}
     files = []
     for root, dirs, names in os.walk(plugin_dir):
         dirs[:] = sorted(d for d in dirs if d not in ("__pycache__", ".git", "tests")
+                         and not os.path.islink(os.path.join(root, d))
                          and not (root == bin_dir and d in ARCHES and d != arch))
         for name in sorted(names):
             if name.endswith(".pyc"):
                 continue
             path = os.path.join(root, name)
-            member = plugin_id + "/" + os.path.relpath(path, plugin_dir)
-            # Plugin source trees may symlink lib/<shared> to ../../../common/<shared> for local
-            # development. Do not archive that dangling-in-installation symlink: the shared file
-            # below is copied into the archive as a regular file at the same member path.
-            if member in shared_members:
-                continue
-            files.append((path, member))
-    for shared_name in shared:
-        path = os.path.join(repo, "common", shared_name)
-        if not os.path.isfile(path):
-            fail("%s: shared file common/%s not found" % (plugin_id, shared_name))
-        files.append((path, plugin_id + "/lib/" + shared_name))
+            files.append((path, plugin_id + "/" + os.path.relpath(path, plugin_dir)))
+    common = os.path.join(repo, "common")
+    for shared in manifest.get("shared", []):
+        path = os.path.join(common, shared)
+        if os.path.isdir(path):
+            for root, dirs, names in os.walk(path):
+                dirs[:] = sorted(d for d in dirs if d != "__pycache__")
+                for name in sorted(names):
+                    if not name.endswith(".pyc"):
+                        source = os.path.join(root, name)
+                        files.append((source, plugin_id + "/lib/" + os.path.relpath(source, common)))
+        elif os.path.isfile(path):
+            files.append((path, plugin_id + "/lib/" + shared))
+        else:
+            fail("%s: shared file common/%s not found" % (plugin_id, shared))
 
     raw = io.BytesIO()
     with tarfile.open(fileobj=raw, mode="w", format=tarfile.PAX_FORMAT) as tar:

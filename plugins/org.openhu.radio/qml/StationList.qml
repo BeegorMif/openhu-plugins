@@ -1,16 +1,18 @@
 import QtQuick
 import OpenHU 1.0
+import "../lib/qml"
 
-// Station list: favorites first, then the other stations. Each entry: {key, name, title, detail, text, logo,
-// favorite, current}; a header entry: {header: "..."}. A tap tunes, the heart on the right toggles the favorite.
+// The stations of the band in the player (where the music player has "Up next"): favorites first, then the other
+// stations, and the scan progress. Each entry: Main.entry() ({key, name, title, detail, text, logo, favorite,
+// current}); a header entry: {header: "..."}. A tap tunes, the heart on the right toggles the favorite.
 Rectangle {
     id: list
 
+    property string title
     property var entries: []
     property bool playing: false
-    property bool scanAvailable: true
     property bool scanning: false
-    property bool canCancel: false
+    property real touch: 48
     // -1: without known progress
     property real scanProgress: -1
     property string scanText
@@ -18,40 +20,20 @@ Rectangle {
 
     signal tuneRequested(var key)
     signal favoriteToggled(var key)
-    signal scanRequested()
-    signal cancelRequested()
 
     radius: Theme.radius
-    color: Qt.rgba(Theme.surface.r, Theme.surface.g, Theme.surface.b, 0.55)
+    color: Qt.rgba(Theme.surface.r, Theme.surface.g, Theme.surface.b, 0.6)
 
-    Item {
+    Text {
         id: header
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.leftMargin: Theme.spacing
-        anchors.rightMargin: Theme.spacing / 2
-        anchors.topMargin: Theme.spacing / 2
-        height: scanButton.height
-
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: qsTrId("org.openhu.radio.main.stations")
-            color: Theme.text
-            font.pixelSize: Theme.fontNormal
-            font.weight: Font.Medium
-        }
-
-        IconButton {
-            id: scanButton
-            anchors.right: parent.right
-            visible: list.scanAvailable
-            implicitWidth: Math.round(52 * Theme.scale)
-            iconName: list.scanning ? "close" : "scan"
-            enabled: !list.scanning || list.canCancel
-            Accessible.name: list.scanning ? qsTrId("org.openhu.radio.main.cancel") : qsTrId("org.openhu.radio.main.scan")
-            onClicked: list.scanning ? list.cancelRequested() : list.scanRequested()
-        }
+        x: Theme.spacing
+        y: Math.round(Theme.spacing * 0.5)
+        width: parent.width - Theme.spacing * 2
+        text: list.title
+        color: Theme.text
+        font.pixelSize: Theme.fontNormal * 0.9
+        font.weight: Font.Medium
+        elide: Text.ElideRight
     }
 
     Column {
@@ -117,7 +99,7 @@ Rectangle {
             readonly property bool active: !entry.isHeader && entry.modelData.current === true
 
             width: ListView.view.width
-            height: entry.isHeader ? Math.round(Theme.fontSmall * 2.2) : Math.round(Math.max(56 * Theme.scale, Theme.fontNormal * 3))
+            height: entry.isHeader ? Math.round(Theme.fontSmall * 2.2) : Math.round(Math.max(list.touch, Theme.fontNormal * 3))
 
             Text {
                 visible: entry.isHeader
@@ -154,6 +136,8 @@ Rectangle {
                 width: height
                 source: entry.modelData.logo || ""
                 name: entry.modelData.name || ""
+                icon: "radio"
+                fit: true
             }
 
             Column {
@@ -200,7 +184,7 @@ Rectangle {
                 visible: !entry.isHeader
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                implicitWidth: Math.round(52 * Theme.scale)
+                implicitWidth: list.touch
                 flat: true
                 iconScale: 0.46
                 iconName: entry.modelData.favorite ? "heartFilled" : "heart"

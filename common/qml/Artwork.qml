@@ -2,14 +2,16 @@ import QtQuick
 import OpenHU 1.0
 import "Placeholder.js" as Placeholder
 
-// A cover (from the radio plugin): the picture; without one the initials of the name on a colour of the name,
-// without a name the icon
+// A cover or station logo: the picture (cropped to the square, fit: whole); without one the initials of the name on
+// a colour of the name, without a name the icon
 Rectangle {
     id: artwork
 
     property string source
     property string name
     property string icon: "note"
+    // the whole picture (station logos) instead of filling the square (covers)
+    property bool fit: false
 
     readonly property bool hasImage: artwork.source !== "" && image.status === Image.Ready
 
@@ -24,7 +26,7 @@ Rectangle {
         source: artwork.source
         sourceSize.width: width
         sourceSize.height: height
-        fillMode: Image.PreserveAspectCrop
+        fillMode: artwork.fit ? Image.PreserveAspectFit : Image.PreserveAspectCrop
         asynchronous: true
         visible: artwork.hasImage
     }

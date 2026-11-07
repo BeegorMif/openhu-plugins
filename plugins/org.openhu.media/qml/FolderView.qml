@@ -1,5 +1,7 @@
 import QtQuick
 import OpenHU 1.0
+import "../lib/qml"
+import "Music.js" as Music
 
 // The Folders tab: a path bar (stick › Music › Artist › …, each part can be tapped), back and "Play folder", the
 // subfolders as tiles (the same as in the other tabs) and the music files of the folder as rows below them.
@@ -176,8 +178,8 @@ Item {
                             x: Math.round(folders.gap / 2)
                             width: folders.cell - folders.gap
                             height: parent.height
-                            kind: folderCell.modelData.path === "" && folderCell.modelData.sourceKind
-                                ? (folderCell.modelData.sourceKind === "local" ? "local" : "source") : "folder"
+                            badgeIcon: Music.badgeIcon(folderCell.modelData.path === "" && folderCell.modelData.sourceKind
+                                ? (folderCell.modelData.sourceKind === "local" ? "local" : "source") : "folder")
                             covers: folderCell.modelData.covers || []
                             title: folders.page ? folders.page.tileTitle(folderCell.modelData) : ""
                             subtitle: folders.page ? folders.page.tileSubtitle(folderCell.modelData) : ""

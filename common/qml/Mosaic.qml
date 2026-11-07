@@ -10,6 +10,7 @@ Item {
     property string name
     property string icon: "note"
     property bool dimmed: false
+    property bool fit: false
 
     readonly property bool tiled: mosaic.covers.length >= 2
     readonly property var cells: mosaic.covers.length >= 4 ? mosaic.covers.slice(0, 4)
@@ -24,6 +25,7 @@ Item {
         source: mosaic.covers.length > 0 ? mosaic.covers[0] : ""
         name: mosaic.name
         icon: mosaic.icon
+        fit: mosaic.fit
     }
 
     Rectangle {

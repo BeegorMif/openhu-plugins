@@ -8,7 +8,7 @@
   "ui": {"page": "qml/Main.qml", "icon": "icon.svg", "dock": true},
   "process": {"exec": "bin/media.py", "restart": "on-failure"},
   "permissions": ["audio", "usb"],
-  "shared": ["openhu.py"],
+  "shared": ["openhu.py", "qml"],
   "packages": ["mpv", "python3-mutagen"],
   "settings": [
     {"key": "columns", "type": "number", "default": 4, "min": 3, "max": 6, "title": "Tiles per row",

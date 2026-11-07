@@ -18,11 +18,14 @@ If a library is missing, the page shows which one (e.g. "DAB not available, miss
 and so do `radio.state.dabMissing` / `rdsMissing`. As always, the DVB-T driver `dvb_usb_rtl28xxu` must not claim
 the stick (blocked in the OS image).
 
-**Page:** band tabs; the station that plays with its logo or DAB slideshow picture (initials on a colour of the
-name without one), radio text and a soft background from the picture; for FM/AM a scale to tap or drag to any
-frequency and − / + (held: faster, after about 1.5 s in bigger steps); the frequency is tuned when the finger is
-lifted. The station list shows the favorites first, a heart in each row keeps or removes a station, the station that
-plays shows its radio text. The icons are drawn for the plugin (`qml/Icons.js`).
+**Page** (the structure of the music player, #40): tabs Favorites (all bands), FM, AM and DAB+ with the stations as
+square tiles (logo, else the initials of the name on a colour of the name, else a radio icon; tiles per row in the
+gear's settings). A tap on a tile tunes it, in its band; a long press keeps or removes the favorite. The station that
+plays shows its radio text and the on-air marker. The mini bar at the bottom has the station that plays, previous /
+play-stop / next (seek) and its heart; a tap on it opens the player: the logo or DAB slideshow picture, radio text, a
+soft background from the picture, the stations of the band (favorites first, a heart in each row) on the right, for
+FM/AM a scale to tap or drag to any frequency and − / + (held: faster, after about 1.5 s in bigger steps); the
+frequency is tuned when the finger is lifted. The shared components and icons are in `common/qml/` of the repository.
 
 State `radio.state`, commands `radio.command` and configuration: see the head of [`bin/radio.py`](bin/radio.py).
 `radio.state.bands` contains both bands with stations, favorites and the RDS names and PI codes the plugin remembers

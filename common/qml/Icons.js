@@ -1,7 +1,7 @@
 .pragma library
 
-// Icons of the music page as SVG (24×24, own drawings; the first ones as in the radio plugin), coloured per use:
-// url("shuffle", "#4f9cf9") is a data URL for an Image. "C" in the markup is replaced by the colour.
+// Icons of the radio and music pages as SVG (24×24, own drawings), coloured per use: url("shuffle", "#4f9cf9") is a
+// data URL for an Image. "C" in the markup is replaced by the colour.
 var line = ' fill="none" stroke="C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'
 var bold = ' fill="none" stroke="C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"'
 
@@ -14,6 +14,7 @@ var shapes = {
         + '<path d="M6.5 6v12" stroke="C" stroke-width="2.2" stroke-linecap="round"/>',
     next: '<path d="M5.5 6.5v11L14 12z" fill="C" stroke="C" stroke-width="1.5" stroke-linejoin="round"/>'
         + '<path d="M17.5 6v12" stroke="C" stroke-width="2.2" stroke-linecap="round"/>',
+    minus: '<path d="M5 12h14" stroke="C" stroke-width="2.2" stroke-linecap="round"/>',
     plus: '<path d="M5 12h14M12 5v14" stroke="C" stroke-width="2.2" stroke-linecap="round"/>',
     close: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11" stroke="C" stroke-width="2.2" stroke-linecap="round"/>',
     onAir: '<path d="M5 10.5v3M9 7v10M13 9v6M17 5.5v13M21 10.5v3" stroke="C" stroke-width="2.2" stroke-linecap="round"/>',
@@ -42,6 +43,17 @@ var shapes = {
         + '<circle cx="15.3" cy="17.6" r="2.4" fill="C"/>',
     folder: '<path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h3.6l2 2.2h7.4a2 2 0 0 1 2 2v7.3a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"'
         + line + '/>',
+
+    // radio
+    heart: '<path d="M19.5 12.6 12 20l-7.5-7.4A5 5 0 1 1 12 6a5 5 0 1 1 7.5 6.6z" fill="none" stroke="C"'
+        + ' stroke-width="2" stroke-linejoin="round"/>',
+    heartFilled: '<path d="M19.5 12.6 12 20l-7.5-7.4A5 5 0 1 1 12 6a5 5 0 1 1 7.5 6.6z" fill="C" stroke="C"'
+        + ' stroke-width="2" stroke-linejoin="round"/>',
+    scan: '<g fill="none" stroke="C" stroke-width="2" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-8-8"/>'
+        + '<path d="M16 12a4 4 0 1 1-4-4"/><path d="M12 12l6.5-6.5"/></g>',
+    radio: '<g fill="none" stroke="C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+        + '<rect x="3" y="8.5" width="18" height="12" rx="2.5"/><path d="M7 8.5 17 4"/><circle cx="9" cy="14.5" r="2.6"/>'
+        + '<path d="M14.5 13h3M14.5 16h3"/></g>',
 
     // actions and places
     gear: '<g' + line + '><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2'

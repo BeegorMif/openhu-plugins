@@ -1,7 +1,8 @@
 import QtQuick
 import OpenHU 1.0
+import "../lib/qml"
 import "Music.js" as Music
-import "Placeholder.js" as Placeholder
+import "../lib/qml/Placeholder.js" as Placeholder
 
 // The player: a back chevron; on the left the cover, title, artist and source; on the right "Up next" (tap: play
 // it now, drag the handle: reorder, long press: the menu); at the bottom the seek bar across the whole width and,

@@ -1,5 +1,6 @@
 import QtQuick
 import OpenHU 1.0
+import "../lib/qml"
 import "Music.js" as Music
 
 // A track as a row (album and playlist pages, files of a folder, "Up next"): number or small cover, title, artist,

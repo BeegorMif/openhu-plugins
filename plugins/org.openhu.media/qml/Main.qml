@@ -2,8 +2,9 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import OpenHU 1.0
+import "../lib/qml"
 import "Music.js" as Music
-import "Placeholder.js" as Placeholder
+import "../lib/qml/Placeholder.js" as Placeholder
 
 // Music player (openhu-plugins#38): the library in tabs (Albums, Artists, Songs, Playlists, Folders) with the same
 // grid of square tiles everywhere, album/artist/playlist pages, the mini bar at the bottom and the player with
@@ -326,74 +327,22 @@ Item {
         spacing: Math.round(Theme.spacing * 0.5)
 
         // tabs and the gear
-        Item {
+        TabBar {
             Layout.fillWidth: true
             Layout.preferredHeight: page.touch
-
-            Row {
-                id: tabs
-                anchors.left: parent.left
-                anchors.right: gear.left
-                height: parent.height
-                readonly property var labels: [qsTrId("org.openhu.media.main.tab_albums"), qsTrId("org.openhu.media.main.tab_artists"),
-                    qsTrId("org.openhu.media.main.tab_songs"), qsTrId("org.openhu.media.main.tab_playlists"),
-                    qsTrId("org.openhu.media.main.tab_folders")]
-
-                Repeater {
-                    model: tabs.labels
-
-                    AbstractButton {
-                        id: tabButton
-                        required property string modelData
-                        required property int index
-                        readonly property bool selected: page.tab === tabButton.index
-                        width: tabs.width / tabs.labels.length
-                        height: tabs.height
-                        focusPolicy: Qt.NoFocus
-                        onClicked: {
-                            if (page.tab === tabButton.index && tabButton.index === 4 && page.stack.length === 0)
-                                folderView.open("", "")
-                            page.tab = tabButton.index
-                            page.stack = []
-                        }
-
-                        contentItem: Text {
-                            text: tabButton.modelData
-                            color: tabButton.selected ? Theme.text : Theme.textDim
-                            font.pixelSize: Math.round(Theme.fontLarge * 0.68)
-                            font.weight: Font.Medium
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            elide: Text.ElideRight
-                        }
-                        background: Item {
-                            Rectangle {
-                                anchors.bottom: parent.bottom
-                                width: parent.width
-                                height: 1
-                                color: Theme.textDim
-                                opacity: 0.25
-                            }
-                            Rectangle {
-                                anchors.bottom: parent.bottom
-                                width: parent.width
-                                height: Math.max(3, Math.round(4 * Theme.scale))
-                                color: Theme.primary
-                                visible: tabButton.selected
-                            }
-                            Rectangle {
-                                anchors.fill: parent
-                                color: Theme.text
-                                opacity: tabButton.down ? 0.06 : 0
-                            }
-                        }
-                    }
-                }
+            touch: page.touch
+            labels: [qsTrId("org.openhu.media.main.tab_albums"), qsTrId("org.openhu.media.main.tab_artists"),
+                qsTrId("org.openhu.media.main.tab_songs"), qsTrId("org.openhu.media.main.tab_playlists"),
+                qsTrId("org.openhu.media.main.tab_folders")]
+            currentIndex: page.tab
+            onClicked: function(index) {
+                if (page.tab === index && index === 4 && page.stack.length === 0)
+                    folderView.open("", "")
+                page.tab = index
+                page.stack = []
             }
 
             IconButton {
-                id: gear
-                anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 implicitWidth: page.touch
                 flat: true
@@ -591,21 +540,52 @@ Item {
         }
 
         MiniBar {
+            id: miniBar
             Layout.fillWidth: true
             Layout.preferredHeight: Math.max(page.touch + Math.round(Theme.spacing * 0.6), Math.round(84 * Theme.scale))
             visible: page.hasTrack
             touch: page.touch
-            track: page.track || ({})
+            pictureSource: page.hasTrack ? page.track.cover || "" : ""
+            pictureName: page.hasTrack ? page.track.title || "" : ""
+            title: page.hasTrack ? page.track.title || "" : ""
+            subtitle: page.hasTrack ? page.track.artist || page.texts.unknownArtist : ""
             playing: page.playing
-            position: page.position
-            duration: page.duration
-            mode: page.mode
-            unknownArtist: page.texts.unknownArtist
+            progress: page.duration > 0 ? page.position / page.duration : 0
+            previousText: qsTrId("org.openhu.media.main.previous")
+            playText: qsTrId("org.openhu.media.main.play")
+            playingText: qsTrId("org.openhu.media.main.pause")
+            nextText: qsTrId("org.openhu.media.main.next")
             onOpened: page.playerOpen = true
             onPreviousClicked: page.command("previous")
             onToggleClicked: page.command("toggle")
             onNextClicked: page.command("next")
-            onModeClicked: page.cycleMode()
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                // the width of the longest time, so the bar does not jump
+                width: Math.ceil(timeMetrics.width)
+                horizontalAlignment: Text.AlignRight
+                text: Music.time(page.position) + " / " + Music.time(page.duration)  // untranslated: times
+                color: Theme.textDim
+                font.pixelSize: Theme.fontSmall * 0.9
+                font.features: { "tnum": 1 }
+
+                TextMetrics {
+                    id: timeMetrics
+                    font.pixelSize: Theme.fontSmall * 0.9
+                    text: page.duration >= 3600 ? "00:00:00 / 00:00:00" : "00:00 / 00:00"  // untranslated: width of a time
+                }
+            }
+            IconButton {
+                anchors.verticalCenter: parent.verticalCenter
+                implicitWidth: page.touch
+                flat: true
+                iconName: Music.modeIcon(page.mode)
+                iconColor: page.mode === "order" ? Theme.text : Qt.lighter(Theme.primary, 1.25)
+                iconScale: 0.46
+                Accessible.name: qsTrId("org.openhu.media.main.mode")
+                onClicked: page.cycleMode()
+            }
         }
     }
 
@@ -639,6 +619,7 @@ Item {
 
     Sheet {
         id: settings
+        closeText: qsTrId("org.openhu.media.main.close")
         anchors.fill: parent
         title: qsTrId("org.openhu.media.main.settings")
 
@@ -684,6 +665,7 @@ Item {
 
     Sheet {
         id: menu
+        closeText: qsTrId("org.openhu.media.main.close")
         anchors.fill: parent
         property var item: ({})
         property var entries: []
@@ -705,6 +687,7 @@ Item {
     // add to a playlist, a new playlist, renaming one
     Sheet {
         id: listSheet
+        closeText: qsTrId("org.openhu.media.main.close")
         anchors.fill: parent
         nearTop: listSheet.mode === "name"
         property var context: null
@@ -821,6 +804,7 @@ Item {
 
     Sheet {
         id: confirm
+        closeText: qsTrId("org.openhu.media.main.close")
         anchors.fill: parent
         property var item: ({})
 

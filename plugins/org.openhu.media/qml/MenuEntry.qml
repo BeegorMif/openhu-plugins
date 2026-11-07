@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import OpenHU 1.0
+import "../lib/qml"
 
 // An entry of a sheet: icon and text over the whole width, at least one touch target high
 AbstractButton {
