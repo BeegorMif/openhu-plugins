@@ -87,6 +87,10 @@
         <source></source>
         <translation>%1 h %2 min</translation>
     </message>
+    <message id="org.openhu.media.main.library">
+        <source></source>
+        <translation>Library</translation>
+    </message>
     <message id="org.openhu.media.main.minutes">
         <source></source>
         <translation>%1 min</translation>

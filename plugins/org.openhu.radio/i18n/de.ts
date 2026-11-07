@@ -67,10 +67,6 @@
         <source></source>
         <translation>Alle Sender</translation>
     </message>
-    <message id="org.openhu.radio.main.back">
-        <source></source>
-        <translation>Zurück</translation>
-    </message>
     <message id="org.openhu.radio.main.band_stations">
         <source></source>
         <translation>%1-Sender</translation>
@@ -150,6 +146,10 @@
     <message id="org.openhu.radio.main.simulated_stick">
         <source></source>
         <translation>Simulierter Stick</translation>
+    </message>
+    <message id="org.openhu.radio.main.station_list">
+        <source></source>
+        <translation>Senderliste</translation>
     </message>
     <message id="org.openhu.radio.main.step_down">
         <source></source>

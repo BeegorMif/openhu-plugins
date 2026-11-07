@@ -4,9 +4,9 @@ import "../lib/qml"
 import "Music.js" as Music
 import "../lib/qml/Placeholder.js" as Placeholder
 
-// The player: a back chevron; on the left the cover, title, artist and source; on the right "Up next" (tap: play
-// it now, drag the handle: reorder, long press: the menu); at the bottom the seek bar across the whole width and,
-// centred, mode, previous, play/pause, next and repeat.
+// The player, the main page while there is a track: the button of the library; on the left the cover, title,
+// artist and source; on the right "Up next" (tap: play it now, drag the handle: reorder, long press: the menu); at
+// the bottom the seek bar across the whole width and, centred, mode, previous, play/pause, next and repeat.
 Item {
     id: player
 
@@ -21,7 +21,7 @@ Item {
     property string unknownArtist
     property real touch: 48
 
-    signal backClicked()
+    signal listClicked()
     signal previousClicked()
     signal toggleClicked()
     signal nextClicked()
@@ -47,10 +47,10 @@ Item {
         y: Math.round(Theme.spacing * 0.25)
         implicitWidth: player.touch
         flat: true
-        iconName: "back"
-        iconScale: 0.5
-        Accessible.name: qsTrId("org.openhu.media.main.back")
-        onClicked: player.backClicked()
+        iconName: "library"
+        iconScale: 0.46
+        Accessible.name: qsTrId("org.openhu.media.main.library")
+        onClicked: player.listClicked()
     }
 
     Item {

@@ -44,7 +44,8 @@ Item {
     property int tab: -1
     readonly property int shownTab: page.tab >= 0 ? page.tab : page.bandIds.indexOf(page.band) + 1
     readonly property string tabBand: page.shownTab > 0 ? page.bandIds[page.shownTab - 1] : ""
-    property bool playerOpen: false
+    // the player is the main page; the station list lies above it while it is open
+    property bool playerOpen: true
 
     // frequency (FM/AM) or service (DAB) chosen on the page and not tuned yet, or not confirmed by radio.state yet
     property var pending: null
@@ -202,6 +203,7 @@ Item {
         }
         if (!page.playing)
             page.command("play")
+        page.playerOpen = true
     }
 
     // the scan of a band: switches to it first
@@ -512,7 +514,7 @@ Item {
         visible: page.playerOpen
         z: 10
         page: page
-        onBackClicked: page.playerOpen = false
+        onListClicked: page.playerOpen = false
     }
 
     Sheet {

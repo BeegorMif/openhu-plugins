@@ -46,7 +46,8 @@ Item {
     // album, artist and playlist pages opened from the tabs: [{kind, id, title}]
     property var stack: []
     property string songSort: "title"
-    property bool playerOpen: false
+    // the player is the main page while there is a track; the library lies above it while it is open
+    property bool playerOpen: true
     property var upNext: []
 
     readonly property var texts: ({
@@ -199,6 +200,7 @@ Item {
         if (mode)
             data.mode = mode
         page.command("playItems", data)
+        page.playerOpen = true
     }
 
     function cycleMode() {
@@ -252,7 +254,6 @@ Item {
     onPlayerOpenChanged: page.loadUpNext()
     readonly property int queueVersion: (page.info.queue || {}).version || 0
     onQueueVersionChanged: page.loadUpNext()
-    onHasTrackChanged: if (!page.hasTrack) page.playerOpen = false
 
     // --- the menu of a long press ---
 
@@ -596,7 +597,7 @@ Item {
         upNext: page.upNext
         sourceText: page.sourceText()
         unknownArtist: page.texts.unknownArtist
-        onBackClicked: page.playerOpen = false
+        onListClicked: page.playerOpen = false
         onPreviousClicked: page.command("previous")
         onToggleClicked: page.command("toggle")
         onNextClicked: page.command("next")

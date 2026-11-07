@@ -59,6 +59,8 @@ var shapes = {
     gear: '<g' + line + '><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2'
         + 'M6 6l1.6 1.6M16.4 16.4 18 18M6 18l1.6-1.6M16.4 7.6 18 6"/><circle cx="12" cy="12" r="6.3"/></g>',
     back: '<path d="M14.5 5.5 8 12l6.5 6.5"' + bold + '/>',
+    library: '<g' + line + '><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/>'
+        + '<rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></g>',
     chevronRight: '<path d="M9.5 6l6 6-6 6"' + line + '/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"' + bold + '/>',
     playNext: '<g' + line + '><path d="M4 6h11M4 11h11M4 16h6"/></g><path d="M15 13.5v7l5.5-3.5z" fill="C"'

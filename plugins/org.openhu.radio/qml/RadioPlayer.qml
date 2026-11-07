@@ -3,7 +3,7 @@ import OpenHU 1.0
 import "../lib/qml"
 import "../lib/qml/Placeholder.js" as Placeholder
 
-// The player: a back chevron and the hints; on the left the picture (logo or DAB slideshow), frequency or channel,
+// The player, the main page of the radio: the button of the station list (the tabs) and the hints; on the left the picture (logo or DAB slideshow), frequency or channel,
 // name, radio text (or an error) and badges; on the right the stations of the band (favorites first); at the
 // bottom the tuning scale across the whole width (FM/AM) and, centred, heart, −, previous, play/stop, next, + and
 // scan. page: Main.qml (state and functions of the radio).
@@ -15,7 +15,7 @@ Item {
     readonly property bool dab: player.page.dab
     readonly property bool am: player.page.am
 
-    signal backClicked()
+    signal listClicked()
 
     // taps do not go through to the overview below
     MouseArea { anchors.fill: parent }
@@ -32,10 +32,10 @@ Item {
         y: Math.round(Theme.spacing * 0.25)
         implicitWidth: player.page.touch
         flat: true
-        iconName: "back"
-        iconScale: 0.5
-        Accessible.name: qsTrId("org.openhu.radio.main.back")
-        onClicked: player.backClicked()
+        iconName: "library"
+        iconScale: 0.46
+        Accessible.name: qsTrId("org.openhu.radio.main.station_list")
+        onClicked: player.listClicked()
     }
 
     Chips {
