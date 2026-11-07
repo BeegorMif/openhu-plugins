@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Layouts
 import OpenHU 1.0
 import "../lib/qml"
-import "../lib/qml/Placeholder.js" as Placeholder
 
 // FM/AM/DAB+ radio (openhu-plugins#40, the structure of the music player): tabs Favorites, FM, AM, DAB+ with the
 // stations as square tiles, the mini bar with the station that plays, and the player with the picture (logo or DAB
@@ -366,12 +365,6 @@ Item {
         : qsTrId("org.openhu.radio.main.scanning")
     // -1: without known progress
     readonly property real scanProgress: radio.data.scan && radio.data.scan.total ? radio.data.scan.done / radio.data.scan.total : -1
-
-    Backdrop {
-        anchors.fill: parent
-        source: page.logoOf(page.frequency)
-        tint: page.currentName ? Placeholder.color(page.currentName) : Theme.background
-    }
 
     ColumnLayout {
         anchors.fill: parent

@@ -25,7 +25,8 @@ plays shows its radio text and the on-air marker. The mini bar at the bottom has
 play-stop / next (seek) and its heart; a tap on it opens the player: the logo or DAB slideshow picture, radio text, a
 soft background from the picture, the stations of the band (favorites first, a heart in each row) on the right, for
 FM/AM a scale to tap or drag to any frequency and − / + (held: faster, after about 1.5 s in bigger steps); the
-frequency is tuned when the finger is lifted. The shared components and icons are in `common/qml/` of the repository.
+frequency is tuned when the finger is lifted. Only the player takes its background from the picture; the overview keeps
+the normal background. The shared components and icons are in `common/qml/` of the repository.
 
 State `radio.state`, commands `radio.command` and configuration: see the head of [`bin/radio.py`](bin/radio.py).
 `radio.state.bands` contains both bands with stations, favorites and the RDS names and PI codes the plugin remembers

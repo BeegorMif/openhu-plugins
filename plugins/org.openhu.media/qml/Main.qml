@@ -4,7 +4,6 @@ import QtQuick.Layouts
 import OpenHU 1.0
 import "../lib/qml"
 import "Music.js" as Music
-import "../lib/qml/Placeholder.js" as Placeholder
 
 // Music player (openhu-plugins#38): the library in tabs (Albums, Artists, Songs, Playlists, Folders) with the same
 // grid of square tiles everywhere, album/artist/playlist pages, the mini bar at the bottom and the player with
@@ -312,12 +311,6 @@ Item {
     }
 
     // --- the page ---
-
-    Backdrop {
-        anchors.fill: parent
-        source: page.hasTrack ? page.track.cover || "" : ""
-        tint: page.hasTrack && page.track.title ? Placeholder.color(page.track.title) : Theme.background
-    }
 
     ColumnLayout {
         anchors.fill: parent
