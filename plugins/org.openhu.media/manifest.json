@@ -1,0 +1,13 @@
+{
+  "id": "org.openhu.media",
+  "name": "Music",
+  "version": "1.0.0",
+  "api": 2,
+  "description": "Music player for USB sticks and the head unit: albums, artists, songs, playlists (M3U, PLS, XSPF and your own) and folders, a queue with order, shuffle and random, gapless playback with mpv. Offline, reads only your own files.",
+  "arch": ["all"],
+  "ui": {"page": "qml/Main.qml", "icon": "icon.svg", "dock": true},
+  "process": {"exec": "bin/media.py", "restart": "on-failure"},
+  "permissions": ["audio", "usb"],
+  "shared": ["openhu.py"],
+  "packages": ["mpv", "python3-mutagen"]
+}
