@@ -45,7 +45,11 @@ and on the page.
 - **Long press** on a tile or row: Play, Play next, Add to queue, Add to playlist.
 - **Mini bar** while there is a track: cover, title and artist; previous, play/pause and next in the centre; mode and
   time on the right; a thin progress line. A tap opens the player.
-- **Player:** cover, title, artist, album and source; "Up next" (tap to jump there, drag the handle to reorder); the
+- **Navigation:** the page opens on the player while there is a track, else on the library. The button at the top
+  left of the player opens the library where it was left; playing something there (a track, Play, Shuffle) goes back
+  to the player.
+- **Player:** cover, title, artist, album and source; "Up next" (tap to jump there, drag the handle to reorder; with
+  repeat it goes on after the end of the list below "Then again"); the
   seek bar with both times; mode, previous, play/pause, next, repeat. The mode button cycles Order → Shuffle → Random
   (with a short notice).
 - Empty state ("Plug in a USB stick with music") and the scan progress.

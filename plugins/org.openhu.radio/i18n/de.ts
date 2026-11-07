@@ -79,14 +79,6 @@
         <source></source>
         <translation>Sender wählen</translation>
     </message>
-    <message id="org.openhu.radio.main.close">
-        <source></source>
-        <translation>Schließen</translation>
-    </message>
-    <message id="org.openhu.radio.main.columns">
-        <source></source>
-        <translation>Kacheln pro Reihe</translation>
-    </message>
     <message id="org.openhu.radio.main.dab_missing">
         <source></source>
         <translation>DAB nicht verfügbar, es fehlt: %1</translation>
@@ -183,6 +175,14 @@
         <source></source>
         <translation>Versorgt eine aktive Antenne über den Stick (DAB+)</translation>
     </message>
+    <message id="org.openhu.radio.settings.columns">
+        <source></source>
+        <translation>Kacheln pro Reihe</translation>
+    </message>
+    <message id="org.openhu.radio.settings.columns.description">
+        <source></source>
+        <translation>Sender in den Tabs Favoriten, FM, AM und DAB+</translation>
+    </message>
     <message id="org.openhu.radio.settings.gain">
         <source></source>
         <translation>Empfangsverstärkung (dB)</translation>
@@ -194,6 +194,10 @@
     <message id="org.openhu.radio.settings.gain.description">
         <source></source>
         <translation>Verringern, wenn starke Sender verzerrt klingen</translation>
+    </message>
+    <message id="org.openhu.radio.settings.page">
+        <source></source>
+        <translation>Seite</translation>
     </message>
     <message id="org.openhu.radio.settings.pauseForAndroidAuto">
         <source></source>

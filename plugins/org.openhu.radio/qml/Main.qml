@@ -402,7 +402,8 @@ Item {
                 iconName: "gear"
                 iconScale: 0.46
                 Accessible.name: qsTrId("org.openhu.radio.main.settings")
-                onClicked: settings.open()
+                // the radio's settings (tuner, RDS, tiles per row): Settings → Apps
+                onClicked: api.request("ui.navigate", { page: "settings/apps/org.openhu.radio" })
             }
         }
 
@@ -515,34 +516,5 @@ Item {
         z: 10
         page: page
         onListClicked: page.playerOpen = false
-    }
-
-    Sheet {
-        id: settings
-        anchors.fill: parent
-        title: qsTrId("org.openhu.radio.main.settings")
-        closeText: qsTrId("org.openhu.radio.main.close")
-
-        Text {
-            text: qsTrId("org.openhu.radio.main.columns")
-            color: Theme.textDim
-            font.pixelSize: Theme.fontSmall
-        }
-        Row {
-            spacing: Math.round(Theme.spacing * 0.5)
-
-            Repeater {
-                model: [3, 4, 5, 6]
-
-                PillButton {
-                    required property int modelData
-                    touch: page.touch
-                    width: page.touch * 1.3
-                    text: String(modelData)  // untranslated: a number
-                    checked: page.columns === modelData
-                    onClicked: page.command("columns", modelData)
-                }
-            }
-        }
     }
 }

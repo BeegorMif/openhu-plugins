@@ -24,6 +24,9 @@
     {"key": "rds", "type": "switch", "default": true, "applies": "restart", "title": "RDS",
      "description": "Station names and radio text on FM"},
     {"key": "pauseForAndroidAuto", "type": "switch", "default": true, "title": "Pause for other sources",
-     "description": "Stops when Android Auto or another source starts playing"}
+     "description": "Stops when Android Auto or another source starts playing"},
+    {"type": "section", "key": "page", "title": "Page"},
+    {"key": "columns", "type": "number", "default": 4, "min": 3, "max": 6, "title": "Tiles per row",
+     "description": "Stations in the Favorites, FM, AM and DAB+ tabs"}
   ]
 }

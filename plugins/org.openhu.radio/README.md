@@ -18,15 +18,16 @@ If a library is missing, the page shows which one (e.g. "DAB not available, miss
 and so do `radio.state.dabMissing` / `rdsMissing`. As always, the DVB-T driver `dvb_usb_rtl28xxu` must not claim
 the stick (blocked in the OS image).
 
-**Page** (the structure of the music player, #40): tabs Favorites (all bands), FM, AM and DAB+ with the stations as
-square tiles (logo, else the initials of the name on a colour of the name, else a radio icon; tiles per row in the
-gear's settings). A tap on a tile tunes it, in its band; a long press keeps or removes the favorite. The station that
-plays shows its radio text and the on-air marker. The mini bar at the bottom has the station that plays, previous /
-play-stop / next (seek) and its heart; a tap on it opens the player: the logo or DAB slideshow picture, radio text, a
-soft background from the picture, the stations of the band (favorites first, a heart in each row) on the right, for
-FM/AM a scale to tap or drag to any frequency and − / + (held: faster, after about 1.5 s in bigger steps); the
-frequency is tuned when the finger is lifted. Only the player takes its background from the picture; the overview keeps
-the normal background. The shared components and icons are in `common/qml/` of the repository.
+**Page** (the structure of the music player, #40): it opens on the **player**: the logo or DAB slideshow picture,
+radio text, a soft background from the picture, the stations of the band (favorites first, a heart in each row) on the
+right, for FM/AM a scale to tap or drag to any frequency and − / + (held: faster, after about 1.5 s in bigger steps);
+the frequency is tuned when the finger is lifted. The button at the top left opens the **station list**: tabs
+Favorites (all bands), FM, AM and DAB+ with the stations as square tiles (logo, else the initials of the name on a
+colour of the name, else a radio icon). A tap on a tile tunes it, in its band, and goes back to the player; a long
+press keeps or removes the favorite. The station that plays shows its radio text and the on-air marker. The mini bar
+at the bottom of the list has the station that plays, previous / play-stop / next (seek) and its heart; a tap on it
+opens the player. The gear opens the radio's settings (Settings → Apps → Radio: tuner, RDS, tiles per row). Only the
+player takes its background from the picture; the list keeps the normal background. The shared components and icons are in `common/qml/` of the repository.
 
 State `radio.state`, commands `radio.command` and configuration: see the head of [`bin/radio.py`](bin/radio.py).
 `radio.state.bands` contains both bands with stations, favorites and the RDS names and PI codes the plugin remembers

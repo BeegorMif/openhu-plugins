@@ -79,14 +79,6 @@
         <source></source>
         <translation>Choose a station</translation>
     </message>
-    <message id="org.openhu.radio.main.close">
-        <source></source>
-        <translation>Close</translation>
-    </message>
-    <message id="org.openhu.radio.main.columns">
-        <source></source>
-        <translation>Tiles per row</translation>
-    </message>
     <message id="org.openhu.radio.main.dab_missing">
         <source></source>
         <translation>DAB unavailable, missing: %1</translation>
@@ -183,6 +175,14 @@
         <source></source>
         <translation>Powers an active antenna through the stick (DAB+)</translation>
     </message>
+    <message id="org.openhu.radio.settings.columns">
+        <source></source>
+        <translation>Tiles per row</translation>
+    </message>
+    <message id="org.openhu.radio.settings.columns.description">
+        <source></source>
+        <translation>Stations in the Favorites, FM, AM and DAB+ tabs</translation>
+    </message>
     <message id="org.openhu.radio.settings.gain">
         <source></source>
         <translation>Tuner gain (dB)</translation>
@@ -194,6 +194,10 @@
     <message id="org.openhu.radio.settings.gain.description">
         <source></source>
         <translation>Lower it when strong stations distort</translation>
+    </message>
+    <message id="org.openhu.radio.settings.page">
+        <source></source>
+        <translation>Page</translation>
     </message>
     <message id="org.openhu.radio.settings.pauseForAndroidAuto">
         <source></source>

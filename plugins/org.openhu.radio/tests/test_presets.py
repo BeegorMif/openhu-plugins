@@ -79,10 +79,14 @@ class PresetTest(unittest.TestCase):
         state = self.command("tune", 101.0, band="sw")
         self.assertEqual((state["band"], state["frequency"]), ("fm", 101.0))
 
-    def test_columns(self):
-        self.assertEqual(self.command("columns", 6)["columns"], 6)
-        self.assertEqual(self.command("columns", 9)["columns"], 6)
-        self.assertEqual(self.plugin.config["columns"], 6)
+    def test_columns_setting(self):
+        # changed in Settings → Apps: sent to the page, within 3-6
+        self.plugin.config["columns"] = 5
+        asyncio.run(self.plugin.settings_changed(["columns"]))
+        self.assertEqual(self.plugin.api.published[-1][1]["columns"], 5)
+        self.plugin.config["columns"] = 9
+        asyncio.run(self.plugin.settings_changed(["columns"]))
+        self.assertEqual(self.plugin.api.published[-1][1]["columns"], 6)
 
 
 if __name__ == "__main__":
