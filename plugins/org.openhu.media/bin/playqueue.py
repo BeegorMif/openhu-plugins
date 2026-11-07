@@ -69,6 +69,21 @@ class PlayQueue:
             keys = keys[:limit]
         return [(key, self.tracks[key]) for key in keys]
 
+    def wrapped(self, limit=None):
+        """[(key, track)] that play after the end of the list with repeat (all or one, by next): in order the list
+        from its start up to the current one, in shuffle the next round (the same one next and peek take)."""
+        if self.repeat == REPEAT_OFF or self.pos < 0 or not self.order:
+            return []
+        if self.mode == ORDER:
+            keys = self.order[:self.pos + 1]
+        elif self.mode == SHUFFLE:
+            keys = list(self._new_round())
+        else:
+            return []
+        if limit is not None:
+            keys = keys[:max(limit, 0)]
+        return [(key, self.tracks[key]) for key in keys]
+
     def played_count(self):
         """How many entries of order played before the current one (for "3 / 12")."""
         return max(self.pos, 0)
@@ -271,7 +286,13 @@ class PlayQueue:
         unplayed; in order it is the position in the list."""
         if key not in self.tracks or key not in self.order:
             return None
-        if self.mode == ORDER:
+        if self.mode == SHUFFLE and key not in self.order[self.pos + 1:] and self.repeat != REPEAT_OFF \
+                and self.next_round is not None and key in self.next_round:
+            # an entry of the next round (shown after the end with repeat): that round starts, at this entry
+            self.history = (self.history + self.order)[-HISTORY_LIMIT:]
+            self.order = self.next_round
+            self.pos = self.order.index(key)
+        elif self.mode == ORDER:
             self.pos = self.order.index(key)
         else:
             index = self.order.index(key, self.pos + 1) if key in self.order[self.pos + 1:] else self.order.index(key)

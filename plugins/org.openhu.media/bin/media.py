@@ -21,7 +21,8 @@ Commands: bus.emit "music.command" {cmd, ...}
          With an "id" the result comes as "music.result" {id, cmd, ok, error}.
 Queries: bus.emit "music.query" {id, cmd, ...} -> "music.result" {id, cmd, ok, ...}
          albums/artists/playlists {offset, limit}, songs {sort: title|artist|added, offset, limit}, album {album},
-         artist {artist}, playlist {playlist}, folder {source, path}, queue {limit}, sources
+         artist {artist}, playlist {playlist}, folder {source, path}, sources, queue {limit} (the entries after
+         the current one; with repeat the ones after the end of the list follow with "repeat": true)
 Notices: "music.notice" {text, error} (one-shot): a short message for a toast (playlist saved, stick removed)
 Media:   media.metadata / media.status with source "music" (home page, media keys, Bluetooth car audio); the media
          keys work while the music is the current media source. Pauses when Android Auto or another local source
@@ -859,10 +860,11 @@ class MusicPlugin:
             counts = self.library.source_counts()
             return {"items": [dict(source.to_dict(), tracks=counts.get(source.key, 0)) for source in self.sources]}
         if command == "queue":
-            infos = self.library.tracks([track for _, track in queue_entries])
+            infos = self.library.tracks([track for _, track, _ in queue_entries])
             items = []
-            for (key, _), info in zip(queue_entries, infos):
+            for (key, _, repeat), info in zip(queue_entries, infos):
                 info["key"] = key
+                info["repeat"] = repeat
                 info["available"] = info.get("available", False) and self.library.available(info["id"])
                 items.append(info)
             return {"items": items, "mode": self.queue.mode, "version": self.queue.version}
@@ -870,8 +872,12 @@ class MusicPlugin:
 
     async def on_query(self, topic, data):
         command = data.get("cmd")
-        entries = self.queue.upcoming(max(1, min(QUERY_LIMIT, int(data.get("limit") or 100)))) \
-            if command == "queue" else []
+        entries = []
+        if command == "queue":
+            # with repeat the list goes on after its end: those entries come with "repeat"
+            limit = max(1, min(QUERY_LIMIT, int(data.get("limit") or 100)))
+            entries = [(key, track, False) for key, track in self.queue.upcoming(limit)]
+            entries += [(key, track, True) for key, track in self.queue.wrapped(limit - len(entries))]
         try:
             result = await asyncio.to_thread(self.query_blocking, command, data, entries)
         except (CommandError, ValueError, TypeError) as error:

@@ -271,6 +271,10 @@
         <source></source>
         <translation>Up next</translation>
     </message>
+    <message id="org.openhu.media.main.up_next_again">
+        <source></source>
+        <translation>Then again</translation>
+    </message>
     <message id="org.openhu.media.name">
         <source></source>
         <translation>Music</translation>

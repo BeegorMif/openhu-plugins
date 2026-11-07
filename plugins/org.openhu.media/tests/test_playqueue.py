@@ -38,6 +38,22 @@ class OrderTest(unittest.TestCase):
         queue.set_repeat(REPEAT_ALL)
         self.assertEqual(play_all(queue, 6), ["t01", "t02", "t00", "t01", "t02", "t00"])
 
+    def test_wrapped_with_repeat(self):
+        queue = PlayQueue(seed=1)
+        queue.set_tracks(TRACKS[:4], start=2)
+        self.assertEqual(queue.wrapped(), [])
+        queue.set_repeat(REPEAT_ALL)
+        # after the end the list again from its start, up to the current one
+        self.assertEqual([track for _, track in queue.wrapped()], ["t00", "t01", "t02"])
+        self.assertEqual([track for _, track in queue.wrapped(2)], ["t00", "t01"])
+        queue.next(auto=True)
+        self.assertEqual([track for _, track in queue.upcoming() + queue.wrapped()], ["t00", "t01", "t02", "t03"])
+        self.assertEqual(queue.peek(), "t00")
+        # a tap on an entry after the end
+        key = queue.wrapped()[1][0]
+        self.assertEqual(queue.jump(key), "t01")
+        self.assertEqual([track for _, track in queue.upcoming()], ["t02", "t03"])
+
     def test_repeat_one(self):
         queue = PlayQueue(seed=1)
         queue.set_tracks(TRACKS[:3])
@@ -175,6 +191,22 @@ class ShuffleTest(unittest.TestCase):
         self.assertEqual(back, list(reversed(played[:-1])))
         # and forward again the same way
         self.assertEqual([queue.next() for _ in range(4)], played[1:])
+
+    def test_wrapped_is_the_next_round(self):
+        queue = PlayQueue(seed=5)
+        queue.set_mode(SHUFFLE)
+        queue.set_tracks(TRACKS[:5])
+        queue.set_repeat(REPEAT_ALL)
+        for _ in range(len(queue.upcoming())):
+            queue.next(auto=True)
+        self.assertEqual(queue.upcoming(), [])
+        round_ = [track for _, track in queue.wrapped()]
+        self.assertEqual(sorted(round_), TRACKS[:5])
+        # the round shown is the one that plays, also when tapped in the middle
+        self.assertEqual(queue.peek(), round_[0])
+        key = queue.wrapped()[2][0]
+        self.assertEqual(queue.jump(key), round_[2])
+        self.assertEqual([track for _, track in queue.upcoming()], round_[3:])
 
     def test_jump_keeps_the_skipped_ones(self):
         queue = PlayQueue(seed=9)

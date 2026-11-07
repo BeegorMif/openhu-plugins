@@ -193,6 +193,12 @@ class MediaPluginTest(unittest.IsolatedAsyncioTestCase):
         await self.play_album()
         await self.plugin.on_query("music.query", {"id": 9, "cmd": "queue"})
         self.assertEqual([item["title"] for item in self.api.emitted[-1][1]["items"]], ["02 Two", "03 Three"])
+        # with repeat the list goes on after its end
+        self.plugin.queue.set_repeat("all")
+        await self.plugin.on_query("music.query", {"id": 9, "cmd": "queue"})
+        items = self.api.emitted[-1][1]["items"]
+        self.assertEqual([(item["title"], item["repeat"]) for item in items],
+                         [("02 Two", False), ("03 Three", False), ("01 One", True)])
         await self.plugin.on_query("music.query", {"id": 10, "cmd": "nonsense"})
         self.assertFalse(self.api.emitted[-1][1]["ok"])
 
