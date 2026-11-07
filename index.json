@@ -1,6 +1,6 @@
 {
   "name": "OpenHU Plugins",
-  "description": "Official plugins for OpenHU: CAN bus, steering wheel keys, reverse camera, vehicle data logger, FM/AM/DAB+ radio",
+  "description": "Official plugins for OpenHU: CAN bus, steering wheel keys, reverse camera, vehicle data logger, FM/AM/DAB+ radio, music player",
   "maintainer": "Leon Strauß <openhu.dev@alias.strauss-hub.de>",
   "api": 2,
   "plugins": [
@@ -106,6 +106,27 @@
       "archive": "dist/org.openhu.logger-1.0.0.tar.gz",
       "sha256": "98f6dd1a2b1231062dbda4786d1295dd04363084ec88a99ab3955ecae4223236",
       "size": 41081
+    },
+    {
+      "id": "org.openhu.media",
+      "name": "Music",
+      "version": "1.0.0",
+      "description": "Music player for USB sticks and the head unit: albums, artists, songs, playlists (M3U, PLS, XSPF and your own) and folders, a queue with order, shuffle and random, gapless playback with mpv. Offline, reads only your own files.",
+      "arch": [
+        "all"
+      ],
+      "api": 2,
+      "permissions": [
+        "audio",
+        "usb"
+      ],
+      "packages": [
+        "mpv",
+        "python3-mutagen"
+      ],
+      "archive": "dist/org.openhu.media-1.0.0.tar.gz",
+      "sha256": "cd50e7b28e284c68b4a7df79ca9adf563fc5bb742aa11ed9c1d2a59de637930c",
+      "size": 74330
     },
     {
       "id": "org.openhu.radio",
