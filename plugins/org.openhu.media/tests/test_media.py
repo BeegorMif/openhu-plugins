@@ -136,6 +136,11 @@ class MediaPluginTest(unittest.IsolatedAsyncioTestCase):
         await self.plugin.on_media_status("media.status", {"source": "radio", "state": "stopped"})
         self.assertEqual(self.state()["state"], "paused")
 
+    async def test_android_auto_pauses(self):
+        await self.play_album()
+        await self.plugin.on_media_status("media.status", {"source": "androidauto", "state": "playing"})
+        self.assertEqual(self.state()["state"], "paused")
+
     async def test_pause_for_android_auto_can_be_off(self):
         self.plugin.config["pauseForAndroidAuto"] = False
         await self.play_album()
