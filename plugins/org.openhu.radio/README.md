@@ -52,8 +52,8 @@ service ID (`"0xD882"`) instead of a frequency (`frequency`, `stations`, `preset
   scan to certain channels (e.g. `["5C", "7A", "8C"]` in Hannover).
 - **No stick / stick busy:** `openhu-dab` reports `no-device` or `device-busy` and exits; the page shows
   "No RTL-SDR stick found" or "The RTL-SDR stick is used by another program".
-- **Antenna power:** `"biasTee": true` in `config.json` switches on the stick's phantom power (RTL-SDR Blog V3/V4 and
-  compatible) for active antennas.
+- **Antenna power:** the setting "Antenna power (bias-T)" (Settings → Apps → Radio → Settings,
+  `biasTee`) switches on the stick's phantom power (RTL-SDR Blog V3/V4 and compatible) for active antennas.
 
 Real DAB reception has not been tested with a stick yet (only the simulated stick and the start of `openhu-dab`
 without a stick); it is also open how much CPU `openhu-dab` needs on a Raspberry Pi 4 next to the Android Auto video

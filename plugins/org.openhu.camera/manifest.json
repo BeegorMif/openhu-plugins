@@ -9,5 +9,12 @@
   "process": {"exec": "bin/camera.py", "restart": "on-failure"},
   "permissions": ["camera"],
   "shared": ["openhu.py"],
-  "recommends": ["org.openhu.vehicle"]
+  "recommends": ["org.openhu.vehicle"],
+  "settings": [
+    {"key": "autoReverse", "type": "switch", "default": true, "title": "Show in reverse gear",
+     "description": "Needs the reverse gear from the vehicle plugin"},
+    {"key": "display", "type": "choice", "default": "page", "options": ["page", "overlay"], "title": "Show as"},
+    {"key": "mirror", "type": "switch", "default": false, "title": "Mirror the picture"},
+    {"key": "guides", "type": "switch", "default": true, "title": "Guide lines"}
+  ]
 }

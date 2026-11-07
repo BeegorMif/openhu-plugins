@@ -27,7 +27,7 @@ Media:   media.metadata / media.status with source "music" (home page, media key
          keys work while the music is the current media source. Pauses when Android Auto or another local source
          starts playing (pauseForAndroidAuto), stops when the stick of the track that plays is pulled.
 Actions: music.toggle, music.next, music.previous (e.g. for steering wheel buttons)
-Config (plugin data dir): columns (tiles per row, 3-6), folders (more music folders), pauseForAndroidAuto,
+Config (the config store in OpenHU, settings in Settings → Apps): columns (tiles per row, 3-6), folders (more music folders), pauseForAndroidAuto,
          mediaRoot (default /run/media), mpv (the program), hiddenPlaylists (own playlists deleted on a read-only
          stick: hidden here, {playlist: mtime})
 """
@@ -94,14 +94,8 @@ def now_ms():
 
 
 def load_config(data_dir):
-    config = json.loads(json.dumps(DEFAULTS))
-    try:
-        with open(os.path.join(data_dir, "config.json")) as file:
-            saved = json.load(file)
-        if isinstance(saved, dict):
-            config.update({key: value for key, value in saved.items() if key in DEFAULTS})
-    except (OSError, ValueError):
-        pass
+    # the config store in OpenHU (columns and pauseForAndroidAuto are settings in Settings → Apps, openhu#152)
+    config = openhu.load_config(DEFAULTS, data_dir)
     try:
         config["columns"] = max(3, min(6, int(config["columns"])))
     except (TypeError, ValueError):
@@ -133,6 +127,9 @@ class MusicPlugin:
         self.texts = Texts(os.path.join(HERE, "..", "i18n"))
         if hasattr(self.api, "on"):
             self.texts.follow(self.api, self.publish_state)
+        if hasattr(self.api, "on_config"):
+            # changed in Settings → Apps
+            openhu.follow_config(self.api, self.config, lambda keys: self.publish_state(), self.data_dir)
         self.library = library.Library(self.data_dir)
         self.queue = PlayQueue(available=self.track_available)
         mpv = mpv or self.config.get("mpv") or "mpv"
@@ -694,7 +691,7 @@ class MusicPlugin:
         return None
 
     def save_config(self):
-        write_json(os.path.join(self.data_dir, "config.json"), self.config)
+        openhu.save_config(self.config, self.data_dir)
 
     # --- own playlists --------------------------------------------------------------------
 

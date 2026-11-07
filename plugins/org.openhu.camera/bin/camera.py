@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Reverse camera: shows the camera overlay on camera.show/hide/toggle actions and in reverse gear.
 
-Config (plugin data dir, editable on the plugin page), published as "camera.config":
+Config (the config store in OpenHU, on the plugin page and in Settings → Apps), published as "camera.config":
     device        camera device id ("" = default camera)
     mirror        mirror the picture horizontally
     guides        draw parking guide lines
@@ -18,7 +18,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 
-from openhu import PLUGIN_ID, OpenHU, load_config, save_config, setup_logging  # noqa: E402
+from openhu import PLUGIN_ID, OpenHU, follow_config, load_config, save_config, setup_logging  # noqa: E402
 
 log = logging.getLogger("camera")
 
@@ -38,6 +38,13 @@ class CameraPlugin:
         self.api.on("input.action", self.on_action)
         self.api.on("vehicle.gear", self.on_gear)
         self.api.on("camera.command", self.on_command)
+        # changed in Settings → Apps
+        follow_config(self.api, self.config, self.on_config)
+
+    async def on_config(self, keys):
+        await self.publish_config()
+        if "display" in keys and self.visible:
+            await self.show(True)
 
     async def show(self, visible):
         changed = visible != self.visible

@@ -147,5 +147,57 @@
         <source></source>
         <translation>Radio</translation>
     </message>
+    <message id="org.openhu.radio.settings.biasTee">
+        <source></source>
+        <translation>Antennenspeisung (Bias-T)</translation>
+    </message>
+    <message id="org.openhu.radio.settings.biasTee.description">
+        <source></source>
+        <translation>Versorgt eine aktive Antenne über den Stick (DAB+)</translation>
+    </message>
+    <message id="org.openhu.radio.settings.gain">
+        <source></source>
+        <translation>Empfangsverstärkung (dB)</translation>
+    </message>
+    <message id="org.openhu.radio.settings.gain.auto">
+        <source></source>
+        <translation>Automatisch</translation>
+    </message>
+    <message id="org.openhu.radio.settings.gain.description">
+        <source></source>
+        <translation>Verringern, wenn starke Sender verzerrt klingen</translation>
+    </message>
+    <message id="org.openhu.radio.settings.pauseForAndroidAuto">
+        <source></source>
+        <translation>Für andere Quellen pausieren</translation>
+    </message>
+    <message id="org.openhu.radio.settings.pauseForAndroidAuto.description">
+        <source></source>
+        <translation>Stoppt, wenn Android Auto oder eine andere Quelle zu spielen beginnt</translation>
+    </message>
+    <message id="org.openhu.radio.settings.playback">
+        <source></source>
+        <translation>Wiedergabe</translation>
+    </message>
+    <message id="org.openhu.radio.settings.ppm">
+        <source></source>
+        <translation>Frequenzkorrektur (ppm)</translation>
+    </message>
+    <message id="org.openhu.radio.settings.ppm.description">
+        <source></source>
+        <translation>Für Sticks, bei denen die Sender leicht daneben liegen</translation>
+    </message>
+    <message id="org.openhu.radio.settings.rds">
+        <source></source>
+        <translation>RDS</translation>
+    </message>
+    <message id="org.openhu.radio.settings.rds.description">
+        <source></source>
+        <translation>Sendernamen und Radiotext bei UKW</translation>
+    </message>
+    <message id="org.openhu.radio.settings.tuner">
+        <source></source>
+        <translation>USB-Stick</translation>
+    </message>
 </context>
 </TS>

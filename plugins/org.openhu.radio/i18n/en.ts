@@ -147,5 +147,57 @@
         <source></source>
         <translation>Radio</translation>
     </message>
+    <message id="org.openhu.radio.settings.biasTee">
+        <source></source>
+        <translation>Antenna power (bias-T)</translation>
+    </message>
+    <message id="org.openhu.radio.settings.biasTee.description">
+        <source></source>
+        <translation>Powers an active antenna through the stick (DAB+)</translation>
+    </message>
+    <message id="org.openhu.radio.settings.gain">
+        <source></source>
+        <translation>Tuner gain (dB)</translation>
+    </message>
+    <message id="org.openhu.radio.settings.gain.auto">
+        <source></source>
+        <translation>Auto</translation>
+    </message>
+    <message id="org.openhu.radio.settings.gain.description">
+        <source></source>
+        <translation>Lower it when strong stations distort</translation>
+    </message>
+    <message id="org.openhu.radio.settings.pauseForAndroidAuto">
+        <source></source>
+        <translation>Pause for other sources</translation>
+    </message>
+    <message id="org.openhu.radio.settings.pauseForAndroidAuto.description">
+        <source></source>
+        <translation>Stops when Android Auto or another source starts playing</translation>
+    </message>
+    <message id="org.openhu.radio.settings.playback">
+        <source></source>
+        <translation>Playback</translation>
+    </message>
+    <message id="org.openhu.radio.settings.ppm">
+        <source></source>
+        <translation>Frequency correction (ppm)</translation>
+    </message>
+    <message id="org.openhu.radio.settings.ppm.description">
+        <source></source>
+        <translation>For sticks whose stations are slightly off</translation>
+    </message>
+    <message id="org.openhu.radio.settings.rds">
+        <source></source>
+        <translation>RDS</translation>
+    </message>
+    <message id="org.openhu.radio.settings.rds.description">
+        <source></source>
+        <translation>Station names and radio text on FM</translation>
+    </message>
+    <message id="org.openhu.radio.settings.tuner">
+        <source></source>
+        <translation>USB stick</translation>
+    </message>
 </context>
 </TS>

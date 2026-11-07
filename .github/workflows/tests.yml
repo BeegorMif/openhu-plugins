@@ -49,6 +49,13 @@ jobs:
               plugins/org.openhu.radio/tools/fake-sdr/openhu-dab plugins/org.openhu.media/tools/fake-mpv/mpv \
               plugins/org.openhu.media/tools/make-test-music.py
 
+      # the TypeScript client common/openhu.ts (plugin programs run with bun)
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.19
+      - name: TypeScript client
+        run: bun test tests/ts
+
       # qmllint of OpenHU (Qt 6) with its OpenHU QML module; OpenHU branch of the same name, else main
       - name: QML
         run: |

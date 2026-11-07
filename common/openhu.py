@@ -12,6 +12,16 @@
     texts.follow(api, on_change)                       # ...also after a switch
     texts.tr("org.example.speed.error.no_sensor")      # i18n/<language>.ts, like qsTrId() in QML
 
+    api.config["ppm"]                                  # the plugin's config store in OpenHU (openhu#152), at once:
+    api.config.get("stations", [])                     # manifest defaults + config.json, no connection needed
+    await api.config.set("frequency", 101.3)           # through OpenHU (checks declared settings); offline: sent later
+    await api.config.update({"band": "fm"})            # several keys, all or none
+    await api.config.remove("oldKey")                  # free key deleted, a setting back to its default
+    api.on_config(lambda values, changed: ...)         # changed in Settings → Apps or by another client
+
+    config = load_config(DEFAULTS)                     # older style, still fine: a dict of the store's values,
+    save_config(config)                                # sends what changed since the last save
+
 Environment (set by OpenHU): OPENHU_API_URL, OPENHU_PLUGIN_ID, OPENHU_PLUGIN_DIR, OPENHU_DATA_DIR, OPENHU_LANGUAGE,
 OPENHU_PLUGIN_TOKEN (the process logs in with it, so its values count as the plugin's: only plugins that declare
 "androidAuto" in their manifest feed Android Auto, openhu#123).
@@ -20,6 +30,7 @@ a plugin against a head unit (OPENHU_API_URL=ws://<head unit>:5520). On the head
 """
 
 import asyncio
+import copy
 import inspect
 import json
 import logging
@@ -49,23 +60,279 @@ def setup_logging():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 
-def load_config(defaults):
-    """defaults merged with DATA_DIR/config.json"""
-    config = dict(defaults)
+_MISSING = object()
+# the OpenHU of the process: load_config/save_config go through its config store
+_instance = None
+# what load_config/save_config saw last, per data dir: save_config sends only what changed since then
+_saved = {}
+
+
+def read_json(path):
     try:
-        with open(os.path.join(DATA_DIR, "config.json")) as file:
-            config.update(json.load(file))
+        with open(path) as file:
+            data = json.load(file)
+        return data if isinstance(data, dict) else {}
     except (OSError, ValueError):
-        pass
+        return {}
+
+
+def write_json(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path + ".tmp", "w") as file:
+        json.dump(data, file, indent=2)
+    os.replace(path + ".tmp", path)
+
+
+def setting_defaults(plugin_dir=None):
+    """key -> default of the settings declared in manifest.json (without sections)."""
+    manifest = read_json(os.path.join(plugin_dir or PLUGIN_DIR, "manifest.json"))
+    settings = manifest.get("settings") if isinstance(manifest.get("settings"), list) else []
+    return {entry["key"]: entry["default"] for entry in settings
+            if isinstance(entry, dict) and entry.get("type") != "section" and "key" in entry and "default" in entry}
+
+
+def _store_for(data_dir):
+    if _instance is not None and os.path.abspath(data_dir or DATA_DIR) == os.path.abspath(_instance.config.data_dir):
+        return _instance.config
+    return None
+
+
+def load_config(defaults, data_dir=None):
+    """defaults merged with the config store (the manifest's setting defaults and config.json, or the values OpenHU
+    published). A plain dict: change it and call save_config(), or use api.config."""
+    data_dir = data_dir or DATA_DIR
+    store = _store_for(data_dir)
+    config = copy.deepcopy(dict(defaults))
+    if store is not None:
+        config.update(copy.deepcopy(store.as_dict()))
+    else:
+        config.update(setting_defaults())
+        config.update(read_json(os.path.join(data_dir, "config.json")))
+    _saved[os.path.abspath(data_dir)] = copy.deepcopy(config)
     return config
 
 
-def save_config(config):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    path = os.path.join(DATA_DIR, "config.json")
-    with open(path + ".tmp", "w") as file:
-        json.dump(config, file, indent=2)
-    os.replace(path + ".tmp", path)
+def save_config(config, data_dir=None):
+    """Stores what changed since the last load_config/save_config: through OpenHU's config store when this process
+    has an OpenHU (sent once it is connected), otherwise into config.json."""
+    data_dir = data_dir or DATA_DIR
+    key = os.path.abspath(data_dir)
+    saved = _saved.get(key, {})
+    changes = {name: copy.deepcopy(value) for name, value in config.items() if saved.get(name, _MISSING) != value}
+    removed = [name for name in saved if name not in config]
+    _saved[key] = copy.deepcopy(dict(config))
+    store = _store_for(data_dir)
+    if store is not None:
+        store.queue(changes, removed)
+        return
+    write_json(os.path.join(data_dir, "config.json"), config)
+
+
+def follow_config(api, config, on_change=None, data_dir=None):
+    """Keeps a dict from load_config() current: values changed from outside (Settings → Apps, another client) are
+    written into it, then on_change(changed keys) is called (sync or async). Call before api.run()."""
+    key = os.path.abspath(data_dir or DATA_DIR)
+
+    async def changed(values, keys):
+        saved = _saved.setdefault(key, {})
+        for name in keys:
+            if name in values:
+                config[name] = copy.deepcopy(values[name])
+                saved[name] = copy.deepcopy(values[name])
+            else:
+                config.pop(name, None)
+                saved.pop(name, None)
+        if on_change is not None:
+            result = on_change(keys)
+            if inspect.isawaitable(result):
+                await result
+    api.on_config(changed)
+
+
+class Config:
+    """The plugin's config store in OpenHU (openhu#152, openhu/docs/plugins.md#config-store): one JSON object, declared
+    keys are the settings of manifest.json (shown in Settings → Apps, checked by OpenHU), all other keys are free.
+
+    Readable at once (the manifest's defaults and config.json, no connection needed) and kept current from the topic
+    plugin.config.<id>. Changes go through OpenHU; made while not connected, they apply locally and are sent once the
+    connection is there. Against an OpenHU without the store, config.json is written directly."""
+
+    def __init__(self, api, plugin_id=None, data_dir=None, plugin_dir=None):
+        self._api = api
+        self.plugin_id = plugin_id or PLUGIN_ID
+        self.data_dir = data_dir or DATA_DIR
+        self.plugin_dir = plugin_dir or PLUGIN_DIR
+        self.defaults = setting_defaults(self.plugin_dir)
+        self._values = dict(copy.deepcopy(self.defaults))
+        self._values.update(read_json(os.path.join(self.data_dir, "config.json")))
+        self._pending = {}  # key -> value, or _MISSING for a removed key
+        self._callbacks = []
+        self._supported = None  # False: OpenHU has no config store (plugin.config.* unknown)
+
+    @property
+    def topic(self):
+        return "plugin.config." + self.plugin_id
+
+    # --- reading ---
+
+    def __getitem__(self, key):
+        return self._values[key]
+
+    def __contains__(self, key):
+        return key in self._values
+
+    def __iter__(self):
+        return iter(dict(self._values))
+
+    def __len__(self):
+        return len(self._values)
+
+    def get(self, key, default=None):
+        return self._values.get(key, default)
+
+    def keys(self):
+        return list(self._values)
+
+    def items(self):
+        return list(self._values.items())
+
+    def as_dict(self):
+        return dict(self._values)
+
+    def on_change(self, callback):
+        """callback(values, changed) (sync or async) when values change from outside: Settings → Apps, another
+        client, the file changed by hand. Not for the process's own changes."""
+        self._callbacks.append(callback)
+
+    # --- changing ---
+
+    async def set(self, key, value):
+        """Sets one key; returns the value as stored (a setting converted to its type). Raises OpenHUError for a value
+        that a declared setting does not take."""
+        return (await self.update({key: value}))[key]
+
+    async def update(self, changes):
+        """Sets several keys, all or none; returns them as stored."""
+        changes = copy.deepcopy(dict(changes))
+        if self._api.connected and self._supported is not False:
+            try:
+                result = await self._api.request("plugin.config.set", id=self.plugin_id, values=changes)
+                self._values.update(result.get("values", {}))
+                return result.get("values", {})
+            except OpenHUError as error:
+                if "unknown method" not in str(error):
+                    raise
+                self._supported = False
+        self.queue(changes, [])
+        return changes
+
+    async def remove(self, *keys):
+        """A free key is deleted, a declared setting goes back to its default."""
+        if self._api.connected and self._supported is not False:
+            try:
+                result = await self._api.request("plugin.config.remove", id=self.plugin_id, keys=list(keys))
+                self._values = result.get("values", self._values)
+                return
+            except OpenHUError as error:
+                if "unknown method" not in str(error):
+                    raise
+                self._supported = False
+        self.queue({}, list(keys))
+
+    def queue(self, changes, removed):
+        """Applies changes locally and sends them when possible (save_config, changes while not connected)."""
+        for key, value in changes.items():
+            self._values[key] = copy.deepcopy(value)
+            self._pending[key] = copy.deepcopy(value)
+        for key in removed:
+            self._values.pop(key, None)
+            if key in self.defaults:
+                self._values[key] = copy.deepcopy(self.defaults[key])
+            self._pending[key] = _MISSING
+        if self._supported is False:
+            self._write_file()
+            return
+        if self._api.connected:
+            try:
+                asyncio.get_running_loop().create_task(self.flush())
+            except RuntimeError:
+                pass  # no loop yet: sent at the connect
+
+    async def flush(self):
+        """Sends the queued changes (also called on every connect)."""
+        if not self._pending or not self._api.connected:
+            return
+        pending, self._pending = self._pending, {}
+        changes = {key: value for key, value in pending.items() if value is not _MISSING}
+        removed = [key for key, value in pending.items() if value is _MISSING]
+        try:
+            if self._supported is not False:
+                if changes:
+                    await self._api.request("plugin.config.set", id=self.plugin_id, values=changes)
+                if removed:
+                    await self._api.request("plugin.config.remove", id=self.plugin_id, keys=removed)
+                return
+        except OpenHUError as error:
+            if "unknown method" in str(error):
+                self._supported = False
+            elif "connection lost" in str(error) or "not connected" in str(error):
+                # again at the next connect
+                for key, value in pending.items():
+                    self._pending.setdefault(key, value)
+                return
+            else:
+                # refused (a setting the plugin set to a value OpenHU does not take): key by key, so the other keys
+                # (e.g. the plugin's stations) are not lost with it; OpenHU keeps its value for the refused one
+                for key, value in changes.items():
+                    try:
+                        await self._api.request("plugin.config.set", id=self.plugin_id, values={key: value})
+                    except OpenHUError as refused:
+                        log.warning("config: %s", refused)
+                if removed:
+                    await self._api.safe(self._api.request("plugin.config.remove", id=self.plugin_id, keys=removed))
+                await self._sync()
+                return
+        self._write_file()
+
+    async def _connected(self):
+        await self.flush()
+        await self._sync()
+
+    async def _sync(self):
+        """Takes OpenHU's values (the store may have changed while the process was not connected)."""
+        if self._supported is False:
+            return
+        try:
+            result = await self._api.request("plugin.config.get", id=self.plugin_id)
+        except OpenHUError as error:
+            if "unknown method" in str(error):
+                self._supported = False
+                self._write_file()
+            return
+        await self._take(result.get("values", {}))
+
+    async def _on_topic(self, topic, data):
+        # local changes still to be sent win until they are
+        if not self._pending and isinstance(data.get("values"), dict):
+            await self._take(data["values"])
+
+    async def _take(self, values):
+        changed = sorted(key for key in set(values) | set(self._values)
+                         if values.get(key, _MISSING) != self._values.get(key, _MISSING))
+        self._values = dict(values)
+        if not changed:
+            return
+        for callback in list(self._callbacks):
+            try:
+                result = callback(dict(values), changed)
+                if inspect.isawaitable(result):
+                    await result
+            except Exception:
+                log.exception("config callback failed")
+
+    def _write_file(self):
+        # OpenHU without a config store: the file as before
+        write_json(os.path.join(self.data_dir, "config.json"), self._values)
 
 
 def load_ts(path):
@@ -139,7 +406,8 @@ class Texts:
 
 
 class OpenHU:
-    def __init__(self, url=None, token=None):
+    def __init__(self, url=None, token=None, plugin_id=None, data_dir=None, plugin_dir=None):
+        global _instance
         self.url = url or os.environ.get("OPENHU_API_URL", "ws://127.0.0.1:5520")
         self.token = token or os.environ.get("OPENHU_API_TOKEN")
         self.plugin_token = os.environ.get("OPENHU_PLUGIN_TOKEN")
@@ -147,6 +415,14 @@ class OpenHU:
         self._next_id = 0
         self._pending = {}
         self._handlers = []
+        self.config = Config(self, plugin_id, data_dir, plugin_dir)
+        self.on(self.config.topic, self.config._on_topic)
+        if _instance is None:
+            _instance = self
+
+    def on_config(self, callback):
+        """callback(values, changed) when the config store changes from outside (see Config.on_change)."""
+        self.config.on_change(callback)
 
     @property
     def connected(self):
@@ -202,6 +478,7 @@ class OpenHU:
                     topics = sorted({pattern for pattern, _ in self._handlers})
                     if topics:
                         await ws.send(json.dumps({"type": "subscribe", "topics": topics}))
+                    asyncio.create_task(self._call(self.config._connected))
                     if on_connect is not None:
                         asyncio.create_task(self._call(on_connect))
                     async for message in ws:

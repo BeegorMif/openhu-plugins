@@ -103,11 +103,12 @@ bus.emit {"topic": "music.query", "data": {"id": "q1", "cmd": "albums", "offset"
   → event "music.result" {"id": "q1", "cmd": "albums", "ok": true, "total": 6, "items": [...]}
 ```
 
-Configuration (`config.json` in the plugin data dir):
+Configuration (the plugin's config store in OpenHU, `config.json` in the plugin data dir; `columns` and
+`pauseForAndroidAuto` are settings in Settings → Apps & Store → Installed → Music → Settings):
 
 | Key | Default | |
 |---|---|---|
-| `columns` | `4` | tiles per row (3–6), set on the page |
+| `columns` | `4` | tiles per row (3–6) |
 | `folders` | `[]` | more music folders |
 | `pauseForAndroidAuto` | `true` | pause when Android Auto or another source plays |
 | `mediaRoot` | `/run/media` | where sticks are mounted |

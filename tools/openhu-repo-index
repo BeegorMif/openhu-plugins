@@ -45,6 +45,88 @@ def fail(message):
     sys.exit(1)
 
 
+SETTING_TYPES = ("switch", "choice", "number", "text", "section")
+SETTING_KEY = re.compile(r"^[A-Za-z0-9_]{1,64}$")
+
+
+def is_number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def is_integer(value):
+    return is_number(value) and float(value).is_integer()
+
+
+def option_text(value):
+    """A choice option as OpenHU stores it: 49.6 -> "49.6", 20 -> "20"."""
+    if is_number(value):
+        return str(int(value)) if float(value).is_integer() else repr(float(value))
+    return value
+
+
+def settings_errors(manifest):
+    """Problems of the manifest's "settings" (openhu#152), the same rules as OpenHU's PluginConfig::parseSchema:
+    OpenHU leaves such entries out, the official store does not ship them."""
+    if "settings" not in manifest:
+        return []
+    settings = manifest["settings"]
+    if not isinstance(settings, list):
+        return ["settings: not a list"]
+    errors = []
+    keys = set()
+    for index, entry in enumerate(settings):
+        where = "settings[%d]" % index
+        if not isinstance(entry, dict):
+            errors.append(where + ": not an object")
+            continue
+        key, kind = entry.get("key"), entry.get("type")
+        where += " " + str(key)
+        if not isinstance(key, str) or not SETTING_KEY.match(key):
+            errors.append(where + ": key missing or not letters, digits and _")
+            continue
+        if key in keys:
+            errors.append(where + ": duplicate key")
+            continue
+        keys.add(key)
+        if kind not in SETTING_TYPES:
+            errors.append(where + ": unknown type %r" % kind)
+            continue
+        if kind == "section":
+            continue
+        if entry.get("applies", "now") not in ("now", "restart"):
+            errors.append(where + ": applies must be now or restart")
+        if "default" not in entry:
+            errors.append(where + ": default missing")
+            continue
+        default = entry["default"]
+        if kind == "switch" and not isinstance(default, bool):
+            errors.append(where + ": default must be true or false")
+        elif kind == "choice":
+            options = entry.get("options")
+            if not isinstance(options, list) or not options \
+                    or not all(isinstance(o, str) or is_number(o) for o in options) \
+                    or len({option_text(o) for o in options}) != len(options):
+                errors.append(where + ": options must be a list of different texts")
+            elif not (isinstance(default, str) or is_number(default)) \
+                    or option_text(default) not in {option_text(o) for o in options}:
+                errors.append(where + ": default must be one of the options")
+        elif kind == "number":
+            low, high, step = entry.get("min"), entry.get("max"), entry.get("step", 1)
+            if not is_integer(low) or not is_integer(high) or low > high:
+                errors.append(where + ": min and max must be integers, min <= max")
+            elif not is_integer(step) or step < 1:
+                errors.append(where + ": step must be an integer >= 1")
+            elif not is_integer(default) or not low <= default <= high or (default - low) % step:
+                errors.append(where + ": default must be a whole number from min to max in steps")
+        elif kind == "text":
+            length = entry.get("maxLength", 256)
+            if not is_integer(length) or not 1 <= length <= 4096:
+                errors.append(where + ": maxLength must be 1 to 4096")
+            elif not isinstance(default, str) or len(default) > length:
+                errors.append(where + ": default must be a text of at most maxLength characters")
+    return errors
+
+
 def add_file(tar, path, arcname):
     info = tar.gettarinfo(path, arcname)
     info.mtime = 0
@@ -164,6 +246,9 @@ def main():
             fail("%s: id must match the folder name" % manifest_path)
         if not VERSION_PATTERN.match(manifest["version"]):
             fail("%s: version must look like 1.2.3" % manifest_path)
+        problems = settings_errors(manifest)
+        if problems:
+            fail("%s: %s" % (manifest_path, "; ".join(problems)))
 
         # translations: the compiled .qm next to every .ts (tools/openhu-translations; OpenHU loads the .qm)
         for ts in sorted(glob.glob(os.path.join(plugin_dir, "i18n", "*.ts"))):

@@ -31,7 +31,7 @@ Slide: "radio.slide" {band, station, image: data URL} – DAB slideshow picture 
 Media: while playing also media.metadata / media.status with source "radio" (home page, Bluetooth car radio), as
           cover the slideshow picture, else the station logo; "stopped" only if the radio was the last media source
           (not when Android Auto music took over)
-Config (plugin data dir): gain ("auto" or dB), ppm, biasTee (antenna power from the stick, DAB), amOptions (rtl_fm
+Config (the config store in OpenHU; gain, ppm, biasTee, rds, pauseForAndroidAuto are settings in Settings → Apps): gain ("auto" or dB), ppm, biasTee (antenna power from the stick, DAB), amOptions (rtl_fm
           arguments for AM, default direct sampling), rds, pauseForAndroidAuto, fakeSdr (simulated stick,
           tools/fake-sdr; also OPENHU_FAKE_SDR=1), dabSyncSeconds (time to find a DAB signal on a channel during
           the scan, default 3), dabScanSeconds (at most per channel with a signal, default 10), dabChannels
@@ -52,7 +52,7 @@ sys.path.insert(0, HERE)
 import dab  # noqa: E402
 import dablib  # noqa: E402
 import radiolib  # noqa: E402
-from openhu import DATA_DIR, OpenHU, Texts, load_config, save_config, setup_logging  # noqa: E402
+from openhu import DATA_DIR, OpenHU, Texts, follow_config, load_config, save_config, setup_logging  # noqa: E402
 
 log = logging.getLogger("radio")
 
@@ -92,6 +92,8 @@ class RadioPlugin(dab.DabMixin):
             self.config[table].setdefault(radiolib.DAB, [])
         self.config["names"].setdefault(radiolib.DAB, {})
         self.api = OpenHU()
+        # settings changed in Settings → Apps (gain, ppm, biasTee, rds restart the process: "applies": "restart")
+        follow_config(self.api, self.config)
         # messages (error) in the shell's language, i18n/<language>.ts; published again after a switch
         self.texts = Texts(os.path.join(HERE, "..", "i18n"))
         self.texts.follow(self.api, self.publish_state)

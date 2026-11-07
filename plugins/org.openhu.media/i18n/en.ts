@@ -51,10 +51,6 @@
         <source></source>
         <translation>Close</translation>
     </message>
-    <message id="org.openhu.media.main.columns">
-        <source></source>
-        <translation>Tiles per row</translation>
-    </message>
     <message id="org.openhu.media.main.create">
         <source></source>
         <translation>Create</translation>
@@ -110,6 +106,10 @@
     <message id="org.openhu.media.main.mode_shuffle">
         <source></source>
         <translation>Shuffle</translation>
+    </message>
+    <message id="org.openhu.media.main.more_settings">
+        <source></source>
+        <translation>Tiles per row and more settings</translation>
     </message>
     <message id="org.openhu.media.main.n_albums">
         <source></source>
@@ -306,6 +306,22 @@
     <message id="org.openhu.media.notice.stick_removed">
         <source></source>
         <translation>USB stick removed, playback stopped</translation>
+    </message>
+    <message id="org.openhu.media.settings.columns">
+        <source></source>
+        <translation>Tiles per row</translation>
+    </message>
+    <message id="org.openhu.media.settings.columns.description">
+        <source></source>
+        <translation>Albums, artists, playlists and folders</translation>
+    </message>
+    <message id="org.openhu.media.settings.pauseForAndroidAuto">
+        <source></source>
+        <translation>Pause for other sources</translation>
+    </message>
+    <message id="org.openhu.media.settings.pauseForAndroidAuto.description">
+        <source></source>
+        <translation>Pauses when Android Auto or another source starts playing</translation>
     </message>
 </context>
 </TS>

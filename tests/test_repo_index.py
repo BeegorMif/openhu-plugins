@@ -115,6 +115,47 @@ class RepoIndexTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("dist/sources/tool-1.tar.gz missing", result.stderr)
 
+    def set_settings(self, settings):
+        path = os.path.join(self.repo, "plugins", "org.example.plain", "manifest.json")
+        with open(path) as file:
+            manifest = json.load(file)
+        manifest["settings"] = settings
+        write(path, json.dumps(manifest))
+
+    def test_settings_are_checked(self):
+        # the plugin settings of openhu#152: valid ones pass
+        self.set_settings([
+            {"type": "section", "key": "tuner"},
+            {"key": "rds", "type": "switch", "default": True},
+            {"key": "gain", "type": "choice", "default": "auto", "options": ["auto", 0, 49.6]},
+            {"key": "gain2", "type": "choice", "default": 49.6, "options": ["auto", "49.6"]},
+            {"key": "ppm", "type": "number", "default": 0, "min": -100, "max": 100},
+            {"key": "even", "type": "number", "default": 4, "min": 0, "max": 10, "step": 2, "applies": "restart"},
+            {"key": "name", "type": "text", "default": "", "maxLength": 20},
+        ])
+        result = self.run_tool()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for entry, problem in [
+            ({"key": "a.b", "type": "switch", "default": True}, "key missing"),
+            ({"key": "a", "type": "slider", "default": 1}, "unknown type"),
+            ({"key": "a", "type": "switch"}, "default missing"),
+            ({"key": "a", "type": "switch", "default": "on"}, "true or false"),
+            ({"key": "a", "type": "number", "default": 9, "min": 0, "max": 5}, "from min to max"),
+            ({"key": "a", "type": "number", "default": 3, "min": 0, "max": 5, "step": 2}, "in steps"),
+            ({"key": "a", "type": "number", "default": 1}, "min and max"),
+            ({"key": "a", "type": "choice", "default": "x", "options": ["x", "x"]}, "different texts"),
+            ({"key": "a", "type": "choice", "default": "y", "options": ["x"]}, "one of the options"),
+            ({"key": "a", "type": "text", "default": "abc", "maxLength": 2}, "maxLength"),
+            ({"key": "a", "type": "switch", "default": True, "applies": "later"}, "applies"),
+        ]:
+            self.set_settings([{"key": "ok", "type": "switch", "default": False}, entry])
+            result = self.run_tool()
+            self.assertNotEqual(result.returncode, 0, entry)
+            self.assertIn("settings[1]", result.stderr)
+            self.assertIn(problem, result.stderr)
+        self.set_settings([{"key": "a", "type": "switch", "default": True}, {"key": "a", "type": "text", "default": ""}])
+        self.assertIn("duplicate key", self.run_tool().stderr)
+
     def test_native_arches(self):
         result = self.run_tool("--native-arches")
         self.assertEqual(result.stdout.split("\n"), ["org.example.native amd64", "org.example.native arm64", ""])

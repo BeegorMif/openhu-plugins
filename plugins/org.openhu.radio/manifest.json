@@ -11,5 +11,19 @@
   "shared": ["openhu.py"],
   "androidAuto": {"services": ["radio"]},
   "packages": ["rtl-sdr", "pulseaudio-utils", "sox", "librtlsdr0", "libfaad2", "libfftw3-single3", "libsamplerate0",
-               "libliquid1", "libsndfile1"]
+               "libliquid1", "libsndfile1"],
+  "settings": [
+    {"type": "section", "key": "tuner", "title": "USB stick"},
+    {"key": "gain", "type": "choice", "default": "auto", "options": ["auto", "0", "10", "20", "30", "40", "49.6"],
+     "applies": "restart", "title": "Tuner gain (dB)", "description": "Lower it when strong stations distort"},
+    {"key": "ppm", "type": "number", "default": 0, "min": -100, "max": 100, "applies": "restart",
+     "title": "Frequency correction (ppm)", "description": "For sticks whose stations are slightly off"},
+    {"key": "biasTee", "type": "switch", "default": false, "applies": "restart", "title": "Antenna power (bias-T)",
+     "description": "Powers an active antenna through the stick (DAB+)"},
+    {"type": "section", "key": "playback", "title": "Playback"},
+    {"key": "rds", "type": "switch", "default": true, "applies": "restart", "title": "RDS",
+     "description": "Station names and radio text on FM"},
+    {"key": "pauseForAndroidAuto", "type": "switch", "default": true, "title": "Pause for other sources",
+     "description": "Stops when Android Auto or another source starts playing"}
+  ]
 }

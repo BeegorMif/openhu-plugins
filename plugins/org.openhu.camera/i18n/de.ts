@@ -47,6 +47,34 @@
         <source></source>
         <translation>Rückfahrkamera</translation>
     </message>
+    <message id="org.openhu.camera.settings.autoReverse">
+        <source></source>
+        <translation>Im Rückwärtsgang zeigen</translation>
+    </message>
+    <message id="org.openhu.camera.settings.autoReverse.description">
+        <source></source>
+        <translation>Braucht den Rückwärtsgang vom Fahrzeug-Plugin</translation>
+    </message>
+    <message id="org.openhu.camera.settings.display">
+        <source></source>
+        <translation>Anzeigen als</translation>
+    </message>
+    <message id="org.openhu.camera.settings.display.overlay">
+        <source></source>
+        <translation>Einblendung</translation>
+    </message>
+    <message id="org.openhu.camera.settings.display.page">
+        <source></source>
+        <translation>Seite</translation>
+    </message>
+    <message id="org.openhu.camera.settings.guides">
+        <source></source>
+        <translation>Hilfslinien</translation>
+    </message>
+    <message id="org.openhu.camera.settings.mirror">
+        <source></source>
+        <translation>Bild spiegeln</translation>
+    </message>
     <message id="org.openhu.camera.view.no_camera">
         <source></source>
         <translation>Keine Kamera gefunden</translation>

@@ -7,8 +7,10 @@
 
 Without plugin dirs: every plugin under plugins/. One .ts file per language, English too, holds the texts of the
 QML (qsTrId("<id>.<page>.<key>")), of the process (string literals "<id>.<area>.<key>" in bin/*.py, translated by
-openhu.Texts from the .ts at runtime) and the plugin's name and description in the dock and the store
-("<id>.name", "<id>.description"; the manifest holds the English ones). After a sync, write the texts with
+openhu.Texts from the .ts at runtime), the plugin's name and description in the dock and the store
+("<id>.name", "<id>.description"; the manifest holds the English ones) and its settings in Settings → Apps
+("<id>.settings.<key>", ".description" when the manifest has one, ".<option>" for choice options with letters; the
+manifest's "title"/"description" are the English ones). After a sync, write the texts with
 `linguist i18n/en.ts i18n/de.ts` or a text editor and run the tool again to compile them.
 
 --check fails when a .ts file lacks an ID of the code or has one the code no longer uses, when a text is
@@ -49,10 +51,46 @@ def sources(plugin_dir, folder, extensions):
                 yield os.path.join(root, name)
 
 
+def manifest_of(plugin_dir):
+    try:
+        with open(os.path.join(plugin_dir, "manifest.json"), encoding="utf-8") as file:
+            return json.load(file)
+    except (OSError, ValueError):
+        return {}
+
+
+def option_text(value):
+    """A choice option as OpenHU shows it: 49.6 -> "49.6"."""
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return str(int(value)) if float(value).is_integer() else repr(float(value))
+    return str(value)
+
+
+def setting_texts(plugin_dir):
+    """Texts of the manifest's settings (openhu#152) -> {id: English text of the manifest or None}: the title of every
+    entry, its description if it has one, and every choice option with a letter in it (numbers need none)."""
+    prefix = plugin_id(plugin_dir) + ".settings."
+    texts = {}
+    settings = manifest_of(plugin_dir).get("settings")
+    for entry in settings if isinstance(settings, list) else []:
+        if not isinstance(entry, dict) or not isinstance(entry.get("key"), str):
+            continue
+        key = prefix + entry["key"]
+        texts[key] = entry.get("title")
+        if "description" in entry:
+            texts[key + ".description"] = entry.get("description")
+        if entry.get("type") == "choice":
+            for option in entry.get("options") or []:
+                if re.search(r"[^\W\d_]", option_text(option)):
+                    texts[key + "." + option_text(option)] = None
+    return texts
+
+
 def code_ids(plugin_dir):
-    """IDs used by the plugin: QML qsTrId(), process literals, name and description -> {id: first place}."""
+    """IDs used by the plugin: QML qsTrId(), process literals, name, description and settings -> {id: first place}."""
     prefix = plugin_id(plugin_dir) + "."
     ids = {prefix + "name": "manifest.json", prefix + "description": "manifest.json"}
+    ids.update({text_id: "manifest.json (settings)" for text_id in setting_texts(plugin_dir)})
     problems = []
     for path in sources(plugin_dir, "qml", (".qml", ".js")):
         with open(path, encoding="utf-8") as file:
@@ -170,6 +208,10 @@ def check(plugin_dir, tool):
         text_id = plugin_id(plugin_dir) + "." + key
         if text_id in english and english[text_id][0] != manifest.get(key, ""):
             errors.append("manifest.json: %s differs from %s in i18n/en.ts" % (key, text_id))
+    # the settings' title and description too (OpenHU shows them while the plugin has no translation)
+    for text_id, text in setting_texts(plugin_dir).items():
+        if text is not None and text_id in english and english[text_id][0] != text:
+            errors.append("manifest.json: the setting text of %s differs from i18n/en.ts" % text_id)
     with tempfile.TemporaryDirectory() as tmp:
         for path in files:
             name = os.path.relpath(path, plugin_dir)

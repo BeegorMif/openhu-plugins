@@ -51,10 +51,6 @@
         <source></source>
         <translation>Schließen</translation>
     </message>
-    <message id="org.openhu.media.main.columns">
-        <source></source>
-        <translation>Kacheln pro Reihe</translation>
-    </message>
     <message id="org.openhu.media.main.create">
         <source></source>
         <translation>Anlegen</translation>
@@ -110,6 +106,10 @@
     <message id="org.openhu.media.main.mode_shuffle">
         <source></source>
         <translation>Shuffle</translation>
+    </message>
+    <message id="org.openhu.media.main.more_settings">
+        <source></source>
+        <translation>Kacheln pro Reihe und weitere Einstellungen</translation>
     </message>
     <message id="org.openhu.media.main.n_albums">
         <source></source>
@@ -306,6 +306,22 @@
     <message id="org.openhu.media.notice.stick_removed">
         <source></source>
         <translation>USB-Stick entfernt, Wiedergabe gestoppt</translation>
+    </message>
+    <message id="org.openhu.media.settings.columns">
+        <source></source>
+        <translation>Kacheln pro Reihe</translation>
+    </message>
+    <message id="org.openhu.media.settings.columns.description">
+        <source></source>
+        <translation>Alben, Interpreten, Playlists und Ordner</translation>
+    </message>
+    <message id="org.openhu.media.settings.pauseForAndroidAuto">
+        <source></source>
+        <translation>Für andere Quellen pausieren</translation>
+    </message>
+    <message id="org.openhu.media.settings.pauseForAndroidAuto.description">
+        <source></source>
+        <translation>Pausiert, wenn Android Auto oder eine andere Quelle zu spielen beginnt</translation>
     </message>
 </context>
 </TS>

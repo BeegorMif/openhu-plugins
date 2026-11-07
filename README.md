@@ -23,6 +23,7 @@ github BeegorMif/openhu-plugins main
 repo.json                    name/description of the repository
 plugins/<id>/manifest.json   one folder per plugin (format: openhu/docs/plugins.md)
 common/openhu.py             API client for Python plugins, copied into the archive via "shared"
+common/openhu.ts             the same for TypeScript plugins run with bun (copy it via "shared" as well)
 tools/openhu-repo-index      builds dist/*.tar.gz and index.json
 tools/openhu-translations    keeps plugins/<id>/i18n/*.ts up to date and compiles the .qm files
 index.json, dist/            generated – do not edit by hand
@@ -35,6 +36,16 @@ For a new release, raise the `version` in the manifest, then the store offers an
 Versions: all plugins start with the first real release at `1.0.0` (the 2.x versions before were development
 states). The store only offers higher versions as an update: on devices with a 2.x state, remove the plugins and
 install them again once.
+
+## Settings
+
+Settings a user may change are declared in the manifest's `settings` (switch, choice, number, text, section) and show
+up in OpenHU under Settings → Apps → Installed → Settings. The values live in OpenHU's config store for the plugin
+(`~/.openhu/plugin-data/<id>/config.json`, format and API: openhu/docs/plugins.md). In Python, `load_config()` and
+`save_config()` go through the store, `follow_config(api, config, on_change)` keeps the dict current when a value is
+changed in the settings; `api.config` and `api.on_config()` are the direct way (TypeScript: `api.config`,
+`api.onConfig()`). Titles and descriptions are translated like the other texts: `<id>.settings.<key>`,
+`<id>.settings.<key>.description` and `<id>.settings.<key>.<option>`; `tools/openhu-translations` adds them.
 
 ## Translations
 
@@ -85,6 +96,7 @@ python3 -m unittest discover -s plugins/org.openhu.swc/tests
 python3 -m unittest discover -s plugins/org.openhu.radio/tests
 python3 -m unittest discover -s plugins/org.openhu.logger/tests
 python3 -m unittest discover -s plugins/org.openhu.media/tests
+bun test tests/ts                              # openhu.ts
 ```
 
 ## Notice

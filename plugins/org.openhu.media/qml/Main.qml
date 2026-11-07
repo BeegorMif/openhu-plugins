@@ -642,25 +642,14 @@ Item {
         anchors.fill: parent
         title: qsTrId("org.openhu.media.main.settings")
 
-        Text {
-            text: qsTrId("org.openhu.media.main.columns")
-            color: Theme.textDim
-            font.pixelSize: Theme.fontSmall
-        }
-        Row {
-            spacing: Math.round(Theme.spacing * 0.5)
-
-            Repeater {
-                model: [3, 4, 5, 6]
-
-                PillButton {
-                    required property int modelData
-                    touch: page.touch
-                    width: page.touch * 1.3
-                    text: String(modelData)  // untranslated: a number
-                    checked: page.columns === modelData
-                    onClicked: page.command("set", { key: "columns", value: modelData })
-                }
+        // tiles per row and the other settings: Settings → Apps (the plugin's settings, openhu#152)
+        MenuEntry {
+            touch: page.touch
+            iconName: "gear"
+            text: qsTrId("org.openhu.media.main.more_settings")
+            onClicked: {
+                settings.close()
+                api.request("ui.navigate", { page: "settings/apps/org.openhu.media" })
             }
         }
         Text {

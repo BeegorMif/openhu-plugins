@@ -47,6 +47,34 @@
         <source></source>
         <translation>Reverse camera</translation>
     </message>
+    <message id="org.openhu.camera.settings.autoReverse">
+        <source></source>
+        <translation>Show in reverse gear</translation>
+    </message>
+    <message id="org.openhu.camera.settings.autoReverse.description">
+        <source></source>
+        <translation>Needs the reverse gear from the vehicle plugin</translation>
+    </message>
+    <message id="org.openhu.camera.settings.display">
+        <source></source>
+        <translation>Show as</translation>
+    </message>
+    <message id="org.openhu.camera.settings.display.overlay">
+        <source></source>
+        <translation>Overlay</translation>
+    </message>
+    <message id="org.openhu.camera.settings.display.page">
+        <source></source>
+        <translation>Page</translation>
+    </message>
+    <message id="org.openhu.camera.settings.guides">
+        <source></source>
+        <translation>Guide lines</translation>
+    </message>
+    <message id="org.openhu.camera.settings.mirror">
+        <source></source>
+        <translation>Mirror the picture</translation>
+    </message>
     <message id="org.openhu.camera.view.no_camera">
         <source></source>
         <translation>No camera found</translation>

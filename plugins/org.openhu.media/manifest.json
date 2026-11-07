@@ -9,5 +9,11 @@
   "process": {"exec": "bin/media.py", "restart": "on-failure"},
   "permissions": ["audio", "usb"],
   "shared": ["openhu.py"],
-  "packages": ["mpv", "python3-mutagen"]
+  "packages": ["mpv", "python3-mutagen"],
+  "settings": [
+    {"key": "columns", "type": "number", "default": 4, "min": 3, "max": 6, "title": "Tiles per row",
+     "description": "Albums, artists, playlists and folders"},
+    {"key": "pauseForAndroidAuto", "type": "switch", "default": true, "title": "Pause for other sources",
+     "description": "Pauses when Android Auto or another source starts playing"}
+  ]
 }
