@@ -1,0 +1,217 @@
+#!/usr/bin/env python3
+"""Simulated mpv for the tests (tests/test_player.py, tests/test_media.py): the JSON IPC of the real one
+(--input-ipc-server) with a playlist, pause, seek and a clock instead of sound.
+
+    FAKE_MPV_DURATION   seconds every file "plays" (default 2)
+    FAKE_MPV_LOG        file that gets every command as a JSON line
+Files that do not exist or end with ".broken" fail to load like a broken file in mpv (end-file reason "error").
+Commands: loadfile (replace, append), playlist-remove, stop, seek (absolute, relative), set_property/get_property
+(pause, time-pos, duration, path, playlist-pos, playlist-count, idle-active), observe_property, quit.
+"""
+
+import asyncio
+import json
+import os
+import sys
+import time
+
+DURATION = float(os.environ.get("FAKE_MPV_DURATION", "2"))
+LOG = os.environ.get("FAKE_MPV_LOG")
+TICK = 0.02
+
+
+class FakeMpv:
+    def __init__(self):
+        self.playlist = []
+        self.pos = -1
+        self.paused = False
+        self.elapsed = 0.0
+        self.observed = {}  # name -> id
+        self.clients = set()
+        self.server = None
+        self.done = asyncio.Event()
+
+    def broadcast(self, message):
+        data = (json.dumps(message) + "\n").encode()
+        for writer in list(self.clients):
+            try:
+                writer.write(data)
+            except (OSError, RuntimeError):
+                self.clients.discard(writer)
+
+    def changed(self, name):
+        if name in self.observed:
+            self.broadcast({"event": "property-change", "id": self.observed[name], "name": name,
+                            "data": self.property(name)})
+
+    def property(self, name):
+        playing = 0 <= self.pos < len(self.playlist)
+        if name == "pause":
+            return self.paused
+        if name == "idle-active":
+            return not playing
+        if name == "time-pos":
+            return round(self.elapsed, 3) if playing else None
+        if name == "duration":
+            return DURATION if playing else None
+        if name == "path":
+            return self.playlist[self.pos] if playing else None
+        if name == "playlist-pos":
+            return self.pos
+        if name == "playlist-count":
+            return len(self.playlist)
+        raise KeyError(name)
+
+    def start_entry(self, index):
+        """Starts playlist entry index; a broken file ends at once with an error and the next one starts."""
+        while 0 <= index < len(self.playlist):
+            self.pos = index
+            self.elapsed = 0.0
+            path = self.playlist[index]
+            self.broadcast({"event": "start-file", "playlist_entry_id": index + 1})
+            if os.path.isfile(path) and not path.endswith(".broken"):
+                self.broadcast({"event": "file-loaded"})
+                self.changed("idle-active")
+                return
+            self.broadcast({"event": "end-file", "reason": "error", "file_error": "loading failed",
+                            "playlist_entry_id": index + 1})
+            index += 1
+        self.idle()
+
+    def idle(self):
+        self.pos = -1
+        self.elapsed = 0.0
+        self.broadcast({"event": "idle"})
+        self.changed("idle-active")
+
+    def end_current(self, reason):
+        if 0 <= self.pos < len(self.playlist):
+            self.broadcast({"event": "end-file", "reason": reason, "playlist_entry_id": self.pos + 1})
+
+    async def tick(self):
+        last = time.monotonic()
+        while not self.done.is_set():
+            await asyncio.sleep(TICK)
+            now = time.monotonic()
+            if 0 <= self.pos < len(self.playlist) and not self.paused:
+                self.elapsed += now - last
+                if self.elapsed >= DURATION:
+                    self.end_current("eof")
+                    if self.pos + 1 < len(self.playlist):
+                        self.start_entry(self.pos + 1)
+                    else:
+                        self.playlist = []
+                        self.idle()
+            last = now
+
+    def run_command(self, args):
+        name = args[0]
+        if name == "loadfile":
+            path, flags = args[1], (args[2] if len(args) > 2 else "replace")
+            if flags == "append":
+                self.playlist.append(path)
+                return None
+            self.end_current("stop")
+            self.playlist = [path]
+            self.start_entry(0)
+            return None
+        if name == "playlist-remove":
+            index = int(args[1])
+            if not 0 <= index < len(self.playlist):
+                raise ValueError("invalid index")
+            if index == self.pos:
+                self.end_current("stop")
+                del self.playlist[index]
+                self.start_entry(index) if index < len(self.playlist) else self.idle()
+                return None
+            del self.playlist[index]
+            if index < self.pos:
+                self.pos -= 1
+            return None
+        if name == "stop":
+            self.end_current("stop")
+            self.playlist = []
+            self.idle()
+            return None
+        if name == "seek":
+            value = float(args[1])
+            mode = args[2] if len(args) > 2 else "relative"
+            self.elapsed = max(0.0, min(DURATION, value if mode.startswith("absolute") else self.elapsed + value))
+            return None
+        if name == "set_property":
+            if args[1] != "pause":
+                raise KeyError(args[1])
+            self.paused = bool(args[2])
+            self.changed("pause")
+            return None
+        if name == "get_property":
+            return self.property(args[1])
+        if name == "observe_property":
+            self.observed[args[2]] = args[1]
+            self.changed(args[2])
+            return None
+        if name == "quit":
+            self.done.set()
+            return None
+        raise KeyError(name)
+
+    async def client(self, reader, writer):
+        self.clients.add(writer)
+        try:
+            while not self.done.is_set():
+                line = await reader.readline()
+                if not line:
+                    break
+                try:
+                    request = json.loads(line)
+                except ValueError:
+                    continue
+                if LOG:
+                    with open(LOG, "a") as file:
+                        file.write(json.dumps(request["command"]) + "\n")
+                reply = {"request_id": request.get("request_id", 0), "error": "success"}
+                try:
+                    data = self.run_command(request["command"])
+                    if data is not None:
+                        reply["data"] = data
+                    elif request["command"][0] == "get_property":
+                        reply["error"] = "property unavailable"
+                except (KeyError, ValueError, IndexError):
+                    reply["error"] = "invalid parameter"
+                writer.write((json.dumps(reply) + "\n").encode())
+                await writer.drain()
+        except (OSError, ConnectionError):
+            pass
+        finally:
+            self.clients.discard(writer)
+
+    async def main(self, socket):
+        try:
+            os.unlink(socket)
+        except OSError:
+            pass
+        self.server = await asyncio.start_unix_server(self.client, socket)
+        ticker = asyncio.create_task(self.tick())
+        await self.done.wait()
+        ticker.cancel()
+        self.server.close()
+        try:
+            os.unlink(socket)
+        except OSError:
+            pass
+
+
+def main():
+    socket = next((arg.split("=", 1)[1] for arg in sys.argv[1:] if arg.startswith("--input-ipc-server=")), None)
+    if not socket:
+        print("fake mpv: --input-ipc-server=<socket> missing", file=sys.stderr)
+        return 2
+    try:
+        asyncio.run(FakeMpv().main(socket))
+    except KeyboardInterrupt:
+        pass
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
