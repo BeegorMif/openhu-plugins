@@ -81,10 +81,15 @@ OWN_ACTIONS = {"music.toggle": {"cmd": "toggle"}, "music.next": {"cmd": "next"},
                "music.previous": {"cmd": "previous"}}
 
 
-def action_command(action, music_is_source):
-    """music.command for an input action, None if the music player does not handle it."""
+def action_command(action, music_is_source, target=None):
+    """music.command for an input action, None if the music player does not handle it.
+
+    target: the action's "source" when it is meant for one source (the buttons of Android Auto's media card, OpenHU's
+    car local media service): the music player's own then, also while another source owns the media keys."""
     if action in OWN_ACTIONS:
         return dict(OWN_ACTIONS[action])
+    if target:
+        music_is_source = target == "music"
     if music_is_source and action in MEDIA_KEYS:
         return dict(MEDIA_KEYS[action])
     return None
@@ -894,7 +899,7 @@ class MusicPlugin:
     async def on_action(self, topic, data):
         if data.get("phase") == "release":
             return
-        command = action_command(data.get("action"), self.media_owner == "music")
+        command = action_command(data.get("action"), self.media_owner == "music", data.get("source"))
         if command:
             await self.on_command(topic, command)
 

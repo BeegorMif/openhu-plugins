@@ -125,6 +125,19 @@ class MediaPluginTest(unittest.IsolatedAsyncioTestCase):
         await self.plugin.on_action("input.action", {"action": "media.pause", "phase": "click"})
         self.assertEqual(self.state()["state"], "paused")
 
+    async def test_actions_for_a_source(self):
+        await self.play_album()
+        await self.plugin.on_media_status("media.status", {"source": "androidauto", "state": "playing"})
+        self.assertEqual(self.state()["state"], "paused")
+        # Android Auto's media card: play for the music player, although the phone's music had the keys
+        await self.plugin.on_action("input.action", {"action": "media.play", "phase": "click", "source": "music"})
+        self.assertEqual(self.state()["state"], "playing")
+        await self.plugin.on_action("input.action", {"action": "media.next", "phase": "click", "source": "music"})
+        self.assertEqual(self.state()["track"]["title"], "02 Two")
+        # meant for another source: not the music player's, also while it owns the keys
+        await self.plugin.on_action("input.action", {"action": "media.pause", "phase": "click", "source": "radio"})
+        self.assertEqual(self.state()["state"], "playing")
+
     async def test_another_local_source_pauses(self):
         await self.play_album()
         # its own status does not count

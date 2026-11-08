@@ -84,7 +84,12 @@ quieter, so that switching from Android Auto keeps the loudness (openhu#154); th
 is relative to it.
 
 - **Media source** `music`: `media.metadata` / `media.status` (home page, Bluetooth car audio). The media keys
-  (`media.play_pause`, `media.next`, ...) work while the music is the current media source.
+  (`media.play_pause`, `media.next`, ...) work while the music is the current media source; an `input.action` with
+  `"source": "music"` always.
+- **Android Auto:** the manifest declares the service `localMedia` (`"androidAuto": {"services": ["localMedia"]}`),
+  so OpenHU shows the song in the phone's media card (title, artist, cover, play/pause/previous/next, openhu#147).
+  Its buttons come back as `input.action` with `"source": "music"`. Android Auto has no song list for it: the songs
+  are chosen on the music page.
 - **Pause** when Android Auto or another local source starts playing (`pauseForAndroidAuto`).
 - **Stick pulled:** when the stick of the track that plays is pulled, the music stops.
 - **Actions** for steering wheel buttons: `music.toggle`, `music.next`, `music.previous`.
