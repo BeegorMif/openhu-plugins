@@ -78,6 +78,11 @@ The queue is saved per source (`queues.json`): a stick that comes back continues
 the next track are in mpv's playlist, so the plugin keeps the queue and mpv still plays gaplessly. A file that cannot
 be played is skipped (with a notice).
 
+**Loudness:** music files are mastered much louder than streams (measured: NCS tracks at −5 to −11 LUFS, Spotify
+through Android Auto at −13.5 LUFS). The manifest's `"audio": {"level": -8}` makes OpenHU play the music 8 dB
+quieter, so that switching from Android Auto keeps the loudness (openhu#154); the user's level in Settings → Audio
+is relative to it.
+
 - **Media source** `music`: `media.metadata` / `media.status` (home page, Bluetooth car audio). The media keys
   (`media.play_pause`, `media.next`, ...) work while the music is the current media source.
 - **Pause** when Android Auto or another local source starts playing (`pauseForAndroidAuto`).

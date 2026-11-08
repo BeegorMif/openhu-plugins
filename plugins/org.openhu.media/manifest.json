@@ -8,6 +8,7 @@
   "ui": {"page": "qml/Main.qml", "icon": "icon.svg", "dock": true},
   "process": {"exec": "bin/media.py", "restart": "on-failure"},
   "permissions": ["audio", "usb"],
+  "audio": {"level": -8},
   "shared": ["openhu.py", "qml"],
   "packages": ["mpv", "python3-mutagen"],
   "settings": [
