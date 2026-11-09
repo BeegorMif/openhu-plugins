@@ -5,71 +5,6 @@
   "api": 2,
   "plugins": [
     {
-      "id": "org.beegor.can",
-      "name": "CAN bus",
-      "version": "1.0.4",
-      "description": "Vehicle data (speed, gear, lights …) and steering wheel keys from the CAN bus via SocketCAN. Vehicle profiles describe the CAN IDs.",
-      "arch": [
-        "all"
-      ],
-      "api": 2,
-      "permissions": [
-        "can",
-        "input"
-      ],
-      "androidAuto": {
-        "sensors": [
-          "speed",
-          "fuel",
-          "odometer",
-          "engine",
-          "climate",
-          "drivingStatus",
-          "info"
-        ]
-      },
-      "archive": "dist/org.beegor.can-1.0.4.tar.gz",
-      "sha256": "77b53c0b51edb4dfb9d1db24c80d9522b535cea645372a007978a2e383a37281",
-      "size": 19648
-    },
-    {
-      "id": "org.beegor.cluster",
-      "name": "Instrument cluster",
-      "version": "1.0.2",
-      "description": "Live digital instrument cluster for speed, engine RPM, climate, fuel and vehicle status from the CAN bus.",
-      "arch": [
-        "all"
-      ],
-      "api": 2,
-      "permissions": [
-        "can",
-        "input"
-      ],
-      "requires": {
-        "org.beegor.can": "1.0.0"
-      },
-      "archive": "dist/org.beegor.cluster-1.0.2.tar.gz",
-      "sha256": "fc39eac74942481656825ae91e4bc2ce29609f7a934befdbee1d7bd4425a6cf3",
-      "size": 10636
-    },
-    {
-      "id": "org.beegor.display",
-      "name": "Display control",
-      "version": "1.0.6",
-      "description": "Set monitor brightness from CAN and power off the system after ignition-off delay.",
-      "arch": [
-        "all"
-      ],
-      "api": 2,
-      "permissions": [],
-      "packages": [
-        "ddcutil"
-      ],
-      "archive": "dist/org.beegor.display-1.0.6.tar.gz",
-      "sha256": "82182bf116cd2bc8967673839e0cfc50dce7ee72053824321e4f71d22b979274",
-      "size": 12459
-    },
-    {
       "id": "org.openhu.camera",
       "name": "Reverse camera",
       "version": "1.0.0",
@@ -85,8 +20,25 @@
         "org.openhu.vehicle"
       ],
       "archive": "dist/org.openhu.camera-1.0.0.tar.gz",
-      "sha256": "bc1c81d59bd42fda51e79b3740449dcca259c3901780f31cf2172daac955fbe6",
-      "size": 9319
+      "sha256": "9890b5179d5c8acc69d93122ffaa4a69aeb3459fdd760b956ab0250e1a0c8060",
+      "size": 12804
+    },
+    {
+      "id": "org.openhu.can",
+      "name": "CAN bus",
+      "version": "1.0.0",
+      "description": "Vehicle data (speed, gear, lights …) and steering wheel keys from the CAN bus via SocketCAN. Vehicle profiles describe the CAN IDs.",
+      "arch": [
+        "all"
+      ],
+      "api": 2,
+      "permissions": [
+        "can",
+        "input"
+      ],
+      "archive": "dist/org.openhu.can-1.0.0.tar.gz",
+      "sha256": "b5f6bef0e3e1d14d7b88911782ae5b4a4a1d3938aa5a11c150a6d41b492eee11",
+      "size": 17438
     },
     {
       "id": "org.openhu.logger",
@@ -104,8 +56,8 @@
         "org.openhu.vehicle"
       ],
       "archive": "dist/org.openhu.logger-1.0.0.tar.gz",
-      "sha256": "98f6dd1a2b1231062dbda4786d1295dd04363084ec88a99ab3955ecae4223236",
-      "size": 41081
+      "sha256": "f8daa04985083a794a6e521f4d7b467161c550810aa54449003654cc7f0655b5",
+      "size": 43984
     },
     {
       "id": "org.openhu.media",
@@ -124,9 +76,14 @@
         "mpv",
         "python3-mutagen"
       ],
+      "androidAuto": {
+        "services": [
+          "localMedia"
+        ]
+      },
       "archive": "dist/org.openhu.media-1.0.0.tar.gz",
-      "sha256": "cd50e7b28e284c68b4a7df79ca9adf563fc5bb742aa11ed9c1d2a59de637930c",
-      "size": 74330
+      "sha256": "b8b15ccc57b1638ff961ecd5f0a710b1e7c0a7ddfe7799bb5e8d8b3e54ff076f",
+      "size": 80858
     },
     {
       "id": "org.openhu.radio",
@@ -161,13 +118,13 @@
       "archives": {
         "amd64": {
           "archive": "dist/org.openhu.radio-1.0.0-amd64.tar.gz",
-          "sha256": "9172c99ac8ac3489f7f4e269004ce506bb12db9d0873f2c45977cb8e9fdd51a4",
-          "size": 527160
+          "sha256": "f4377e94f094999bfb91993237f5c10137f83f10b7baa4330d2acd3124759c60",
+          "size": 541939
         },
         "arm64": {
           "archive": "dist/org.openhu.radio-1.0.0-arm64.tar.gz",
-          "sha256": "8971646e740dc54a14e244214cb97ea11c82e81a39c095deef843e9341f8efbd",
-          "size": 489830
+          "sha256": "6e12d5a370c45f8c9cae1d589925966402fa2e7bd095dc928a516982e59a5ac5",
+          "size": 504398
         }
       }
     },
@@ -184,13 +141,13 @@
         "input"
       ],
       "archive": "dist/org.openhu.swc-1.0.0.tar.gz",
-      "sha256": "e793f22c0d901159013772d7b9b2bf7e8ffb0fa018ab2b135f3d9a51d5d93366",
-      "size": 9690
+      "sha256": "1ca7ec17497df5871f70fd90e800e087ef5f0df83481943c771098d304541b13",
+      "size": 12556
     },
     {
       "id": "org.openhu.vehicle",
       "name": "Vehicle data",
-      "version": "1.0.1",
+      "version": "1.0.0",
       "description": "Passes the vehicle data of the CAN plugin (speed, gear, parking brake, fuel …) to Android Auto and to the vehicle topics of OpenHU.",
       "arch": [
         "all"
@@ -215,11 +172,11 @@
         ]
       },
       "requires": {
-        "org.beegor.can": "1.0.0"
+        "org.openhu.can": "1.0.0"
       },
-      "archive": "dist/org.openhu.vehicle-1.0.1.tar.gz",
-      "sha256": "d5b7ab9f01237a77f98fad641e8b13ae4a91a58eb707610e4e15321579ca04a4",
-      "size": 7507
+      "archive": "dist/org.openhu.vehicle-1.0.0.tar.gz",
+      "sha256": "4156037fd2fd64ca77371a066a93ed36d6d0f736ffab079b72a85f6a09158d51",
+      "size": 10444
     }
   ]
 }
