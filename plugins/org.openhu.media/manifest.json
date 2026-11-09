@@ -9,6 +9,8 @@
   "process": {"exec": "bin/media.py", "restart": "on-failure"},
   "permissions": ["audio", "usb"],
   "androidAuto": {"services": ["localMedia"]},
+  "companion": {"package": "org.openhu.companion.music", "name": "Music",
+                "topics": ["music.*", "media.metadata"], "commands": ["music.command", "music.query"]},
   "audio": {"level": -8},
   "shared": ["openhu.py", "qml"],
   "packages": ["mpv", "python3-mutagen"],
