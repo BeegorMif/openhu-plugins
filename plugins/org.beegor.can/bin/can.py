@@ -64,6 +64,19 @@ def ensure_interface(interface, bitrate):
     import re
     import subprocess
 
+    # An already-UP interface needs no configuration.
+    # Let the SocketCAN bind below verify that it is actually usable.
+    flags_path = f"/sys/class/net/{interface}/flags"
+
+    try:
+        with open(flags_path) as file:
+            flags = int(file.read().strip(), 16)
+    except FileNotFoundError:
+        raise OSError(f"{interface} does not exist")
+
+    if flags & 0x1:  # IFF_UP
+        return
+
     def ip(*args):
         return subprocess.run(
             ["ip", *args],
@@ -80,10 +93,10 @@ def ensure_interface(interface, bitrate):
 
     details = result.stdout
 
-    # Check the interface flags, not just the word "UP" in the output.
+    # Check the interface flags.
     flags_match = re.search(r"<([^>]*)>", details)
-    flags = set(flags_match.group(1).split(",")) if flags_match else set()
-    is_up = "UP" in flags
+    link_flags = set(flags_match.group(1).split(",")) if flags_match else set()
+    is_up = "UP" in link_flags
 
     # Only treat this as CAN if the kernel identifies it as such.
     if not re.search(r"\blink/can\b", details):
@@ -298,6 +311,7 @@ class CanPlugin:
             error=self.error or self.profile_error,
             profile=self.config["profile"],
             profileName=self.profile.name if self.profile else "",
+            frameNames=self.profile.frame_names() if self.profile else {},
             profiles=list_profiles(),
             monitor=self.config["monitor"],
             framesPerSecond=self.frames_per_second,
