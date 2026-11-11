@@ -182,6 +182,27 @@ class Profile:
     def ids(self):
         return set(self.signals) | set(self.buttons) | set(self.control_reads)
 
+    def frame_names(self):
+        """{"165": "engine.rpm, engine.speed"} for the frame monitor. An optional "frame" key on an entry
+        wins, otherwise topic.field for signals, the action for buttons, the name for controls."""
+        labels = {}
+
+        def add(can_id, label):
+            names = labels.setdefault(can_id, [])
+            if label and label not in names:
+                names.append(label)
+
+        for can_id, signals in self.signals.items():
+            for signal in signals:
+                add(can_id, signal.get("frame") or "%s.%s" % (signal["topic"][4:], signal["field"]))
+        for can_id, buttons in self.buttons.items():
+            for button in buttons:
+                add(can_id, button.get("frame") or button.get("action"))
+        for can_id, controls in self.control_reads.items():
+            for control in controls:
+                add(can_id, control.get("frame") or control["name"])
+        return {str(can_id): ", ".join(names) for can_id, names in labels.items()}
+
     def controls_state(self):
         """can.controls: the controls with their current values (OpenHU's vehicle.controls format)"""
         properties = []

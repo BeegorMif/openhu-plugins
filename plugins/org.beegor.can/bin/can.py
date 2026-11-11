@@ -311,6 +311,7 @@ class CanPlugin:
             error=self.error or self.profile_error,
             profile=self.config["profile"],
             profileName=self.profile.name if self.profile else "",
+            frameNames=self.profile.frame_names() if self.profile else {},
             profiles=list_profiles(),
             monitor=self.config["monitor"],
             framesPerSecond=self.frames_per_second,
