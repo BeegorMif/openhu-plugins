@@ -24,7 +24,7 @@ Item {
             if (ids.indexOf(id) === -1)
                 ids.push(id)
         }
-        return ids.sort()
+        return ids.sort(function(a, b) { return Number(a) - Number(b) })
     }
 
     property var filteredFrames: {
