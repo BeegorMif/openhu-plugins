@@ -7,7 +7,7 @@
     {
       "id": "org.beegor.can",
       "name": "CAN bus",
-      "version": "1.0.3",
+      "version": "1.0.5",
       "description": "Vehicle data (speed, gear, lights …) and steering wheel keys from the CAN bus via SocketCAN. Vehicle profiles describe the CAN IDs.",
       "arch": [
         "all"
@@ -28,9 +28,9 @@
           "info"
         ]
       },
-      "archive": "dist/org.beegor.can-1.0.3.tar.gz",
-      "sha256": "abff505865bc86c1039312eade9a96ca849c0fa05878de4804f2872616af3551",
-      "size": 17610
+      "archive": "dist/org.beegor.can-1.0.5.tar.gz",
+      "sha256": "b1451d1a275f0672a11116ae234d826a8da2aae2ab0002e65513348c393e6618",
+      "size": 19030
     },
     {
       "id": "org.beegor.cluster",
