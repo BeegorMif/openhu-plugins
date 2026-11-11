@@ -60,6 +60,12 @@ Item {
         api.emitEvent("can.command", { cmd: cmd, value: value })
     }
 
+    // Name(s) of the signals the profile defines for a frame ID, or "" if unknown.
+    function frameName(id) {
+        var names = canState.data.frameNames || {}
+        return names[String(Number(id))] || ""
+    }
+
     function updateVehicle(topic, data) {
         var copy = Object.assign({}, vehicle)
         copy[topic] = data
@@ -265,11 +271,16 @@ Item {
                                 ListView {
                                     Layout.fillWidth: true
                                     Layout.fillHeight: true
+                                    // ListView has no implicitHeight, so without this the
+                                    // popup's height calculation ignores the list entirely.
+                                    Layout.preferredHeight: Math.min(contentHeight, 220)
                                     clip: true
                                     model: page.availableFrameIds
                                     delegate: CheckBox {
                                         width: ListView.view.width
-                                        text: "0x" + Number(modelData).toString(16).toUpperCase()
+                                        text: "0x" + Number(modelData).toString(16).toUpperCase() +
+                                              (page.frameName(modelData) !== ""
+                                               ? "  " + page.frameName(modelData) : "")
                                         checked: page.selectedFrameIds.length === 0 ||
                                                  page.selectedFrameIds.indexOf(String(modelData)) !== -1
                                         onToggled: page.toggleFrameFilter(
